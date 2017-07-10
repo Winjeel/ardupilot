@@ -96,6 +96,8 @@
 #include <AP_ICEngine/AP_ICEngine.h>
 #include <AP_Landing/AP_Landing.h>
 
+#include <AP_Sightline/AP_Sightline.h>
+
 #include "GCS_Mavlink.h"
 #include "GCS_Plane.h"
 #include "quadplane.h"
@@ -793,6 +795,8 @@ private:
     // support for transmitter tuning
     AP_Tuning_Plane tuning;
 
+    Sightline sightline {serial_manager};
+
     static const struct LogStructure log_structure[];
     
 #if CONFIG_HAL_BOARD == HAL_BOARD_PX4
@@ -1105,6 +1109,9 @@ private:
     // support for AP_Avoidance custom flight mode, AVOID_ADSB
     bool avoid_adsb_init(bool ignore_checks);
     void avoid_adsb_run();
+
+    void init_sightline(void);
+    void read_sightline(void);
 
 public:
     void mavlink_delay_cb();

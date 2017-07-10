@@ -381,3 +381,17 @@ void Plane::update_sensor_status_flags(void)
     frsky_telemetry.update_sensor_status_flags(~control_sensors_health & control_sensors_enabled & control_sensors_present);
 #endif
 }
+
+void Plane::init_sightline(void)
+{
+    sightline.init();
+}
+
+/*
+  read the rangefinder and update height estimate
+ */
+void Plane::read_sightline(void)
+{
+    sightline.update();
+}
+
