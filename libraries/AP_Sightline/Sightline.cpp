@@ -19,7 +19,7 @@
 extern const AP_HAL::HAL &hal;
 
 // table of user settable parameters
-const AP_Param::GroupInfo RangeFinder::var_info[] = {
+const AP_Param::GroupInfo Sightline::var_info[] = {
 
     // @Param: _FREQUENCY
     // @DisplayName: Sightline frequency
@@ -27,7 +27,7 @@ const AP_Param::GroupInfo RangeFinder::var_info[] = {
     // @Units: Hz
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("_FREQUENCY", 0, RangeFinder, _scaling[0], 1.0f),
+    AP_GROUPINFO("_FREQUENCY", 0, Sightline, _frequency[0], 1.0f),
 
     AP_GROUPEND
 };
@@ -40,9 +40,7 @@ Sightline::Sightline(AP_SerialManager &_serial_manager) :
 }
 
 /*
-  initialise the RangeFinder class. We do detection of attached range
-  finders here. For now we won't allow for hot-plugging of
-  rangefinders.
+  initialise the Sightline class.
  */
 void Sightline::init(void)
 {
@@ -55,7 +53,7 @@ void Sightline::init(void)
 }
 
 /*
-  update RangeFinder state for all instances. This should be called at
+  update Sightline state for all instances. This should be called at
   around 10Hz by main loop
  */
 void Sightline::update(void)
