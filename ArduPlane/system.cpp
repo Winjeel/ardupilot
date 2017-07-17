@@ -165,6 +165,9 @@ void Plane::init_ardupilot()
     // initialise rangefinder
     init_rangefinder();
 
+    // initialise SightLine boards
+    init_sightline();
+
     // initialise battery monitoring
     battery.init();
 
