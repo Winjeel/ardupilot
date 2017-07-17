@@ -20,6 +20,8 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 
+#include "SL_MsgBuffer.h"
+
 // Maximum number of range finder instances available on this platform
 #define SIGHTLINE_MAX_INSTANCES 1
 
@@ -51,6 +53,18 @@ public:
     void handle_msg(mavlink_message_t *msg);
 
 private:
+
     uint8_t num_instances;
+
     AP_SerialManager &serial_manager;
+    AP_HAL::UARTDriver *uart = nullptr;
+
+    SL_MsgBuffer msgBuffer;
+
+    uint32_t init_time;
+    uint32_t lastDoSnapshotTime;
+    uint32_t lastSetMetadataTime;
+    uint32_t lastGetVersionTime;
+
+    SL_DiscoverInfo discoverInfo;
 };
