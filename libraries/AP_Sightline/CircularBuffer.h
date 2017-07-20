@@ -10,7 +10,7 @@
 #include <iostream>
 #endif // INCLUDE_PRINT
 
-
+// TODO: Currently kBufferSz needs to be a power of two...
 template <size_t kBufferSz, int kClearChar = '\0'>
 class CircularBuffer {
     public:

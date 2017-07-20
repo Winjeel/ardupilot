@@ -5,8 +5,9 @@
 #include <cstddef> // for offsetof
 
 
-// TODO: check the max message size (260 = 255 data + 4 header + 1 crc)
-class SL_MsgBuffer : private CircularBuffer<260, 0> {
+// TODO: check the max message size (256 = 251 data + 4 header + 1 crc)
+//       currently needs to be power of two
+class SL_MsgBuffer : private CircularBuffer<256, 0> {
     public:
 
         SL_MsgBuffer(void);
