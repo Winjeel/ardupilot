@@ -109,7 +109,10 @@ size_t SL_MsgBuffer::getMsgDataLength(void) {
 }
 
 bool SL_MsgBuffer::isValidMsg(void) {
-    return (_hasMsg() && (_getCrc() == _calculateCrc()));
+    uint8_t crc = _getCrc();
+    uint8_t calc = _calculateCrc();
+
+    return (_hasMsg() && (crc == calc));
 }
 
 
@@ -147,8 +150,8 @@ uint8_t SL_MsgBuffer::_calculateCrc(void) {
     size_t msgLen = getMsgDataLength();
     if (msgLen != 0) {
         // length includes CRC bytes, CRC calc doesn't
-        for (size_t idx = kOffsetType; idx < (msgLen + kOffsetType - 1); idx++) {
-            crc = crc8_Table[crc ^ get(kOffsetType + idx)];
+        for (size_t idx = kOffsetType; idx < (msgLen + kOffsetType + 1); idx++) {
+            crc = crc8_Table[crc ^ get(idx)];
         }
     }
 
