@@ -30,14 +30,17 @@ class SL_MsgBuffer : private CircularBuffer<256, 0> {
 
         SL_MsgId assess(void);
 
-        size_t copyMsg(void * const out, const size_t num);
-        size_t copyData(void * const out, const size_t num);
+        size_t copyMsg(void * const out, const size_t len);
+        size_t copyData(void * const out, const size_t len);
         size_t consumeMsg(void);
 
         bool isValidMsg(void);
         SL_MsgId getMsgType(void);
         size_t getMsgDataLength(void);
         size_t getMsgLength(void);
+
+
+        uint8_t calculateCrc(const SL_MsgId id, uint8_t const * const data, size_t dataLen);
 
     private:
         typedef enum {

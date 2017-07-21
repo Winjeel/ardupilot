@@ -19,7 +19,7 @@ extern "C" {
 
 //Discover
 
-static const char *SL_DiscoverRequest  = "SLDISCOVER";
+//static const char *SL_DiscoverRequest  = "SLDISCOVER";
 
 #define SL_MAGIC_NUMBER (0x51acd00d)
 
@@ -73,12 +73,12 @@ typedef struct {
 
 typedef enum {
     // TODO: Use Sightline version of this...
-    SL_Msg_None = 0x00,
-    SL_Msg_GetVersionNumber = 0x00,
-    SL_Msg_SetMetadataValues = 0x13,
-    SL_Msg_GetParameters = 0x28,
-    SL_Msg_VersionNumber = 0x40,
-    SL_Msg_DoSnapshot = 0x60,
+    SL_MsgId_None = 0x00,
+    SL_MsgId_GetVersionNumber = 0x00,
+    SL_MsgId_SetMetadataValues = 0x13,
+    SL_MsgId_GetParameters = 0x28,
+    SL_MsgId_VersionNumber = 0x40,
+    SL_MsgId_DoSnapshot = 0x60,
 } PACKED SL_MsgId;
 static_assert(sizeof(SL_MsgId) == 1, "");
 
@@ -86,7 +86,7 @@ typedef struct {
     uint8_t magic1;
     uint8_t magic2;
     uint8_t length;
-    SL_MsgId type;
+    SL_MsgId id;
 } PACKED SL_MsgHeader;
 static_assert(sizeof(SL_MsgHeader) == 4, "");
 
@@ -98,7 +98,7 @@ typedef struct {
 
 typedef struct {
     uint16_t updateMask;
-    uint64_t utcTime;
+    uint64_t utcTime_us;
 
     uint16_t platformHeading;
     int16_t platformPitch;
