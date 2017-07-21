@@ -31,48 +31,46 @@ const AP_Param::GroupInfo Sightline::var_info[] = {
     // @Units: Hz
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("_FREQUENCY", 0, Sightline, _frequency[0], 5.0f),
+    AP_GROUPINFO("_FREQUENCY", 0, Sightline, _frequency, 5.0f),
 
     AP_GROUPEND
 };
 
 
-#define _DEBUG(s) if (HAL_OS_POSIX_IO) { ::printf(s); }
-
-
 Sightline::Sightline(AP_SerialManager &_serial_manager) :
-    num_instances(0),
-    serial_manager(_serial_manager)
+    serial_manager(_serial_manager),
+
+    init_time(AP_HAL::millis()),
+    nextDoSnapshotTime(-1),
+    nextSetMetadataTime(-1),
+    nextGetVersionTime(-1)
 {
     AP_Param::setup_object_defaults(this, var_info);
-
-    // TODO: This is the correct way to do it, but it may require a rebuild of
-    //       the ground station app. Might need to hardcode the serial port...
-    uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_Sightline, 0);
-    if (uart != nullptr) {
-        uart->begin(serial_manager.find_baudrate(AP_SerialManager::SerialProtocol_Sightline, 0));
-    } else {
-        _DEBUG("sightline: no uart!\n");
-    }
 }
 
 /*
   initialise the Sightline class.
  */
 void Sightline::init(void) {
-    if (num_instances != 0) {
-        // init called a 2nd time?
-        _DEBUG("sightline: failed init\n");
-        return;
+
+    //hal.console->printf("sightline: init\n");
+
+    // TODO: This is the correct way to do it, but it may require a rebuild of
+    //       the ground station app. Might need to hardcode the serial port...
+    if (uart == nullptr) {
+        uart = serial_manager.find_serial(AP_SerialManager::SerialProtocol_Sightline, 0);
+
+        if (uart != nullptr) {
+            //hal.console->printf("sightline: init found uart\n");
+            uart->begin(serial_manager.find_baudrate(AP_SerialManager::SerialProtocol_Sightline, 0));
+        } else {
+            //hal.console->printf("sightline: init no uart\n");
+        }
     }
 
-    num_instances = 1;
-    init_time = AP_HAL::millis();
-    lastDoSnapshotTime = init_time;
-    lastSetMetadataTime = init_time;
-    lastGetVersionTime = init_time;
-
-    _DEBUG("sightline: init\n");
+    nextDoSnapshotTime = init_time;
+    nextSetMetadataTime = init_time;
+    nextGetVersionTime = init_time;
 }
 
 
@@ -81,8 +79,11 @@ void Sightline::init(void) {
   around 10Hz by main loop
  */
 void Sightline::update(void) {
+
+    //hal.console->printf("sightline: update\n");
+
     if (uart == nullptr) {
-        _DEBUG("sightline: update no uart\n");
+        //hal.console->printf("sightline: update err no uart\n");
         return;
     }
 
@@ -100,21 +101,21 @@ void Sightline::update(void) {
     }
 
     SL_MsgId msgType = msgBuffer.assess();
-    while (msgType != SL_Msg_None) {
+    while (msgType != SL_MsgId_None) {
         switch (msgType) {
-        case SL_Msg_VersionNumber: {
+        case SL_MsgId_VersionNumber: {
             SL_Cmd_VersionNumber versionMsg;
 
-            _DEBUG("sightline: got SL_Cmd_VersionNumber:\n");
+            //hal.console->printf("sightline: got SL_Cmd_VersionNumber:\n");
             msgBuffer.copyData(&versionMsg, sizeof(versionMsg)); // TODO: check length is correct
-            if (HAL_OS_POSIX_IO) { ::printf("           talking to hwType=%d:\n", versionMsg.hwType); }
+            //hal.console->printf("           talking to hwType=%d:\n", versionMsg.hwType);
 
             break;
         }
 
         // TODO: Handle other received messages
         default:
-            if (HAL_OS_POSIX_IO) { ::printf("sightline: got message 0x%02x\n", msgType); }
+            //hal.console->printf("sightline: got message 0x%02x\n", msgType);
             break;
         }
 
@@ -123,26 +124,56 @@ void Sightline::update(void) {
 
 
     // send periodic messages
-    const uint32_t kDoSnapshotPeriod = (uint32_t)(_frequency[0] * 1000); // Hz to millis
+    const uint32_t kDoSnapshotPeriod = static_cast<uint32_t>(_frequency * 1000); // Hz to millis
     const uint32_t kSetMetadataPeriod = 5000; // millis
     const uint32_t kGetVersionPeriod = 5000; // millis
 
     uint32_t timeNow = AP_HAL::millis();
+    SL_MsgHeader header = { SL_MAGIC_1, SL_MAGIC_2, 0, };
 
-    if (timeNow > (lastGetVersionTime + kGetVersionPeriod)) {
-        uint8_t msg[6] = { SL_MAGIC_1, SL_MAGIC_2, 3, SL_Msg_GetParameters, SL_Msg_GetVersionNumber, 0x73, }; // TODO: use proper struct
+    if (timeNow > nextGetVersionTime) {
+        uint8_t msg[6] = { SL_MAGIC_1, SL_MAGIC_2, 3, SL_MsgId_GetParameters, SL_MsgId_GetVersionNumber, 0x73, }; // TODO: use proper struct
         uart->write((const uint8_t *)&msg, sizeof(msg));
-        lastGetVersionTime = timeNow;
+        nextGetVersionTime = timeNow + kGetVersionPeriod;
     }
-    if (timeNow > (lastDoSnapshotTime + kDoSnapshotPeriod)) {
-        SL_Cmd_SetMetadataValues msg = {0}; // TODO: Populate...
+    if (timeNow > nextSetMetadataTime) {
+        // TODO: Populate fully...
+        SL_Cmd_SetMetadataValues msg = {
+                .updateMask = 0x0000,
+                .utcTime_us = (uint64_t)timeNow * 1000, // millis to micros
+        };
+        header.length = sizeof(SL_Cmd_SetMetadataValues) + 2;
+        header.id = SL_MsgId_SetMetadataValues;
+
+        const uint8_t crc = msgBuffer.calculateCrc(
+                SL_MsgId_SetMetadataValues, (uint8_t const * const)&msg, sizeof(msg));
+
+        uart->write((const uint8_t *)&header, sizeof(header));
         uart->write((const uint8_t *)&msg, sizeof(msg));
-        lastDoSnapshotTime = timeNow;
+        uart->write(&crc, sizeof(crc));
+
+        nextSetMetadataTime = timeNow + kSetMetadataPeriod;
     }
-    if (timeNow > (lastSetMetadataTime + kSetMetadataPeriod)) {
-        SL_Cmd_DoSnapshot msg = {0}; // TODO: Populate...
+    if (timeNow > nextDoSnapshotTime) {
+        // TODO: Populate properly...
+        SL_Cmd_DoSnapshot msg = {
+                .frameStep = 1,
+                .numSnapshots = 1,
+                .filenameLen = 5, // max 64
+                .baseFilename = { 'c', 'o', 'r', 'v', 'o' },
+                .maskSnapAllCameras = 0xFF,
+        };
+        header.length = sizeof(SL_Cmd_DoSnapshot) + 2;
+        header.id = SL_MsgId_DoSnapshot;
+
+        const uint8_t crc = msgBuffer.calculateCrc(
+                SL_MsgId_DoSnapshot, (uint8_t const * const)&msg, sizeof(msg));
+
+        uart->write((const uint8_t *)&header, sizeof(header));
         uart->write((const uint8_t *)&msg, sizeof(msg));
-        lastSetMetadataTime = timeNow;
+        uart->write(&crc, sizeof(crc));
+
+        nextDoSnapshotTime = timeNow + kDoSnapshotPeriod;
     }
 }
 

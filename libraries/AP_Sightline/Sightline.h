@@ -21,10 +21,6 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 
 #include "SL_MsgBuffer.h"
-
-// Maximum number of range finder instances available on this platform
-#define SIGHTLINE_MAX_INSTANCES 1
-
  
 class Sightline
 {
@@ -33,14 +29,9 @@ public:
     Sightline(AP_SerialManager &_serial_manager);
 
     // parameters for each instance
-    AP_Float _frequency[SIGHTLINE_MAX_INSTANCES];
+    AP_Float _frequency;
 
     static const struct AP_Param::GroupInfo var_info[];
-    
-    // Return the number of range finder instances
-    uint8_t num_sensors(void) const {
-        return num_instances;
-    }
 
     // detect and initialise any available SightLine boards
     void init(void);
@@ -53,18 +44,15 @@ public:
     void handle_msg(mavlink_message_t *msg);
 
 private:
-
-    uint8_t num_instances;
-
     AP_SerialManager &serial_manager;
     AP_HAL::UARTDriver *uart = nullptr;
 
     SL_MsgBuffer msgBuffer;
 
-    uint32_t init_time;
-    uint32_t lastDoSnapshotTime;
-    uint32_t lastSetMetadataTime;
-    uint32_t lastGetVersionTime;
+    uint32_t init_time = 0;
+    uint32_t nextDoSnapshotTime = 0;
+    uint32_t nextSetMetadataTime = 0;
+    uint32_t nextGetVersionTime = 0;
 
-    SL_DiscoverInfo discoverInfo;
+    //SL_DiscoverInfo discoverInfo;
 };
