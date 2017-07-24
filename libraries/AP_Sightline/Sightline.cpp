@@ -15,6 +15,7 @@
 
 #include "Sightline.h"
 #include <AP_BoardConfig/AP_BoardConfig.h>
+#include <GCS_Mavlink/GCS.h>
 
 #include "sightline_protocol.h"
 
@@ -31,7 +32,7 @@ const AP_Param::GroupInfo Sightline::var_info[] = {
     // @Units: Hz
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("_FREQUENCY", 0, Sightline, _frequency, 5.0f),
+    AP_GROUPINFO("FREQUENCY", 0, Sightline, frequency, 5.0f),
 
     AP_GROUPEND
 };
@@ -39,6 +40,7 @@ const AP_Param::GroupInfo Sightline::var_info[] = {
 
 Sightline::Sightline(AP_SerialManager &_serial_manager) :
     serial_manager(_serial_manager),
+    uart(nullptr),
 
     init_time(AP_HAL::millis()),
     nextDoSnapshotTime(-1),
@@ -46,6 +48,10 @@ Sightline::Sightline(AP_SerialManager &_serial_manager) :
     nextGetVersionTime(-1)
 {
     AP_Param::setup_object_defaults(this, var_info);
+
+    if (SIGHTLINE_DEBUG) {
+        tick = 0;
+    }
 }
 
 /*
@@ -73,17 +79,24 @@ void Sightline::init(void) {
     nextGetVersionTime = init_time;
 }
 
-
 /*
   update Sightline state for all instances. This should be called at
   around 10Hz by main loop
  */
 void Sightline::update(void) {
 
-    //hal.console->printf("sightline: update\n");
+    uint32_t timeNow = AP_HAL::millis();
+
+    if (SIGHTLINE_DEBUG) {
+        tick = ((tick + 1) % 10);
+        if (tick != 0) {
+            return;
+        }
+        gcs().send_text(MAV_SEVERITY_DEBUG, "[%lums] SightLine update", timeNow);
+    }
 
     if (uart == nullptr) {
-        //hal.console->printf("sightline: update err no uart\n");
+        gcs().send_text(MAV_SEVERITY_WARNING, "    SL: err no uart\n");
         return;
     }
 
@@ -96,6 +109,10 @@ void Sightline::update(void) {
         numBytes = bufferFree;
     }
 
+    if (SIGHTLINE_DEBUG && numBytes) {
+        gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: got %lu bytes", numBytes);
+    }
+
     while (numBytes-- > 0) {
         msgBuffer.push(uart->read());
     }
@@ -106,16 +123,17 @@ void Sightline::update(void) {
         case SL_MsgId_VersionNumber: {
             SL_Cmd_VersionNumber versionMsg;
 
-            //hal.console->printf("sightline: got SL_Cmd_VersionNumber:\n");
+            gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: got msg SL_Cmd_VersionNumber\n");
             msgBuffer.copyData(&versionMsg, sizeof(versionMsg)); // TODO: check length is correct
             //hal.console->printf("           talking to hwType=%d:\n", versionMsg.hwType);
+            gcs().send_text(MAV_SEVERITY_DEBUG, "    SL:     talking to hwType=%d:\n", versionMsg.hwType);
 
             break;
         }
 
         // TODO: Handle other received messages
         default:
-            //hal.console->printf("sightline: got message 0x%02x\n", msgType);
+            gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: got msg 0x%02x", msgType);
             break;
         }
 
@@ -124,17 +142,20 @@ void Sightline::update(void) {
 
 
     // send periodic messages
-    const uint32_t kDoSnapshotPeriod = static_cast<uint32_t>(_frequency * 1000); // Hz to millis
+    const uint32_t kDoSnapshotPeriod = static_cast<uint32_t>(frequency.get() * 1000); // Hz to millis
     const uint32_t kSetMetadataPeriod = 5000; // millis
     const uint32_t kGetVersionPeriod = 5000; // millis
 
-    uint32_t timeNow = AP_HAL::millis();
-    SL_MsgHeader header = { SL_MAGIC_1, SL_MAGIC_2, 0, };
+    SL_MsgHeader header = {
+            .magic1 = SL_MAGIC_1,
+            .magic2 = SL_MAGIC_2,
+    };
 
     if (timeNow > nextGetVersionTime) {
         uint8_t msg[6] = { SL_MAGIC_1, SL_MAGIC_2, 3, SL_MsgId_GetParameters, SL_MsgId_GetVersionNumber, 0x73, }; // TODO: use proper struct
         uart->write((const uint8_t *)&msg, sizeof(msg));
         nextGetVersionTime = timeNow + kGetVersionPeriod;
+        gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: sent msg 0x%02x", SL_MsgId_GetParameters);
     }
     if (timeNow > nextSetMetadataTime) {
         // TODO: Populate fully...
@@ -153,6 +174,7 @@ void Sightline::update(void) {
         uart->write(&crc, sizeof(crc));
 
         nextSetMetadataTime = timeNow + kSetMetadataPeriod;
+        gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: sent msg 0x%02x", header.id);
     }
     if (timeNow > nextDoSnapshotTime) {
         // TODO: Populate properly...
@@ -174,6 +196,7 @@ void Sightline::update(void) {
         uart->write(&crc, sizeof(crc));
 
         nextDoSnapshotTime = timeNow + kDoSnapshotPeriod;
+        gcs().send_text(MAV_SEVERITY_DEBUG, "    SL: sent msg 0x%02x", header.id);
     }
 }
 

@@ -21,6 +21,8 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 
 #include "SL_MsgBuffer.h"
+
+#define SIGHTLINE_DEBUG (true)
  
 class Sightline
 {
@@ -28,9 +30,7 @@ public:
 
     Sightline(AP_SerialManager &_serial_manager);
 
-    // parameters for each instance
-    AP_Float _frequency;
-
+    AP_Float frequency;
     static const struct AP_Param::GroupInfo var_info[];
 
     // detect and initialise any available SightLine boards
@@ -54,5 +54,7 @@ private:
     uint32_t nextSetMetadataTime = 0;
     uint32_t nextGetVersionTime = 0;
 
-    //SL_DiscoverInfo discoverInfo;
+#if (SIGHTLINE_DEBUG)
+    uint8_t tick = 0;
+#endif // SIGHTLINE_DEBUG
 };
