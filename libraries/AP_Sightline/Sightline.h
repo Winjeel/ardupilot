@@ -30,6 +30,14 @@ public:
 
     Sightline(AP_SerialManager &_serial_manager);
 
+    // FIXME:
+    // In order to expose this, re-used an existing (unused) Parameter enum:
+    //     k_param_camera_mount2 = 162
+    // See FIXMEs in Parameters.cpp and Parameters.h
+    //
+    // More info: http://ardupilot.org/dev/docs/code-overview-adding-a-new-parameter.html
+    //
+    // TODO: Investigate how to add to Parameter Group 2.
     AP_Float frequency;
     static const struct AP_Param::GroupInfo var_info[];
 

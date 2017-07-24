@@ -1076,6 +1076,11 @@ const AP_Param::Info Plane::var_info[] = {
     GOBJECT(camera_mount,           "MNT",  AP_Mount),
 #endif
 
+    // FIXME: Potentially breaking change -- reusing an existing (unused) param enum
+    // @Group: SL_
+    // @Path: ../libraries/AP_Sightline/Sightline.cpp
+    GOBJECT(sightline,           "SL_",  Sightline),
+
     // @Group: LOG
     // @Path: ../libraries/DataFlash/DataFlash.cpp
     GOBJECT(DataFlash,           "LOG",  DataFlash_Class),
