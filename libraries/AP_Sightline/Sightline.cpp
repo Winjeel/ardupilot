@@ -21,6 +21,8 @@
 
 #include <cstring>
 
+// test JIRA/Bitbucket integration...
+
 extern const AP_HAL::HAL &hal;
 
 // table of user settable parameters
