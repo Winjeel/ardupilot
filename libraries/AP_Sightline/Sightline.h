@@ -57,10 +57,12 @@ private:
 
     SL_MsgBuffer msgBuffer;
 
-    uint32_t init_time = 0;
+    uint32_t driver_init_time = 0;
     uint32_t nextDoSnapshotTime = 0;
     uint32_t nextSetMetadataTime = 0;
     uint32_t nextGetVersionTime = 0;
+
+    bool isConnected = false;
 
 #if (SIGHTLINE_DEBUG)
     uint8_t tick = 0;

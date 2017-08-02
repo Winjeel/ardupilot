@@ -245,6 +245,22 @@ AP_HAL::UARTDriver *AP_SerialManager::find_serial(enum SerialProtocol protocol, 
     return nullptr;
 }
 
+
+// TODO: document...
+int8_t AP_SerialManager::get_index(AP_HAL::UARTDriver * uart) {
+    if (uart == nullptr) {
+        return -1;
+    }
+
+    for(int8_t i=0; i<SERIALMANAGER_NUM_PORTS; i++) {
+        if (state[i].uart == uart) {
+            return i;
+        }
+    }
+
+    return -1;
+}
+
 // find_baudrate - searches available serial ports for the first instance that allows the given protocol
 //  instance should be zero if searching for the first instance, 1 for the second, etc
 //  returns baudrate on success, 0 if a serial port cannot be found
