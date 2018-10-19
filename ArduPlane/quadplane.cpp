@@ -2345,6 +2345,18 @@ void QuadPlane::takeoff_controller(void)
 
     pos_control->set_alt_target_from_climb_rate_ff(pilot_velocity_z_max, plane.G_Dt, false);
     run_z_controller();
+
+    // trigger a position controller wind drift state reset above 2m height if vehicle has drifted more than 2m horizontally
+    const Vector3f& curr_pos = inertial_nav.get_position();
+    float pos_err_N = takeoff_pos_cm.x - curr_pos.x;
+    float pos_err_E = takeoff_pos_cm.y - curr_pos.y;
+    if (!takeoff_reset_complete &&
+            ((plane.current_loc.alt - takeoff_alt_cm) > 200) &&
+            (sqrtf(pos_err_N*pos_err_N + pos_err_E*pos_err_E) > 200.0f)) {
+        pos_control->reset_wind_drift_integ();
+        takeoff_reset_complete = true;
+        gcs().send_text(MAV_SEVERITY_INFO,"Takeoff drift reset");
+    }
 }
 
 /*
@@ -2488,6 +2500,7 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
         plane.next_WP_loc.alt = plane.current_loc.alt + cmd.content.location.alt;
     }
     throttle_wait = false;
+    takeoff_reset_complete = false;
 
     // set target to current position
     loiter_nav->clear_pilot_desired_acceleration();
@@ -2499,10 +2512,11 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
 
     // initialise position and desired velocity
     set_alt_target_current();
-    const Vector3f& curr_pos = inertial_nav.get_position();
-    pos_control->set_xy_target(curr_pos.x, curr_pos.y);
+    takeoff_pos_cm = inertial_nav.get_position();
+    pos_control->set_xy_target(takeoff_pos_cm.x, takeoff_pos_cm.y);
     pos_control->set_desired_velocity_xy(0.0f,0.0f);
     pos_control->set_desired_accel_xy(0.0f,0.0f);
+    takeoff_alt_cm = plane.current_loc.alt;
     pos_control->set_desired_velocity_z(0.0f);
 
     // also update nav_controller for status output
