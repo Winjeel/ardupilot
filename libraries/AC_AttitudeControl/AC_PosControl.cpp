@@ -1304,6 +1304,20 @@ void AC_PosControl::run_xy_controller(float dt)
 
 }
 
+void AC_PosControl::reset_wind_drift_integ()
+{
+    float vel_forward = 0.01f * (_vehicle_horiz_vel.x * _ahrs.cos_yaw() + _vehicle_horiz_vel.y * _ahrs.sin_yaw());
+    float vel_forward_diff = _vel_forward_filt - vel_forward;
+    _vel_xy_error_integ.x += vel_forward_diff * _ahrs.cos_yaw();
+    _vel_xy_error_integ.y += vel_forward_diff * _ahrs.sin_yaw();
+    float _vel_xy_error_integ_norm = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+    float _max_airspeed_cms = 100.0f * _fwd_spd_max;
+    if (_vel_xy_error_integ_norm > _max_airspeed_cms) {
+        _vel_xy_error_integ = _vel_xy_error_integ * (_max_airspeed_cms / _vel_xy_error_integ_norm);
+    }
+}
+
+
 // get_lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
 void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
 {

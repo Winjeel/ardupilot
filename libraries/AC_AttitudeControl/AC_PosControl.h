@@ -224,6 +224,9 @@ public:
     /// freeze_ff_z - used to stop the feed forward being calculated during a known discontinuity
     void freeze_ff_z() { _flags.freeze_ff_z = true; }
 
+    /// resets the wind drift integrator state - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
+    void reset_wind_drift_integ();
+
     // is_active_xy - returns true if the xy position controller has been run very recently
     bool is_active_xy() const;
 
