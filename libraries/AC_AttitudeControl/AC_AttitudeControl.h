@@ -236,6 +236,15 @@ public:
     // Return configured tilt angle limit in centidegrees
     float lean_angle_max() const { return _aparm.angle_max; }
 
+    // Return forward tilt angle limit in degrees
+    float lean_angle_max_fwd() const { return _fwd_lean_angle_max;}
+
+    // Return aft tilt angle limit in degrees
+    float lean_angle_max_aft() const { return _aft_lean_angle_max;}
+
+    // Return lateral tilt angle limit in degrees
+    float lean_angle_max_lat() const { return _lat_lean_angle_max;}
+
     // Proportional controller with piecewise sqrt sections to constrain second derivative
     static float sqrt_controller(float error, float p, float second_ord_lim, float dt);
 
@@ -297,6 +306,15 @@ public:
     // User settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
+    // zero roll rate PID integrator
+    virtual void zero_roll_integrator() {}
+
+    // zero roll rate PID integrator
+    virtual void zero_pitch_integrator() {}
+
+    // zero roll rate PID integrator
+    virtual void zero_yaw_integrator() {}
+
 protected:
 
     // Update rate_target_ang_vel using attitude_error_rot_vec_rad
@@ -345,6 +363,11 @@ protected:
     AC_P                _p_angle_roll;
     AC_P                _p_angle_pitch;
     AC_P                _p_angle_yaw;
+
+    // Tilt limits
+    AP_Float    _fwd_lean_angle_max;    // maximum forward tilt in deg
+    AP_Float    _aft_lean_angle_max;    // maximum rearwards tilt in deg
+    AP_Float    _lat_lean_angle_max;    // maximum lateral tilt in deg
 
     // Angle limit time constant (to maintain altitude)
     AP_Float            _angle_limit_tc;

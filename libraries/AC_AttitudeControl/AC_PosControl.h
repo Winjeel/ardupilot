@@ -16,7 +16,7 @@
 // position controller default definitions
 #define POSCONTROL_ACCELERATION_MIN             50.0f   // minimum horizontal acceleration in cm/s/s - used for sanity checking acceleration in leash length calculation
 #define POSCONTROL_ACCEL_XY                     100.0f  // default horizontal acceleration in cm/s/s.  This is overwritten by waypoint and loiter controllers
-#define POSCONTROL_ACCEL_XY_MAX                 980.0f  // max horizontal acceleration in cm/s/s that the position velocity controller will ask from the lower accel controller
+#define POSCONTROL_ACCEL_XY_MAX                 490.0f  // max horizontal acceleration in cm/s/s that the position velocity controller will ask from the lower accel controller
 #define POSCONTROL_STOPPING_DIST_UP_MAX         300.0f  // max stopping distance (in cm) vertically while climbing
 #define POSCONTROL_STOPPING_DIST_DOWN_MAX       200.0f  // max stopping distance (in cm) vertically while descending
 
@@ -45,7 +45,7 @@ class AC_PosControl
 public:
 
     /// Constructor
-    AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& inav,
+    AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing, const AP_InertialNav& inav,
                   const AP_Motors& motors, AC_AttitudeControl& attitude_control);
 
     ///
@@ -265,8 +265,8 @@ public:
     void update_vel_controller_xyz();
 
     /// get desired roll, pitch which should be fed into stabilize controllers
-    float get_roll() const { return _roll_target; }
-    float get_pitch() const { return _pitch_target; }
+    float get_roll() const { return _roll_target_cd; }
+    float get_pitch() const { return _pitch_target_cd; }
 
     // get_leash_xy - returns horizontal leash length in cm
     float get_leash_xy() const { return _leash; }
@@ -324,12 +324,13 @@ protected:
     /// z controller private methods
     ///
 
-    // run position control for Z axis
+    // Calculates throttle, roll and pitch demands required to track vertical position and velocity
+    // and horizontal velocity and acceleration demands.
     // target altitude should be set with one of these functions
     //          set_alt_target
     //          set_target_to_stopping_point_z
     //          init_takeoff
-    void run_z_controller();
+    void calc_roll_pitch_throttle();
 
     ///
     /// xy controller private methods
@@ -365,18 +366,27 @@ protected:
 
     // references to inertial nav and ahrs libraries
     const AP_AHRS_View &        _ahrs;
+    const AP_AHRS &             _ahrs_wing;
     const AP_InertialNav&       _inav;
     const AP_Motors&            _motors;
     AC_AttitudeControl&         _attitude_control;
 
     // parameters
+    AP_Float    _accel_z_wing_k;        // fraction of wing noraml force accounted for in throttle calculation
     AP_Float    _accel_xy_filt_hz;      // XY acceleration filter cutoff frequency
-    AP_Float    _lean_angle_max;        // Maximum autopilot commanded angle (in degrees). Set to zero for Angle Max
     AC_P        _p_pos_z;
     AC_P        _p_vel_z;
     AC_PID      _pid_accel_z;
     AC_P        _p_pos_xy;
     AC_PID_2D   _pid_vel_xy;
+    AP_Float    _spd_to_lean_exp;       // amount of exponential applied to speed to lean function
+    AP_Int8     _trim_method;           // 0: No trim compensation, 1: Use linear gain method, 2: Use wing normal g, 3 Use lookup table
+    AP_Float    _trim_tau;              // time constant applied to trim corrections
+    AP_Float    _vel_err_i_gain;        // gain from integral of ground velocity error to demanded airspeed
+    AP_Float    _fwd_spd_max;           // trim speed in m/s at max forward lean specified by _fwd_lean_max
+    AP_Float    _aft_spd_max;           // trim speed in m/s at max rearward lean specified by _aft_lean_max
+    AP_Float    _fwd_acc_gain;          // gain applied to longitudinal acceleraton demands in throttle and tilt calculation
+
 
     // internal variables
     float       _dt;                    // time difference (in seconds) between calls from the main program
@@ -393,25 +403,44 @@ protected:
     float       _leash_up_z;            // vertical leash up in cm.  target will never be further than this distance above the vehicle
 
     // output from controller
-    float       _roll_target;           // desired roll angle in centi-degrees calculated by position controller
-    float       _pitch_target;          // desired roll pitch in centi-degrees calculated by position controller
+    float       _roll_target_cd;        // desired roll angle in centi-degrees calculated by position controller
+    float       _pitch_target_cd;       // desired roll pitch in centi-degrees calculated by position controller
 
     // position controller internal variables
     Vector3f    _pos_target;            // target location in cm from home
     Vector3f    _pos_error;             // error between desired and actual position in cm
     Vector3f    _vel_desired;           // desired velocity in cm/s
     Vector3f    _vel_target;            // velocity target in cm/s calculated by pos_to_rate step
-    Vector3f    _vel_error;             // error between desired and actual acceleration in cm/s
+    Vector3f    _vel_error;             // error between desired and actual velocity in cm/s
     Vector3f    _vel_last;              // previous iterations velocity in cm/s
     Vector3f    _accel_desired;         // desired acceleration in cm/s/s (feed forward)
     Vector3f    _accel_target;          // acceleration target in cm/s/s
     Vector3f    _accel_error;           // acceleration error in cm/s/s
     Vector2f    _vehicle_horiz_vel;     // velocity to use if _flags.vehicle_horiz_vel_override is set
+    Vector2f    _vel_xy_error_integ;    // integral of error between NE desired and actual velocity in cm/s and equivalent to reciprocal of wind velocity vector
+    float       _vel_xy_integ_length_prev;
+    float       _distance_to_target;    // distance to position target - for reporting only
+    float       _wing_lift_accel_g;     // estimated wing contribution to acceleration in lift direction in g
+    float       _pitch_trim_rad;        // feed forward pitch trim angle in radians
     LowPassFilterFloat _vel_error_filter;   // low-pass-filter on z-axis velocity error
+    LowPassFilterFloat _wing_lift_accel_filter;   // low-pass-filter on wing normal force lift accel filter
+    LowPassFilterFloat _wing_drag_accel_filter;   // low-pass-filter on wing normal force drag accel filter
+    bool _accel_target_xy_updated;      // true when the accel target has been updated on the last cycle and has not been converted toa tit and throttle demand
+    float _vel_forward_filt;            // filtered forward velocity
+    uint32_t _last_log_time_ms;         // system time of last position controller log
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 
     // ekf reset handling
     uint32_t    _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset
     uint32_t    _ekf_z_reset_ms;       // system time of last recorded ekf altitude reset
+
+#define SPD_N_BP        13
+
+    const float pitch_table[SPD_N_BP] =
+    { 75.0f,  67.0f,  55.0f, 48.0f, 37.0f, 21.0f, 0.0f, -21.0f, -37.0f, -48.0f, -55.0f, -67.0f, -75.0f};
+    const float spd_table[SPD_N_BP] =
+    {-13.0f, -11.0f, -10.0f, -9.0f, -7.0f, -5.0f, 0.0f,   5.0f,   7.0f,   9.0f,  10.0f,  11.0f,  13.0f};
+
+    float get_pitch_trim(float spd);
 };

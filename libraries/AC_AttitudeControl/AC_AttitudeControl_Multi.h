@@ -81,6 +81,15 @@ public:
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
+    // zero roll rate PID integrator
+    void zero_roll_integrator() {_pid_rate_roll.set_integrator(0.0f);}
+
+    // zero roll rate PID integrator
+    void zero_pitch_integrator() {_pid_rate_pitch.set_integrator(0.0f);}
+
+    // zero roll rate PID integrator
+    void zero_yaw_integrator() {_pid_rate_yaw.set_integrator(0.0f);}
+
 protected:
 
     // update_throttle_rpy_mix - updates thr_low_comp value towards the target

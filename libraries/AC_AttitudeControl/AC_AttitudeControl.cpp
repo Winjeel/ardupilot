@@ -143,6 +143,30 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("INPUT_TC", 20, AC_AttitudeControl, _input_tc, AC_ATTITUDE_CONTROL_INPUT_TC_DEFAULT),
 
+    // @Param: ANG_FWD_LIM
+    // @DisplayName: Forward Lean Angle Limit.
+    // @Units: deg
+    // @Range: 45 85
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("ANG_FWD_LIM",  21, AC_AttitudeControl, _fwd_lean_angle_max, 75.0f),
+
+    // @Param: ANG_AFT_LIM
+    // @DisplayName: Rearward Lean Angle Limit.
+    // @Units: deg
+    // @Range: 45 85
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("ANG_AFT_LIM",  22, AC_AttitudeControl, _aft_lean_angle_max, 75.0f),
+
+    // @Param: ANG_LAT_LIM
+    // @DisplayName: Lateral Lean Angle Limit.
+    // @Units: deg
+    // @Range: 10 30
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("ANG_LAT_LIM",  23, AC_AttitudeControl, _lat_lean_angle_max, 20.0f),
+
     AP_GROUPEND
 };
 
