@@ -45,7 +45,16 @@ public:
     // return a DCM rotation matrix representing our current
     // attitude in this view
     const Matrix3f &get_rotation_body_to_ned(void) const {
-        return rot_body_to_ned;
+        return rot_rotor_to_ned;
+    }
+
+    // return pitch angle in radians from 312 Tait-Bryan sequence
+    float get_pitch_312_wing() const {
+        return atan2f(-rot_wing_to_ned.c.x,rot_wing_to_ned.c.z);
+    }
+
+    float get_pitch_312_rotor() const {
+        return atan2f(-rot_rotor_to_ned.c.x,rot_rotor_to_ned.c.z);
     }
 
     // helper trig value accessors
@@ -165,6 +174,11 @@ public:
         return ahrs.get_error_yaw();
     }
     
+    // set the pitch of the rotor relative to the wing/body in degrees
+    void set_pitch_offset(float offset) {
+        pitch_offset_deg = offset;
+    }
+
     float roll;
     float pitch;
     float yaw;
@@ -176,9 +190,12 @@ private:
     const enum Rotation rotation;
     AP_AHRS &ahrs;
 
-    Matrix3f rot_view;
-    Matrix3f rot_body_to_ned;
+    Matrix3f rot_view_rotor;
+    Matrix3f rot_view_wing;
+    Matrix3f rot_rotor_to_ned;
+    Matrix3f rot_wing_to_ned;
     Vector3f gyro;
+    float pitch_offset_deg = 0.0f; // additional pitch offset in degrees
 
     struct {
         float cos_roll;
