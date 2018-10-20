@@ -140,7 +140,8 @@ public:
 
     // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
     // An out of range instance (eg -1) returns data for the the primary instance
-    void getWind(int8_t instance, Vector3f &wind) const;
+    // returns true if wind state estimation is active
+    bool getWind(int8_t instance, Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000 for the specified instance
     // An out of range instance (eg -1) returns data for the the primary instance

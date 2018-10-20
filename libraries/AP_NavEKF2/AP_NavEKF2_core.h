@@ -136,7 +136,8 @@ public:
     void getAccelZBias(float &zbias) const;
 
     // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-    void getWind(Vector3f &wind) const;
+    // returns true if wind state estimation is active
+    bool getWind(Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000
     void getMagNED(Vector3f &magNED) const;
