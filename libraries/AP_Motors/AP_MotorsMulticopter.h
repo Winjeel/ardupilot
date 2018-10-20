@@ -103,6 +103,10 @@ public:
     // var_info for holding Parameter information
     static const struct AP_Param::GroupInfo        var_info[];
 
+    // Calculate and return scale factor for forward thrust motor ESC demands based on battery voltage and air density ratio.
+    // DO NOT call if update_lift_max_from_batt_voltage() is being called elsewhere on that scheduler frame.
+    float               calc_fwd_compensation_gain();
+
 protected:
 
     // run spool logic
@@ -186,6 +190,7 @@ protected:
     // battery voltage, current and air pressure compensation variables
     LowPassFilterFloat  _batt_voltage_filt;     // filtered battery voltage expressed as a percentage (0 ~ 1.0) of batt_voltage_max
     float               _lift_max;              // maximum lift ratio from battery voltage
+    float               _rpm_max_ratio;               // maximum RPM ratio from battery voltage
     float               _throttle_limit;        // ratio of throttle limit between hover and maximum
     float               _throttle_thrust_max;   // the maximum allowed throttle thrust 0.0 to 1.0 in the range throttle_min to throttle_max
     uint16_t            _disarm_safety_timer;

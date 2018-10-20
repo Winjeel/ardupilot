@@ -191,6 +191,7 @@ AP_MotorsMulticopter::AP_MotorsMulticopter(uint16_t loop_rate, uint16_t speed_hz
     AP_Motors(loop_rate, speed_hz),
     _spool_mode(SHUT_DOWN),
     _lift_max(1.0f),
+    _rpm_max_ratio(1.0f),
     _throttle_limit(1.0f)
 {
     AP_Param::setup_object_defaults(this, var_info);
@@ -328,6 +329,7 @@ void AP_MotorsMulticopter::update_lift_max_from_batt_voltage()
     if((_batt_voltage_max <= 0) || (_batt_voltage_min >= _batt_voltage_max) || (_batt_voltage_resting_estimate < 0.25f*_batt_voltage_min)) {
         _batt_voltage_filt.reset(1.0f);
         _lift_max = 1.0f;
+        _rpm_max_ratio = 1.0f;
         return;
     }
 
@@ -337,11 +339,11 @@ void AP_MotorsMulticopter::update_lift_max_from_batt_voltage()
     _batt_voltage_resting_estimate = constrain_float(_batt_voltage_resting_estimate, _batt_voltage_min, _batt_voltage_max);
 
     // filter at 0.5 Hz
-    float batt_voltage_filt = _batt_voltage_filt.apply(_batt_voltage_resting_estimate/_batt_voltage_max, 1.0f/_loop_rate);
+    _rpm_max_ratio = _batt_voltage_filt.apply(_batt_voltage_resting_estimate/_batt_voltage_max, 1.0f/_loop_rate);
 
     // calculate lift max
     float thrust_curve_expo = constrain_float(_thrust_curve_expo, -1.0f, 1.0f);
-    _lift_max = batt_voltage_filt*(1-thrust_curve_expo) + thrust_curve_expo*batt_voltage_filt*batt_voltage_filt;
+    _lift_max = _rpm_max_ratio*(1-thrust_curve_expo) + thrust_curve_expo*_rpm_max_ratio*_rpm_max_ratio;
 }
 
 float AP_MotorsMulticopter::get_compensation_gain() const
@@ -357,6 +359,29 @@ float AP_MotorsMulticopter::get_compensation_gain() const
     // air density ratio is increasing in density / decreasing in altitude
     if (_air_density_ratio > 0.3f && _air_density_ratio < 1.5f) {
         ret *= 1.0f / constrain_float(_air_density_ratio,0.5f,1.25f);
+    }
+#endif
+    return ret;
+}
+
+// return scale factor for forward thrust motor ESC demands
+float AP_MotorsMulticopter::calc_fwd_compensation_gain()
+{
+    // run the function that calculates the max RPM ratio
+    update_lift_max_from_batt_voltage();
+
+    // avoid divide by zero
+    if (_rpm_max_ratio <= 0.0f) {
+        return 1.0f;
+    }
+
+    float ret = 1.0f / _rpm_max_ratio;
+
+#if AP_MOTORS_DENSITY_COMP == 1
+    // air density ratio is increasing in density / decreasing in altitude
+    // fixed pitch prop RPM needs to scale with TAS and therefore 1 / sqrt(density)
+    if (_air_density_ratio > 0.3f && _air_density_ratio < 1.5f) {
+        ret *= 1.0f / sqrtf(constrain_float(_air_density_ratio,0.5f,1.25f));
     }
 #endif
     return ret;
