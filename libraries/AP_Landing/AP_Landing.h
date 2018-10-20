@@ -21,12 +21,12 @@
 #include <AP_SpdHgtControl/AP_SpdHgtControl.h>
 #include <AP_Navigation/AP_Navigation.h>
 #include <GCS_MAVLink/GCS.h>
-#include "AP_Landing_Deepstall.h"
+#include "AP_Landing_VTOL.h"
 
 /// @class  AP_Landing
 /// @brief  Class managing ArduPlane landing methods
 class AP_Landing {
-    friend class AP_Landing_Deepstall;
+    friend class AP_Landing_VTOL;
 
 public:
     FUNCTOR_TYPEDEF(set_target_altitude_proportion_fn_t, void, const Location&, float);
@@ -52,7 +52,7 @@ public:
     // NOTE: make sure to update is_type_valid()
     enum Landing_Type {
         TYPE_STANDARD_GLIDE_SLOPE = 0,
-        TYPE_DEEPSTALL = 1,
+        TYPE_VTOL = 1,
 //      TODO: TYPE_PARACHUTE,
 //      TODO: TYPE_HELICAL,
     };
@@ -138,8 +138,8 @@ private:
     // saved bearing for yaw correction after touchdown
     float runway_bearing;
 
-    // support for deepstall landings
-    AP_Landing_Deepstall deepstall;
+    // support for wind adaptive VTOL landings
+    AP_Landing_VTOL vtol;
 
     AP_Int16 pitch_cd;
     AP_Float flare_alt;
