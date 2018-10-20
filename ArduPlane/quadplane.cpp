@@ -1662,18 +1662,23 @@ void QuadPlane::update(void)
         return;
     }
 
-    if (!hal.util->get_soft_armed()) {
+    bool soft_arm_status = hal.util->get_soft_armed();
+    if (!soft_arm_status) {
         /*
           make sure we don't have any residual control from previous flight stages
          */
         if (!is_tailsitter()) {
-            // tailsitters don't relax, so users can test disarmed in Q modes
+            // tailsitter attitude controllers don't relax so users can test disarmed in Q modes
             attitude_control->relax_attitude_controllers();
         }
         attitude_control->reset_rate_controller_I_terms();
         pos_control->relax_alt_hold_controllers(0);
+    } else if (is_tailsitter() && soft_arm_status && !soft_arm_status_prev) {
+        // ensure that tailsitter attitude controllers are reset on the first frame when arming
+        attitude_control->relax_attitude_controllers();
     }
-    
+    soft_arm_status_prev = soft_arm_status;
+
     check_yaw_reset();
     
     if (!in_vtol_mode()) {

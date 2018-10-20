@@ -494,6 +494,7 @@ private:
     float _elev_gain_factor = 1.0f;
     float _ail_gain_factor = 1.0f;
     float _fw_throttle_factor = 1.0f; // scaling factor applied to fixed wing throttle demands to compensate for battery voltage and air density effects
+    bool soft_arm_status_prev = false;
 
     // elevator channel gain limit cycle control
     float _last_elev_feedback = 0.0f;           // value of the filtered elevator channel feedback from the previous time step (deg)
