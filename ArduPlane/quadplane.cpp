@@ -584,6 +584,14 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_FW_E_DZ", 37, QuadPlane, tailsitter.tvbs_fw_elev_deadband_deg, 0),
 
+    // @Param: TVBS_TO_SCALER
+    // @DisplayName: Max scale factor applied to wind drift integrator during initial takeoff.
+    // @Description: Controls how fast the wind drift is learned during the first 10 metres of climb
+    // @Range: 1.0 10.0
+    // @Increment: 0.5
+    // @User: Standard
+    AP_GROUPINFO("TVBS_TO_SCALER", 38, QuadPlane, tailsitter.tvbs_to_scaler, 5.0f),
+
     AP_GROUPEND
 };
 
@@ -2346,13 +2354,16 @@ void QuadPlane::takeoff_controller(void)
     pos_control->set_alt_target_from_climb_rate_ff(pilot_velocity_z_max, plane.G_Dt, false);
     run_z_controller();
 
-    // trigger a position controller wind drift state reset if vehicle drits outside a +- 30 degree cone centred on the takeoff location.
+    // trigger a position controller wind drift state reset if vehicle drits outside a +- 45 degree cone centred on the takeoff location.
+    // also scale up wind drift integrator gain during first part of ascent to speed learning
     const Vector3f& curr_pos = inertial_nav.get_position();
+    float height_cm = plane.current_loc.alt - takeoff_alt_cm;
+    float gain_scaler = tailsitter.tvbs_to_scaler * (1.0f - constrain_float(height_cm / 1000.0f, 0.0f, 1.0f));
+    pos_control->scale_wind_drift_integ_gain(gain_scaler);
     float pos_err_N_cm = takeoff_pos_cm.x - curr_pos.x;
     float pos_err_E_cm = takeoff_pos_cm.y - curr_pos.y;
     float pos_err_mag_cm = sqrtf(pos_err_N_cm * pos_err_N_cm + pos_err_E_cm * pos_err_E_cm);
-    float height_cm = plane.current_loc.alt - takeoff_alt_cm;
-    float pos_err_lim_cm = MAX(height_cm * tanf(radians(30.0f)), 200.0f);
+    float pos_err_lim_cm = MAX(height_cm * tanf(radians(45.0f)), 200.0f);
     if (!takeoff_reset_complete && (pos_err_mag_cm > pos_err_lim_cm)) {
         pos_control->reset_wind_drift_integ();
         takeoff_reset_complete = true;
