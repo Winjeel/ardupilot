@@ -452,6 +452,7 @@ MAV_TYPE Copter::get_frame_mav_type()
         case AP_Motors::MOTOR_FRAME_SINGLE:
         case AP_Motors::MOTOR_FRAME_COAX:
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
+        case AP_Motors::MOTOR_FRAME_TVBS:
             return MAV_TYPE_COAXIAL;
         case AP_Motors::MOTOR_FRAME_DODECAHEXA:
             return MAV_TYPE_DODECAROTOR;
@@ -488,6 +489,8 @@ const char* Copter::get_frame_string()
             return "COAX";
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
             return "TAILSITTER";
+    case AP_Motors::MOTOR_FRAME_TVBS:
+        return "BELLYSITTER";
         case AP_Motors::MOTOR_FRAME_DODECAHEXA:
             return "DODECA_HEXA";
         case AP_Motors::MOTOR_FRAME_UNDEFINED:
@@ -527,6 +530,8 @@ void Copter::allocate_motors(void)
             motors_var_info = AP_MotorsCoax::var_info;
             break;
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
+            motors = new AP_MotorsTailsitter(copter.scheduler.get_loop_rate_hz());
+        case AP_Motors::MOTOR_FRAME_TVBS:
             motors = new AP_MotorsTailsitter(copter.scheduler.get_loop_rate_hz());
             motors_var_info = AP_MotorsTailsitter::var_info;
             break;

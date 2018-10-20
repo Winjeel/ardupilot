@@ -143,7 +143,7 @@ struct PACKED log_MotBatt {
     uint64_t time_us;
     float   lift_max;
     float   bat_volt;
-    float   bat_res;
+    float   fw_th_gain;
     float   th_limit;
 };
 
@@ -156,7 +156,7 @@ void Copter::Log_Write_MotBatt()
         time_us         : AP_HAL::micros64(),
         lift_max        : (float)(motors->get_lift_max()),
         bat_volt        : (float)(motors->get_batt_voltage_filt()),
-        bat_res         : (float)(battery.get_resistance()),
+        fw_th_gain      : 1.0f,
         th_limit        : (float)(motors->get_throttle_limit())
     };
     DataFlash.WriteBlock(&pkt_mot, sizeof(pkt_mot));
@@ -477,7 +477,7 @@ const struct LogStructure Copter::log_structure[] = {
     { LOG_CONTROL_TUNING_MSG, sizeof(log_Control_Tuning),
       "CTUN", "Qffffffefcfhh", "TimeUS,ThI,ABst,ThO,ThH,DAlt,Alt,BAlt,DSAlt,SAlt,TAlt,DCRt,CRt", "s----mmmmmmnn", "F----00B0BBBB" },
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt),
-      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,BatRes,ThLimit", "s-vw-", "F-00-" },
+      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,ThGainFW,ThLimit", "s-vw-", "F-00-" },
     { LOG_EVENT_MSG, sizeof(log_Event),         
       "EV",   "QB",           "TimeUS,Id", "s-", "F-" },
     { LOG_DATA_INT16_MSG, sizeof(log_Data_Int16t),         
