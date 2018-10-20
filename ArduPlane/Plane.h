@@ -197,6 +197,7 @@ private:
     AP_Notify notify;
 
     DataFlash_Class DataFlash;
+    uint8_t log_thin_counter = 0;
 
     // scaled roll limit based on pitch
     int32_t roll_limit_cd;
@@ -234,7 +235,7 @@ private:
     // Attitude to servo controllers
     AP_RollController rollController{ahrs, aparm, DataFlash};
     AP_PitchController pitchController{ahrs, aparm, DataFlash};
-    AP_YawController yawController{ahrs, aparm};
+    AP_YawController yawController{ahrs, aparm, DataFlash};
     AP_SteerController steerController{ahrs};
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -690,6 +691,13 @@ private:
 
         // The amount of time we should stay in a loiter for the Loiter Time command.  Milliseconds.
         uint32_t time_max_ms;
+
+        // NE velocity of the loiter waypoint in m/s
+        Vector2f velNE;
+
+        // Time the loiter waypoint position was last updated
+        uint32_t last_update_ms;
+
     } loiter;
 
 

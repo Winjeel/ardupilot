@@ -376,15 +376,6 @@ void Plane::stabilize()
     }
     float speed_scaler = get_speed_scaler();
 
-    if (quadplane.in_tailsitter_vtol_transition()) {
-        /*
-          during transition to vtol in a tailsitter try to raise the
-          nose rapidly while keeping the wings level
-         */
-        nav_pitch_cd = constrain_float((quadplane.tailsitter.transition_angle+5)*100, 5500, 8500),
-        nav_roll_cd = 0;
-    }
-    
     if (control_mode == TRAINING) {
         stabilize_training(speed_scaler);
     } else if (control_mode == ACRO) {
@@ -393,9 +384,20 @@ void Plane::stabilize()
                 control_mode == QHOVER ||
                 control_mode == QLOITER ||
                 control_mode == QLAND ||
-                control_mode == QRTL) &&
-               !quadplane.in_tailsitter_vtol_transition()) {
-        quadplane.control_run();
+                control_mode == QRTL)) {
+        if (quadplane.reverse_transition_pullup_active) {
+            /*
+              during transition to vtol in a tailsitter raise the nose to the max tilt allowed during VTOL
+              with throttle closed and wait for speed to decay before transitioning
+             */
+            nav_pitch_cd = 9000 - (int32_t)(100.0f * quadplane.attitude_control->lean_angle_max_fwd());
+            nav_roll_cd = 0;
+            stabilize_roll(speed_scaler);
+            stabilize_pitch(speed_scaler);
+            stabilize_yaw(speed_scaler);
+        } else {
+            quadplane.control_run();
+        }
     } else {
         if (g.stick_mixing == STICK_MIXING_FBW && control_mode != STABILIZE) {
             stabilize_stick_mixing_fbw();
@@ -440,6 +442,11 @@ void Plane::calc_throttle()
         return;
     }
 
+    // close throttle to reduce speed before performing transition
+    if (quadplane.reverse_transition_pullup_active) {
+        SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, 0);
+    }
+
     int32_t commanded_throttle = SpdHgt_Controller->get_throttle_demand();
 
     // Received an external msg that guides throttle in the last 3 seconds?
@@ -463,6 +470,11 @@ void Plane::calc_nav_yaw_coordinated(float speed_scaler)
 {
     bool disable_integrator = false;
     int16_t rudder_in = rudder_input();
+
+    // For tailsitters using differential thrust for yaw, control power does not scale with speed
+    if (quadplane.is_tailsitter() && (plane.g2.rudd_dt_gain > 0)) {
+        speed_scaler = 1.0f;
+    }
 
     int16_t commanded_rudder;
 

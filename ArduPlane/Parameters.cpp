@@ -282,8 +282,8 @@ const AP_Param::Info Plane::var_info[] = {
 #if GEOFENCE_ENABLED == ENABLED
     // @Param: FENCE_ACTION
     // @DisplayName: Action on geofence breach
-    // @Description: What to do on fence breach. If this is set to 0 then no action is taken, and geofencing is disabled. If this is set to 1 then the plane will enter GUIDED mode, with the target waypoint as the fence return point. If this is set to 2 then the fence breach is reported to the ground station, but no other action is taken. If set to 3 then the plane enters guided mode but the pilot retains manual throttle control. If set to 4 the plane enters RTL mode, with the target waypoint as the closest rally point (or home point if there are no rally points).
-    // @Values: 0:None,1:GuidedMode,2:ReportOnly,3:GuidedModeThrPass,4:RTL_Mode
+    // @Description: What to do on fence breach. If this is set to 0 then no action is taken, and geofencing is disabled. If this is set to 1 then the plane will enter GUIDED mode, with the target waypoint as the fence return point. If this is set to 2 then the fence breach is reported to the ground station, but no other action is taken. If set to 3 then the plane enters guided mode but the pilot retains manual throttle control. If set to 4 the plane enters RTL mode, with the target waypoint as the closest rally point (or home point if there are no rally points). If set to 5, the plane is a TVBS VTOL frame type, is in a fixed wing flight mode and below FENCE_MINALT it will enter QHOVER.
+    // @Values: 0:None,1:GuidedMode,2:ReportOnly,3:GuidedModeThrPass,4:RTL_Mode,5:QHOVER
     // @User: Standard
     GSCALAR(fence_action,           "FENCE_ACTION",   0),
 
@@ -347,6 +347,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
     ASCALAR(stall_prevention, "STALL_PREVENTION",  1),
+
+    // @Param: FBWB_SINK_RATE
+    // @DisplayName: Fly By Wire B sink rate
+    // @Description: This sets the rate in m/s at which FBWB and CRUISE modes will reduce its target altitude for full forward pitch stick deflection. Note that the actual sink rate of the aircraft may be less than this depending on other settings, in particular the TECS_SINK_MAX and LIM_PITCH_MIN parameters.
+    // @Range: 1 10
+    // @Units: m/s
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(flybywire_sink_rate, "FBWB_SINK_RATE",  2.0f),
 
     // @Param: ARSPD_FBW_MIN
     // @DisplayName: Minimum Airspeed
@@ -675,11 +684,26 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(rudder_only,             "RUDDER_ONLY",  0),
 
+    // @Param: TVBS_MIX_GAIN
+    // @DisplayName: Mixing Gain for TVBS frame types in VTOL modes
+    // @Description: The gain for the Vtail and elevon output mixers used by TVBS frame types in VTOL modes. The default is 0.5, which ensures that the mixer doesn't saturate, allowing both input channels to go to extremes while retaining control over the output. If you don't have enough control authority with VTAIL_OUTPUT or ELEVON_OUTPUT enabled then you can raise the gain using MIXING_GAIN. The mixer allows outputs in the range 900 to 2100 microseconds.
+    // @Range: 0.5 1.0
+    // @User: User
+    GSCALAR(mixing_gain_tvbs,          "TVBS_MIX_GAIN",  1.0f),
+
+    // @Param: TVBS_MIX_OFFSET
+    // @DisplayName: Mixing Offset for TVBS frame types in VTOL modes
+    // @Description: Enables TVBS frame types to use larger elevator deflections for enhanced pitch damping when in VTOL modes. The response to aileron or elevator input can be increased by setting this parameter to a positive or negative value. Set to a negative value to increase the amount of elevator/pitch response relative to aileron/roll. Set to a negtive value to decrease it.
+    // @Units: %
+    // @Range: -50 50
+    // @User: User
+    GSCALAR(mixing_offset_tvbs,          "TVBS_MIX_OFFSET",  0),
+
     // @Param: MIXING_OFFSET
     // @DisplayName: Mixing Offset
-    // @Description: The offset for the Vtail and elevon output mixers, as a percentage. This can be used in combination with MIXING_GAIN to configure how the control surfaces respond to input. The response to aileron or elevator input can be increased by setting this parameter to a positive or negative value. A common usage is to enter a positive value to increase the aileron response of the elevons of a flying wing. The default value of zero will leave the aileron-input response equal to the elevator-input response.
-    // @Units: d%
-    // @Range: -1000 1000
+    // @Description: The offset for the Vtail and elevon output mixers, as a percentage. This can be used in combination with MIXING_GAIN to configure how the control surfaces respond to input. The response to aileron or elevator input can be increased by setting this parameter to a positive or negative value. A common usage is to enter a positive value to increase aileron and decrease elevator response for a flying wing. The default value of zero will leave the aileron-input response equal to the elevator-input response.
+    // @Units: %
+    // @Range: -50 50
     // @User: User
     GSCALAR(mixing_offset,          "MIXING_OFFSET",  0),
 

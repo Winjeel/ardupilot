@@ -66,6 +66,11 @@ private:
         TUNING_PIT_I =                        55,
         TUNING_PIT_D =                        56,
         TUNING_PIT_FF =                       57,
+
+        TUNING_YAW_D =                        58,
+        TUNING_YAW_I =                        59,
+        TUNING_YAW_S =                        60,
+        TUNING_YAW_FF =                       61,
     };
 
     /*

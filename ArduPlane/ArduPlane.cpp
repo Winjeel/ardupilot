@@ -142,6 +142,11 @@ void Plane::read_aux_all()
 // update AHRS system
 void Plane::ahrs_update()
 {
+    log_thin_counter++;
+    if (log_thin_counter >= 8) {
+        log_thin_counter = 0;
+    }
+
     update_soft_armed();
 
 #if HIL_SUPPORT
@@ -153,7 +158,7 @@ void Plane::ahrs_update()
 
     ahrs.update();
 
-    if (should_log(MASK_LOG_IMU)) {
+    if (should_log(MASK_LOG_IMU) && (log_thin_counter == 0)) {
         DataFlash.Log_Write_IMU();
     }
 
@@ -235,6 +240,10 @@ void Plane::update_logging2(void)
 
     if (should_log(MASK_LOG_IMU))
         DataFlash.Log_Write_Vibration();
+
+    if (should_log(MASK_LOG_MOTBATT))
+        quadplane.Log_Write_MotBatt();
+
 }
 
 
@@ -484,13 +493,19 @@ void Plane::update_flight_mode(void)
     // ensure we are fly-forward when we are flying as a pure fixed
     // wing aircraft. This helps the EKF produce better state
     // estimates as it can make stronger assumptions
+    static uint32_t fly_forward_off_ms=0;
     if (quadplane.in_vtol_mode() ||
         quadplane.in_assisted_flight()) {
         ahrs.set_fly_forward(false);
+        fly_forward_off_ms = AP_HAL::millis();
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
         ahrs.set_fly_forward(landing.is_flying_forward());
     } else {
-        ahrs.set_fly_forward(true);
+        if  (AP_HAL::millis() - fly_forward_off_ms > 5000) {
+            ahrs.set_fly_forward(true);
+        } else {
+            ahrs.set_fly_forward(false);
+        }
     }
 
     switch (effective_mode) 
@@ -656,13 +671,30 @@ void Plane::update_flight_mode(void)
     case QRTL: {
         // set nav_roll and nav_pitch using sticks
         int16_t roll_limit = MIN(roll_limit_cd, quadplane.aparm.angle_max);
+
+        // Apply a separate roll limit for TVBS airframes which normally require
+        // more pitch than roll movement range due to wing drag
+        if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) {
+            roll_limit = MIN(roll_limit, 100 * quadplane.attitude_control->lean_angle_max_lat());
+        }
+
         nav_roll_cd  = (channel_roll->get_control_in() / 4500.0) * roll_limit;
         nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit, roll_limit);
         float pitch_input = channel_pitch->norm_input();
         // Scale from normalized input [-1,1] to centidegrees
         if (quadplane.tailsitter_active()) {
-            // For tailsitters, the pitch range is symmetrical: [-Q_ANGLE_MAX,Q_ANGLE_MAX]
-            nav_pitch_cd = pitch_input * quadplane.aparm.angle_max;
+            if (quadplane.reverse_transition_active) {
+                nav_roll_cd = 0;
+                if (quadplane.reverse_transition_pullup_active) {
+                    nav_pitch_cd = 9000 - (int32_t)(100.0f * quadplane.attitude_control->lean_angle_max_fwd());
+                }
+            }
+            // For TVBS, the pitch range is asymmetric
+            if (pitch_input >= 0.0f) {
+                nav_pitch_cd = (int32_t)(100.0f * pitch_input * quadplane.attitude_control->lean_angle_max_aft());
+            } else {
+                nav_pitch_cd = (int32_t)(100.0f * pitch_input * quadplane.attitude_control->lean_angle_max_fwd());
+            }
         } else {
             // pitch is further constrained by LIM_PITCH_MIN/MAX which may impose
             // tighter (possibly asymmetrical) limits than Q_ANGLE_MAX

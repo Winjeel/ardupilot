@@ -191,6 +191,11 @@ void Plane::calc_gndspeed_undershoot()
 
 void Plane::update_loiter(uint16_t radius)
 {
+    // Move waypoint at constant velocity
+    float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
+    location_offset(next_WP_loc, time_delta * loiter.velNE.x, time_delta * loiter.velNE.y);
+    loiter.last_update_ms = millis();
+
     if (radius <= 1) {
         // if radius is <=1 then use the general loiter radius. if it's small, use default
         radius = (abs(aparm.loiter_radius) <= 1) ? LOITER_RADIUS_DEFAULT : abs(aparm.loiter_radius);
@@ -225,7 +230,7 @@ void Plane::update_loiter(uint16_t radius)
         */
         nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
     } else {
-        nav_controller->update_loiter(next_WP_loc, radius, loiter.direction);
+        nav_controller->update_loiter(next_WP_loc, radius, loiter.direction, loiter.velNE);
     }
 
     if (loiter.start_time_ms == 0) {
@@ -301,7 +306,12 @@ void Plane::update_fbwb_speed_height(void)
             elevator_input = -elevator_input;
         }
 
-        int32_t alt_change_cm = g.flybywire_climb_rate * elevator_input * dt * 100;
+        int32_t alt_change_cm;
+        if (elevator_input >= 0.0f) {
+            alt_change_cm = g.flybywire_climb_rate * elevator_input * dt * 100;
+        } else {
+            alt_change_cm = g.flybywire_sink_rate * elevator_input * dt * 100;
+        }
         change_target_altitude(alt_change_cm);
         
         if (is_zero(elevator_input) && !is_zero(target_altitude.last_elevator_input)) {

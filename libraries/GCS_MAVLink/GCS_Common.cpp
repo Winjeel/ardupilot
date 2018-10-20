@@ -2933,6 +2933,34 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_long_t &
     roi_loc.lat = (int32_t)(packet.param5 * 1.0e7f);
     roi_loc.lng = (int32_t)(packet.param6 * 1.0e7f);
     roi_loc.alt = (int32_t)(packet.param7 * 100.0f);
+
+    // Now check if the vehicle should be moved to loiter around the ROI
+    // We are using a non-zero value for param 3 to indicate a move is requested
+    if (!is_zero(packet.param3)) {
+        Location requested_position {};
+        requested_position.lat = roi_loc.lat;
+        requested_position.lng = roi_loc.lng;
+
+        // stay at the current height
+        requested_position.alt = plane.current_loc.alt;
+
+        // we are using a non zero value for param 4 to indicate a ccw loiter
+        if (is_zero(packet.param4)) {
+            requested_position.flags.loiter_ccw = 0;
+        } else {
+            requested_position.flags.loiter_ccw = 1;
+        }
+
+        // set guided mode at specified position
+        if (!(control_mode == GUIDED)) {
+            plane.set_mode(GUIDED, MODE_REASON_GCS_COMMAND);
+        }
+        plane.guided_WP_loc = requested_position;
+        plane.loiter.velNE.x = packet.param1;
+        plane.loiter.velNE.y = packet.param2;
+        plane.set_guided_WP();
+    }
+
     return handle_command_do_set_roi(roi_loc);
 }
 

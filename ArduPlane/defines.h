@@ -149,6 +149,7 @@ enum log_messages {
     LOG_PIQY_MSG,
     LOG_PIQA_MSG,
     LOG_AETR_MSG,
+    LOG_MOTBATT_MSG,
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -167,6 +168,7 @@ enum log_messages {
 #define MASK_LOG_RC                     (1<<13)
 #define MASK_LOG_SONAR                  (1<<14)
 #define MASK_LOG_ARM_DISARM             (1<<15)
+#define MASK_LOG_MOTBATT                (1UL<<17)
 #define MASK_LOG_IMU_RAW                (1UL<<19)
 
 // altitude control algorithms

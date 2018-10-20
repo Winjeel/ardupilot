@@ -63,7 +63,7 @@ public:
       return true if we are a tailsitter transitioning to VTOL flight
     */
     bool in_tailsitter_vtol_transition(void) const;
-    
+
     bool handle_do_vtol_transition(enum MAV_VTOL_STATE state);
 
     bool do_vtol_takeoff(const AP_Mission::Mission_Command& cmd);
@@ -97,6 +97,9 @@ public:
     // create outputs for tailsitters
     void tailsitter_output(void);
 
+    // create outputs for twin vectored belly sitters
+    void tvbs_output(void);
+
     // handle different tailsitter input types
     void tailsitter_check_input(void);
     
@@ -106,6 +109,9 @@ public:
     // check if we have completed transition to vtol
     bool tailsitter_transition_vtol_complete(void) const;
 
+    // check if we have completed the initial pullup
+    bool tailsitter_transition_pullup_complete(void) const;
+
     // account for surface speed scaling in hover
     void tailsitter_speed_scaling(void);
     
@@ -114,6 +120,10 @@ public:
 
     // return true if the wp_nav controller is being updated
     bool using_wp_nav(void) const;
+
+    float get_fw_throttle_factor(void) { return _fw_throttle_factor; }
+
+    bool attitude_control_lost(void) {return control_loss_declared; }
     
     struct PACKED log_QControl_Tuning {
         LOG_PACKET_HEADER;
@@ -129,8 +139,20 @@ public:
         float    dax;
         float    day;
         float    throttle_mix;
+        float    tvbs_gain_mod;
     };
-        
+
+    struct PACKED log_MotBatt {
+        LOG_PACKET_HEADER;
+        uint64_t time_us;
+        float   lift_max;
+        float   bat_volt;
+        float   fw_th_gain;
+        float   th_limit;
+    };
+
+    void Log_Write_MotBatt();
+
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
@@ -158,7 +180,7 @@ private:
     bool assistance_needed(float aspeed);
 
     // update transition handling
-    void update_transition(void);
+    void update_transition_to_fw(void);
 
     // check for an EKF yaw reset
     void check_yaw_reset(void);
@@ -193,7 +215,7 @@ private:
     void control_hover(void);
 
     void init_loiter(void);
-    void init_land(void);
+    void init_qland(void);
     void control_loiter(void);
     void check_land_complete(void);
 
@@ -202,14 +224,16 @@ private:
     
     float assist_climb_rate_cms(void) const;
 
-    // calculate desired yaw rate for assistance
+    void control_qland(void);
+
+     // calculate desired yaw rate for assistance
     float desired_auto_yaw_rate_cds(void) const;
 
     bool should_relax(void);
     void motors_output(bool run_rate_controller = true);
     void Log_Write_QControl_Tuning();
     float landing_descent_rate_cms(float height_above_ground) const;
-    
+
     // setup correct aux channels for frame class
     void setup_default_channels(uint8_t num_motors);
 
@@ -294,6 +318,8 @@ private:
         AP_Float gain;
         AP_Float min_roll;
         uint32_t last_pilot_input_ms;
+        uint32_t last_frame_ms;
+        float gain_modifier;
         float last_output;
     } weathervane;
     
@@ -328,6 +354,10 @@ private:
     // true when quad is assisting a fixed wing mode
     bool assisted_flight:1;
 
+    // used to control pitch angle scheduling during transiton into forward flight
+    int32_t nav_pitch_init_cd = 0; // initial pitch angle on entry into pitch scheduled forward transition
+    bool fwd_transition = false;   // true when forward transition pitch scheduling is active
+
     // true when in angle assist
     bool in_angle_assist:1;
 
@@ -353,11 +383,12 @@ private:
     };
     struct {
         enum position_control_state state;
-        float speed_scale;
+        bool initialised;
         Vector2f target_velocity;
         float max_speed;
         Vector3f target;
         bool slow_descent:1;
+        uint32_t time_ms;
     } poscontrol;
 
     struct {
@@ -413,7 +444,62 @@ private:
         AP_Float vectored_hover_gain;
         AP_Float vectored_hover_power;
         AP_Float throttle_scale_max;
+        AP_Int16 tvbs_tilt_lag_ms;          // msec of lag from demanded to achieved tilt servo deflection that is compensated for
+        AP_Int8 tvbs_ang_min_deg;           // most negative number of degrees of thrust line rotation achieved when the tilt servo is at the travel limit as set by the servos max or min PWM parameter
+        AP_Int8 tvbs_ang_max_deg;           // most positive number of degrees of thrust line rotation achieved when the tilt servo is at the travel limit as set by the servos max or min PWM parameter
+        AP_Float tvbs_rate_gain;            // number of equivalent elevator servo degrees per deg/sec of pitch rate used to damp body pitch motion during VTOL operation
+        AP_Float tvbs_rotor_to_elev_gain;   // number of equivalent elevator servo degrees per deg/sec of rotor pitch rate
+        AP_Int16 tvbs_slew_lim_dps;         // maximum allowed rate of change of demanded rotor pitch angle
+        AP_Int16 tvbs_slew_tau_msec;        // time constant in msec of the low pass filter that is applied to the demanded rotor pitch angle
+        AP_Float tvbs_dgain;                // number of equivalent elevator servo degrees per deg/sec/sec of wing pitch acceleration
+        AP_Float tvbs_dtau_sec;             // time constant in seconds of the noise filter that is appleid to the pitch rate derivative used by the wing elevator pitch control loop
+        AP_Float elev_slew_rate_max_dps;    // maximum allowed elevator channel demand slew rate in deg/sec
+        AP_Float elev_slew_rate_tau_sec;    // time constant in sec used to recover the elevator channel gain after it has been reduced due to excessive servo slew rate
+        AP_Float tvbs_tilt_slew_lim_dps;    // maximum allowed tilt servo demand slew rate in deg/sec
+        AP_Float tvbs_elev_hpf_tau_sec;     // time constant in seconds used to filter the tilt servo derivative
+        AP_Float tvbs_roll_gain;            // gain factor that modifies the amount of roll demand from the position controller used by the attitude controller
+        AP_Int16 tvbs_bt_time_msec;         // number of milliseconds taken to slew the rotors back to the hover position when doing a back transition
+        AP_Int8  tvbs_elev_trim_pcnt;       // elevator as a percentage of full throw used to trim the wing during hover so that it produces zero normal force
+        AP_Int8 tvbs_ail_gf;                // gain factor percentage reduction applied to the aileron deflection when the wing is at a horizontal flying orientation
+        AP_Int8 tvbs_elev_gf;               // gain factor percentage reduction applied to the elevator deflection when the wing is at a horizontal flying orientation
+        AP_Int8 tvbs_ar_tune;               // activates tuning mode for attitude recovery
+        AP_Float tvbs_ar_gain;              // all thrust vectoring gains are multiplied by this value when attitude recovery is active
+        AP_Int8 tvbs_fw_elev_deadband_deg;  // the number of degrees of equivalent elevator deflection before thrust vectoring is added to augment control authority in forward flight
+        AP_Float tvbs_fw_elev_fwd_gain;     // the gain from equivalent elevator deflection to thrust vectoring used in forward flight
+        AP_Int8 tvbs_fw_ail_deadband_deg;   // the number of degrees of equivalent aileron deflection before thrust vectoring is added to augment control authority in forward flight
+        AP_Float tvbs_fw_ail_fwd_gain;      // the gain from equivalent aileron deflection to thrust vectoring used in forward flight
+
     } tailsitter;
+
+    // TVBS control variables
+    float tvbs_body_thrust_angle_dem = 0.0f; // body relative thrust pitch angle demand (deg)
+    float tvbs_body_thrust_angle_est = 0.0f; // body relative thrust pitch estimate (deg)
+    float tvbs_body_thrust_angle_est_prev = 0.0f; // body relative thrust pitch estimate from previous frame(deg)
+    float tvbs_pitch_dem_cd = 0.0f; // demanded pitch angle for the TVBS rotors in earth frame in centi-degrees after slew rate limiting
+    float tvbs_pitch_dem_filt_cd = 0.0f; // demanded pitch angle for the TVBS rotors in earth frame in centi-degrees after low pass filtering
+    uint32_t tvbs_last_filt_time_ms = 0; // time the tvbs pitch demand filter was last updated
+    bool tvbs_active = false; // true when the vehicle is flying using the TVBS controller
+    float tvbs_dt_avg = 0.002f; // average time step taken by the TVBS controller - initialise to smallest feasible time step
+    float tvbs_pitch_rate_filt = 0.0f; // wing low pass filtered pitch rate (deg/sec)
+    float peak_tilt_rate_pos = 1.0f;
+    float peak_tilt_rate_neg = 1.0f;
+    float tvbs_thrust_ang_deriv = 0.0f;
+    float prev_pitch_error_deg = 0.0f;
+    uint32_t reverse_transition_time_ms = 0; // activation time of the transition from FW to VTOL mode (msec)
+    bool reverse_transition_active = false;
+    bool reverse_transition_pullup_active = false;
+    float gyro_rate_length_filt = 0;
+    uint32_t time_control_lost_ms = 0;
+    bool control_loss_declared = false;
+    float _elev_gain_factor = 1.0f;
+    float _ail_gain_factor = 1.0f;
+    float _fw_throttle_factor = 1.0f; // scaling factor applied to fixed wing throttle demands to compensate for battery voltage and air density effects
+
+    // elevator channel gain limit cycle control
+    float _last_elev_feedback = 0.0f;           // value of the filtered elevator channel feedback from the previous time step (deg)
+    LowPassFilterFloat _elev_slew_rate_filter;  // LPF used by elevator channel slew rate calculation
+    float _elev_slew_rate_amplitude = 0.0f;     // Amplitude of the elevator channel slew rate produced by the unmodified feedback (deg/sec)
+    float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;

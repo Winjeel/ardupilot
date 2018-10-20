@@ -30,6 +30,10 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         // reset loiter start time. New command is a new loiter
         loiter.start_time_ms = 0;
 
+        // used for moving waypoints - record update time and reset velocity
+        loiter.last_update_ms = millis();
+        loiter.velNE.zero();
+
         AP_Mission::Mission_Command next_nav_cmd;
         const uint16_t next_index = mission.get_current_nav_index() + 1;
         auto_state.wp_is_land_approach = mission.get_next_nav_cmd(next_index, next_nav_cmd) && (next_nav_cmd.id == MAV_CMD_NAV_LAND) &&
@@ -241,8 +245,11 @@ bool Plane::verify_command(const AP_Mission::Mission_Command& cmd)        // Ret
         } else {
             // use rangefinder to correct if possible
             const float height = height_above_target() - rangefinder_correction();
-            return landing.verify_land(prev_WP_loc, next_WP_loc, current_loc,
-                height, auto_state.sink_rate, auto_state.wp_proportion, auto_state.last_flying_ms, arming.is_armed(), is_flying(), rangefinder_state.in_range);
+            if (landing.verify_land(prev_WP_loc, next_WP_loc, current_loc,
+                height, auto_state.sink_rate, auto_state.wp_proportion, auto_state.last_flying_ms, arming.is_armed(), is_flying(), rangefinder_state.in_range)) {
+                set_mode(QLAND, MODE_REASON_MISSION_END);
+            }
+            return false;
         }
 
     case MAV_CMD_NAV_LOITER_UNLIM:
@@ -333,6 +340,7 @@ void Plane::do_RTL(int32_t rtl_altitude)
     } else {
         loiter.direction = 1;
     }
+    loiter.velNE.zero();
 
     setup_glide_slope();
     setup_turn_angle();
@@ -874,6 +882,7 @@ void Plane::do_loiter_at_location()
     } else {
         loiter.direction = 1;
     }
+    loiter.velNE.zero();
     next_WP_loc = current_loc;
 }
 

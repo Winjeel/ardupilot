@@ -149,15 +149,29 @@ void Plane::channel_function_mixer(SRV_Channel::Aux_servo_function_t func1_in, S
     float in1 = SRV_Channels::get_output_scaled(func1_in);
     float in2 = SRV_Channels::get_output_scaled(func2_in);
 
-    // apply MIXING_OFFSET to input channels
-    if (g.mixing_offset < 0) {
-        in2 *= (100 - g.mixing_offset) * 0.01;
-    } else if (g.mixing_offset > 0) {
-        in1 *= (100 + g.mixing_offset) * 0.01;
+    // apply gain offset to input channels
+    int16_t gain_offset = 0;
+    float gain;
+    if ((quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) &&
+            quadplane.in_vtol_mode()
+            && !quadplane.reverse_transition_pullup_active) {
+        gain = g.mixing_gain_tvbs;
+        gain_offset = g.mixing_offset_tvbs;
+    } else {
+        gain = g.mixing_gain;
+        gain_offset = g.mixing_offset;
+    }
+
+    if (gain_offset < 0) {
+        in2 *= (float)(100 - gain_offset) * 0.01f;
+        in1 *= (float)(100 + gain_offset) * 0.01f;
+    } else if (gain_offset > 0) {
+        in1 *= (float)(100 + gain_offset) * 0.01f;
+        in2 *= (float)(100 - gain_offset) * 0.01f;
     }
     
-    float out1 = constrain_float((in2 - in1) * g.mixing_gain, -4500, 4500);
-    float out2 = constrain_float((in2 + in1) * g.mixing_gain, -4500, 4500);
+    float out1 = constrain_float((in2 - in1) * gain, -4500, 4500);
+    float out2 = constrain_float((in2 + in1) * gain, -4500, 4500);
     SRV_Channels::set_output_scaled(func1_out, out1);
     SRV_Channels::set_output_scaled(func2_out, out2);
 }
@@ -532,7 +546,7 @@ void Plane::servo_output_mixers(void)
 void Plane::servos_twin_engine_mix(void)
 {
     float throttle = SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
-    float rud_gain = float(plane.g2.rudd_dt_gain) / 100;
+    float rud_gain = 0.01f * float(plane.g2.rudd_dt_gain);
     float rudder = rud_gain * SRV_Channels::get_output_scaled(SRV_Channel::k_rudder) / float(SERVO_MAX);
 
     if (afs.should_crash_vehicle()) {
@@ -541,17 +555,18 @@ void Plane::servos_twin_engine_mix(void)
     }
 
     float throttle_left, throttle_right;
+    float throttle_comp_gain = quadplane.get_fw_throttle_factor();
 
     if (throttle < 0 && have_reverse_thrust() && allow_reverse_thrust()) {
         // doing reverse thrust
-        throttle_left  = constrain_float(throttle + 50 * rudder, -100, 0);
-        throttle_right = constrain_float(throttle - 50 * rudder, -100, 0);
+        throttle_left  =  throttle_comp_gain * constrain_float(throttle + 50.0f * rudder, -100.0f, 0.0f);
+        throttle_right =  throttle_comp_gain * constrain_float(throttle - 50.0f * rudder, -100.0f, 0.0f);
     } else if (throttle <= 0) {
         throttle_left  = throttle_right = 0;
     } else {
         // doing forward thrust
-        throttle_left  = constrain_float(throttle + 50 * rudder, 0, 100);
-        throttle_right = constrain_float(throttle - 50 * rudder, 0, 100);
+        throttle_left  = throttle_comp_gain * constrain_float(throttle + 50.0f * rudder, 0.0f, 100.0f);
+        throttle_right =  throttle_comp_gain * constrain_float(throttle - 50.0f * rudder, 0.0f, 100.0f);
     }
     if (!hal.util->get_soft_armed()) {
         if (arming.arming_required() == AP_Arming::YES_ZERO_PWM) {
@@ -730,8 +745,12 @@ void Plane::servos_output(void)
     // support twin-engine aircraft
     servos_twin_engine_mix();
 
-    // cope with tailsitters
-    quadplane.tailsitter_output();
+    // cope with tailsitters and bellysitters
+    if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TAILSITTER) {
+        quadplane.tailsitter_output();
+    } else if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) {
+        quadplane.tvbs_output();
+    }
     
     // the mixers need pwm to be calculated now
     SRV_Channels::calc_pwm();

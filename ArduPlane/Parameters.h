@@ -165,11 +165,11 @@ public:
         k_param_serial0_baud_old,   // deprecated
         k_param_gcs2,               // stream rates for uartD
         k_param_serial2_baud_old,   // deprecated
-        k_param_serial2_protocol,   // deprecated
 
-        // 120: Fly-by-wire control
+        // 119: Fly-by-wire control
         //
-        k_param_airspeed_min = 120,
+        k_param_flybywire_sink_rate = 119,
+        k_param_airspeed_min,
         k_param_airspeed_max,
         k_param_FBWB_min_altitude_cm,  // 0=disabled, minimum value for altitude in cm (for first time try 30 meters = 3000 cm)
         k_param_flybywire_elev_reverse,
@@ -336,9 +336,8 @@ public:
         k_param_pidNavPitchAirspeed, // unused
         k_param_pidServoRudder, // unused
         k_param_pidTeThrottle, // unused
-        k_param_pidNavPitchAltitude, // unused
-        k_param_pidWheelSteer, // unused
-
+        k_param_mixing_gain_tvbs,
+        k_param_mixing_offset_tvbs,
         k_param_mixing_offset,
         k_param_dspoiler_rud_rate,
 
@@ -407,6 +406,7 @@ public:
     //
     AP_Int8 flybywire_elev_reverse;
     AP_Int8 flybywire_climb_rate;
+    AP_Int8 flybywire_sink_rate;
 
     // Throttle
     //
@@ -448,6 +448,8 @@ public:
     AP_Int8 rudder_only;
     AP_Float mixing_gain;
     AP_Int16 mixing_offset;
+    AP_Float mixing_gain_tvbs;
+    AP_Int16 mixing_offset_tvbs;
     AP_Int16 dspoiler_rud_rate;
     AP_Int16 num_resets;
     AP_Int32 log_bitmask;
