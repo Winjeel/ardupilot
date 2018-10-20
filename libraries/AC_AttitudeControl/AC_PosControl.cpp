@@ -1308,8 +1308,8 @@ void AC_PosControl::reset_wind_drift_integ()
 {
     float vel_forward = 0.01f * (_vehicle_horiz_vel.x * _ahrs.cos_yaw() + _vehicle_horiz_vel.y * _ahrs.sin_yaw());
     float vel_forward_diff = _vel_forward_filt - vel_forward;
-    _vel_xy_error_integ.x += vel_forward_diff * _ahrs.cos_yaw();
-    _vel_xy_error_integ.y += vel_forward_diff * _ahrs.sin_yaw();
+    _vel_xy_error_integ.x += 100.0f * vel_forward_diff * _ahrs.cos_yaw();
+    _vel_xy_error_integ.y += 100.0f * vel_forward_diff * _ahrs.sin_yaw();
     float _vel_xy_error_integ_norm = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
     float _max_airspeed_cms = 100.0f * _fwd_spd_max;
     if (_vel_xy_error_integ_norm > _max_airspeed_cms) {

@@ -429,7 +429,7 @@ protected:
     LowPassFilterFloat _wing_lift_accel_filter;   // low-pass-filter on wing normal force lift accel filter
     LowPassFilterFloat _wing_drag_accel_filter;   // low-pass-filter on wing normal force drag accel filter
     bool _accel_target_xy_updated;      // true when the accel target has been updated on the last cycle and has not been converted toa tit and throttle demand
-    float _vel_forward_filt;            // filtered forward velocity
+    float _vel_forward_filt;            // filtered forward velocity (m/s)
     uint32_t _last_log_time_ms;         // system time of last position controller log
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
