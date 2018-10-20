@@ -275,7 +275,8 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing,
     _pitch_trim_rad(0.0f),
     _accel_target_xy_updated(false),
     _vel_forward_filt(0.0f),
-    _last_log_time_ms(0)
+    _last_log_time_ms(0),
+    _vel_err_i_gain_scale(1.0f)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -1244,9 +1245,11 @@ void AC_PosControl::run_xy_controller(float dt)
     _vel_error.y = _vel_target.y - _vehicle_horiz_vel.y;
     // TODO: constrain velocity error and velocity target
 
-    // calcuate integral of velocity error and constrain
-    _vel_xy_error_integ.x += _vel_err_i_gain * _vel_error.x * dt;
-    _vel_xy_error_integ.y += _vel_err_i_gain * _vel_error.y * dt;
+    // calculate integral of velocity error and constrain
+    // integrator gain can be scaled externally, but asymptotes back to unity over a 1 second time constant if not updated
+    _vel_err_i_gain_scale = constrain_float((1.0f - dt) * _vel_err_i_gain_scale + dt, 1.0f , 10.0f);
+    _vel_xy_error_integ.x += _vel_err_i_gain_scale * _vel_err_i_gain * _vel_error.x * dt;
+    _vel_xy_error_integ.y += _vel_err_i_gain_scale * _vel_err_i_gain * _vel_error.y * dt;
     float _vel_xy_error_integ_norm = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
     float _max_airspeed_cms = 100.0f * _fwd_spd_max;
     if (_vel_xy_error_integ_norm > _max_airspeed_cms) {

@@ -224,6 +224,10 @@ public:
     /// freeze_ff_z - used to stop the feed forward being calculated during a known discontinuity
     void freeze_ff_z() { _flags.freeze_ff_z = true; }
 
+    /// scale wind drift integrator gain - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
+    /// if not updated, scale factor decays to unity
+    void scale_wind_drift_integ_gain(float scale) {_vel_err_i_gain_scale = scale; }
+
     /// resets the wind drift integrator state - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
     void reset_wind_drift_integ();
 
@@ -431,6 +435,7 @@ protected:
     bool _accel_target_xy_updated;      // true when the accel target has been updated on the last cycle and has not been converted toa tit and throttle demand
     float _vel_forward_filt;            // filtered forward velocity (m/s)
     uint32_t _last_log_time_ms;         // system time of last position controller log
+    float _vel_err_i_gain_scale;
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 
