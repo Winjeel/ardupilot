@@ -32,7 +32,7 @@ const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
 
     // @Param: LIM_BANK
     // @DisplayName: Loiter Radius Bank Angle Limit
-    // @Description: The sealevel bank angle limit for a continous loiter. (Used to calculate airframe loading limits at higher altitudes). Setting to 0, will instead just scale the loiter radius directly
+    // @Description: The sealevel bank angle limit for a continous loiter. If left at zero, loiter radius will be increased with altitude to maintain the sea level load factor. If set to a positive value grester than 10 degrees, the loiter radius will be incressed if necessary, taking into account both wind and altitude so that the specified bank angle limit can be respected and still maintain a constant radius loiter.
     // @Units: deg
     // @Range: 0 89
     // @User: Advanced
@@ -137,36 +137,23 @@ float AP_L1_Control::turn_distance(float wp_radius, float turn_angle) const
 
 float AP_L1_Control::loiter_radius(const float radius) const
 {
-    // prevent an insane loiter bank limit
-    float sanitized_bank_limit = constrain_float(_loiter_bank_limit, 0.0f, 89.0f);
-    float lateral_accel_sea_level = tanf(radians(sanitized_bank_limit)) * GRAVITY_MSS;
-
-    float nominal_velocity_sea_level;
-    if(_spdHgtControl == nullptr) {
-        nominal_velocity_sea_level = 0.0f;
+    // Increase the loiter radius if necessary to prevent bank angle saturating
+    float eas2tas = _ahrs.get_EAS2TAS();
+    float min_radius = radius;
+    if (_loiter_bank_limit > 10.0f) {
+        // user has specified navigation bank angle limit, so respect that
+        Vector3f wind = _ahrs.wind_estimate();
+        float wind_speed = sqrtf(wind.x*wind.x+wind.y*wind.y);
+        float true_airspeed = _spdHgtControl->get_target_airspeed() * eas2tas;
+        float max_speed = true_airspeed + wind_speed;
+        float lateral_accel = GRAVITY_MSS * tanf(radians(MIN(_loiter_bank_limit, 80.0f)));
+        min_radius = (max_speed * max_speed) / lateral_accel;
     } else {
-        nominal_velocity_sea_level =  _spdHgtControl->get_target_airspeed();
+        // no sensible bank angle limit has been specified so only adjust for altitude
+        min_radius = min_radius / (eas2tas * eas2tas);
     }
 
-    float eas2tas_sq = sq(_ahrs.get_EAS2TAS());
-
-    if (is_zero(sanitized_bank_limit) || is_zero(nominal_velocity_sea_level) ||
-        is_zero(lateral_accel_sea_level)) {
-        // Missing a sane input for calculating the limit, or the user has
-        // requested a straight scaling with altitude. This will always vary
-        // with the current altitude, but will at least protect the airframe
-        return radius * eas2tas_sq;
-    } else {
-        float sea_level_radius = sq(nominal_velocity_sea_level) / lateral_accel_sea_level;
-        if (sea_level_radius > radius) {
-            // If we've told the plane that its sea level radius is unachievable fallback to
-            // straight altitude scaling
-            return radius * eas2tas_sq;
-        } else {
-            // select the requested radius, or the required altitude scale, whichever is safer
-            return MAX(sea_level_radius * eas2tas_sq, radius);
-        }
-    }
+    return MAX(min_radius, radius);
 }
 
 bool AP_L1_Control::reached_loiter_target(void)
@@ -330,12 +317,12 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 }
 
 // update L1 control for loitering
-void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction)
+void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction, Vector2f center_velNE)
 {
     struct Location _current_loc;
 
     // scale loiter radius with square of EAS2TAS to allow us to stay
-    // stable at high altitude
+    // stable at high altitude and allow for tail wind
     radius = loiter_radius(radius);
 
     // Calculate guidance gains used by PD loop (used during circle tracking)
@@ -353,7 +340,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
         return;
     }
 
-    Vector2f _groundspeed_vector = _ahrs.groundspeed_vector();
+    Vector2f _groundspeed_vector = _ahrs.groundspeed_vector() - center_velNE;
 
     //Calculate groundspeed
     float groundSpeed = MAX(_groundspeed_vector.length() , 1.0f);
