@@ -162,6 +162,9 @@ private:
 
     // setup any special options
     void set_options(uint8_t i);
+
+    // true when there is a GPS2 protocol port configured
+    bool have_gps2;
 };
 
 namespace AP {

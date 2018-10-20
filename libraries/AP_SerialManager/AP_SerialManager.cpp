@@ -282,9 +282,11 @@ void AP_SerialManager::init()
                     state[i].baud = AP_SERIALMANAGER_FRSKY_SPORT_BAUD/1000; // update baud param in case user looks at it
                     // begin is handled by AP_Frsky_telem library
                     break;
-                case SerialProtocol_GPS:
                 case SerialProtocol_GPS2:
-                    state[i].uart->begin(map_baudrate(state[i].baud), 
+                    have_gps2 = true;
+                    FALLTHROUGH;
+                case SerialProtocol_GPS:
+                    state[i].uart->begin(map_baudrate(state[i].baud),
                                          AP_SERIALMANAGER_GPS_BUFSIZE_RX,
                                          AP_SERIALMANAGER_GPS_BUFSIZE_TX);
                     break;
@@ -340,6 +342,11 @@ void AP_SerialManager::init()
 const AP_SerialManager::UARTState *AP_SerialManager::find_protocol_instance(enum SerialProtocol protocol, uint8_t instance) const
 {
     uint8_t found_instance = 0;
+
+    if (protocol == SerialProtocol_GPS2 && !have_gps2 && instance == 0) {
+        protocol = SerialProtocol_GPS;
+        instance = 1;
+    }
 
     // search for matching protocol
     for(uint8_t i=0; i<SERIALMANAGER_NUM_PORTS; i++) {
@@ -477,7 +484,8 @@ bool AP_SerialManager::protocol_match(enum SerialProtocol protocol1, enum Serial
     }
 
     // gps match
-    if (((protocol1 == SerialProtocol_GPS) || (protocol1 == SerialProtocol_GPS2)) &&
+    if (!have_gps2 &&
+        ((protocol1 == SerialProtocol_GPS) || (protocol1 == SerialProtocol_GPS2)) &&
         ((protocol2 == SerialProtocol_GPS) || (protocol2 == SerialProtocol_GPS2))) {
         return true;
     }
