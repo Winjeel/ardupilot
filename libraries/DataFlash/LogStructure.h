@@ -680,6 +680,7 @@ struct PACKED log_PID {
     float   I;
     float   D;
     float   FF;
+    float   Dmod;
 };
 
 struct PACKED log_Current {
@@ -1064,14 +1065,7 @@ struct PACKED log_DSTL {
     int32_t target_lat;
     int32_t target_lng;
     int32_t target_alt;
-    int16_t crosstrack_error;
     int16_t travel_distance;
-    float l1_i;
-    int32_t loiter_sum_cd;
-    float desired;
-    float P;
-    float I;
-    float D;
 };
 
 // #endif // SBP_HW_LOGGING
@@ -1137,10 +1131,10 @@ struct PACKED log_DSTL {
 #define MAG_UNITS "sGGGGGGGGG-s"
 #define MAG_MULTS "FCCCCCCCCC-F"
 
-#define PID_LABELS "TimeUS,Des,Act,P,I,D,FF"
-#define PID_FMT    "Qffffff"
-#define PID_UNITS  "s------"
-#define PID_MULTS  "F------"
+#define PID_LABELS "TimeUS,Des,Act,P,I,D,FF,Dmod"
+#define PID_FMT    "Qfffffff"
+#define PID_UNITS  "s-------"
+#define PID_MULTS  "F-------"
 
 #define QUAT_LABELS "TimeUS,Q1,Q2,Q3,Q4"
 #define QUAT_FMT    "Qffff"
@@ -1412,7 +1406,7 @@ Format characters in the format string for binary log messages
     { LOG_PIDS_MSG, sizeof(log_PID), \
       "PIDS", PID_FMT,  PID_LABELS, PID_UNITS, PID_MULTS }, \
     { LOG_DSTL_MSG, sizeof(log_DSTL), \
-      "DSTL", "QBfLLeccfeffff", "TimeUS,Stg,THdg,Lat,Lng,Alt,XT,Travel,L1I,Loiter,Des,P,I,D", "s??DUm--------", "F??000--------" }, \
+      "DSTL", "QBfLLec", "TimeUS,Stg,THdg,Lat,Lng,Alt,Travel", "s??DUm-", "F??000-" }, \
     { LOG_BAR2_MSG, sizeof(log_BARO), \
       "BAR2",  BARO_FMT, BARO_LABELS, BARO_UNITS, BARO_MULTS }, \
     { LOG_BAR3_MSG, sizeof(log_BARO), \
