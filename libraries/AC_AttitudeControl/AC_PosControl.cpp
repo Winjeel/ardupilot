@@ -719,7 +719,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
         if (_trim_method == 2) {
             // use lookup table method
-            _pitch_trim_rad = get_pitch_trim(_vel_forward_filt);
+            get_pitch_thr_trim(_vel_forward_filt, _pitch_trim_rad, _thr_trim);
         } else if (_trim_method == 1) {
             // use a blend of a linear and quadratic function
             float x; // normalised speed demand varying between -1.0 at _aft_spd_max to +1.0 at _fwd-spd_max
@@ -739,9 +739,11 @@ void AC_PosControl::calc_roll_pitch_throttle()
                 // lean backwards
                 _pitch_trim_rad = - radians(_attitude_control.lean_angle_max_aft() * y);
             }
+            _thr_trim = _motors.get_throttle_hover();
         } else {
             // Don't do trim compensation here
             _pitch_trim_rad = 0.0f;
+            _thr_trim = _motors.get_throttle_hover();
         }
 
         // rotate accelerations into body forward-right frame
@@ -1448,7 +1450,7 @@ Vector3f AC_PosControl::sqrt_controller(const Vector3f& error, float p, float se
 }
 
 
-float AC_PosControl::get_pitch_trim(float spd) {
+void AC_PosControl::get_pitch_thr_trim(float spd, float &pitch_trim_rad, float &thr_trim) {
 
 
     spd = constrain_float(spd, spd_table[0], spd_table[SPD_N_BP-1]);
@@ -1462,17 +1464,19 @@ float AC_PosControl::get_pitch_trim(float spd) {
         }
     }
 
-    float pitch_trim_rad = 0.0f;
     if (low_index >= (SPD_N_BP-1)) {
         pitch_trim_rad = radians(pitch_table[SPD_N_BP-1]);
+        thr_trim = thr_table[SPD_N_BP-1];
     } else if (low_index <= -1) {
         pitch_trim_rad = radians(pitch_table[0]);
+        thr_trim = thr_table[0];
     } else {
-        pitch_trim_rad = radians(pitch_table[low_index]);
         float spd_delta = spd - spd_table[low_index];
-        pitch_trim_rad += (spd_delta / (spd_table[low_index+1]-spd_table[low_index]))*radians((pitch_table[low_index+1] - pitch_table[low_index]));
+        float frac = spd_delta / (spd_table[low_index+1]-spd_table[low_index]);
+        pitch_trim_rad = radians(pitch_table[low_index]);
+        pitch_trim_rad += frac * radians((pitch_table[low_index+1] - pitch_table[low_index]));
+        thr_trim = thr_table[low_index];
+        thr_trim += frac * ((thr_table[low_index+1] - thr_table[low_index]));
     }
-
-    return pitch_trim_rad;
 }
 

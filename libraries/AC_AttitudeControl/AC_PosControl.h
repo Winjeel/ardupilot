@@ -429,6 +429,7 @@ protected:
     float       _distance_to_target;    // distance to position target - for reporting only
     float       _wing_lift_accel_g;     // estimated wing contribution to acceleration in lift direction in g
     float       _pitch_trim_rad;        // feed forward pitch trim angle in radians
+    float       _thr_trim;              // feed forward throttle trim [0 ... 1]
     LowPassFilterFloat _vel_error_filter;   // low-pass-filter on z-axis velocity error
     LowPassFilterFloat _wing_lift_accel_filter;   // low-pass-filter on wing normal force lift accel filter
     LowPassFilterFloat _wing_drag_accel_filter;   // low-pass-filter on wing normal force drag accel filter
@@ -446,9 +447,11 @@ protected:
 #define SPD_N_BP        13
 
     const float pitch_table[SPD_N_BP] =
-    { 75.0f,  67.0f,  55.0f, 48.0f, 37.0f, 21.0f, 0.0f, -21.0f, -37.0f, -48.0f, -55.0f, -67.0f, -75.0f};
+    {80.0f,  70.0f, 60.0f, 45.0f, 0.0f, -45.0f, -60.0f, -70.0f, -75.0f, -80.0f, -85.0f, -88.0f, -90.0f};
     const float spd_table[SPD_N_BP] =
-    {-13.0f, -11.0f, -10.0f, -9.0f, -7.0f, -5.0f, 0.0f,   5.0f,   7.0f,   9.0f,  10.0f,  11.0f,  13.0f};
+    {-10.0f, -9.0f, -7.0f, -5.0f, 0.0f,   5.0f,   7.0f,   8.0f,   9.0f,  11.0f,  13.0f,  15.0f,  20.0f};
+    const float thr_table[SPD_N_BP] =
+    { 0.4f,   0.4f,  0.4f,  0.4f, 0.4f,   0.35f,  0.32f,  0.3f,   0.3f,   0.3f,   0.35f,  0.5f,   0.7f};
 
-    float get_pitch_trim(float spd);
+    void get_pitch_thr_trim(float spd, float &pitch_trim_rad, float &thr_trim);
 };
