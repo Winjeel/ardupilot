@@ -626,6 +626,18 @@ void QuadPlane::tvbs_output(void)
         _ail_gain_factor = constrain_float((1.0f - 0.01f * (float)tailsitter.tvbs_elev_gf * sq_sine_wing_tilt), 0.0f, 1.0f);
     }
 
+    // calculate an elevator used to prevent the wing being less tilted than the rotor at large tilt angles
+    if (pitch_demand_rad < 0.0f &&
+            pitch_312_mea_rad < 0.0f &&
+            pitch_312_mea_rad > pitch_demand_rad) {
+        elev_demand += degrees((pitch_demand_rad - pitch_312_mea_rad) * tailsitter.tvbs_wpe_gain * (-pitch_demand_rad/M_PI_2));
+    } else if (pitch_demand_rad > 0.0f &&
+               pitch_312_mea_rad > 0.0f &&
+               pitch_312_mea_rad < pitch_demand_rad) {
+        elev_demand += degrees((pitch_demand_rad - pitch_312_mea_rad) * tailsitter.tvbs_wpe_gain * (pitch_demand_rad/M_PI_2));
+    }
+
+    // sum all elevator contributions and limit to channel range
     elev_demand = constrain_float(elev_demand * propwash_gain_factor * _elev_gain_factor + elev_trim_deg, -45.0f, 45.0f);
 
     // Calculate the slew rate amplitude produced by the unmodified control feedback

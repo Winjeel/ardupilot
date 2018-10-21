@@ -592,6 +592,14 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_TO_SCALER", 38, QuadPlane, tailsitter.tvbs_to_scaler, 5.0f),
 
+    // @Param: TVBS_WPE_GAIN
+    // @DisplayName: Gain from wing pitch angle error to elevator.
+    // @Description: Used in high rotor tilt situations to allow the wing to re-trim to follow the rotor tilt, reduce wing drag and allow a larger forward speed in VTOL modes.
+    // @Range: 0.0 2.0
+    // @Increment: 0.05
+    // @User: Standard
+    AP_GROUPINFO("TVBS_WPE_GAIN", 39, QuadPlane, tailsitter.tvbs_wpe_gain, 0.0f),
+
     AP_GROUPEND
 };
 

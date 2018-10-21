@@ -469,6 +469,7 @@ private:
         AP_Int8 tvbs_fw_ail_deadband_deg;   // the number of degrees of equivalent aileron deflection before thrust vectoring is added to augment control authority in forward flight
         AP_Float tvbs_fw_ail_fwd_gain;      // the gain from equivalent aileron deflection to thrust vectoring used in forward flight
         AP_Float tvbs_to_scaler;            // scaler applied to position controller wind drift integrator during first part of takeoff
+        AP_Float tvbs_wpe_gain;             // gain from wing pitch error to elevator
 
     } tailsitter;
 
