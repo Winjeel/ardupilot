@@ -689,11 +689,10 @@ void Plane::update_flight_mode(void)
                     nav_pitch_cd = 9000 - (int32_t)(100.0f * quadplane.attitude_control->lean_angle_max_fwd());
                 }
             }
-            // For TVBS, the pitch range is asymmetric
             if (pitch_input >= 0.0f) {
-                nav_pitch_cd = (int32_t)(100.0f * pitch_input * quadplane.attitude_control->lean_angle_max_aft());
+                nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_fwd(), quadplane.aparm.angle_max));
             } else {
-                nav_pitch_cd = (int32_t)(100.0f * pitch_input * quadplane.attitude_control->lean_angle_max_fwd());
+                nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_aft(), quadplane.aparm.angle_max));
             }
         } else {
             // pitch is further constrained by LIM_PITCH_MIN/MAX which may impose
