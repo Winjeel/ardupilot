@@ -43,8 +43,9 @@ static const double RAD_TO_DEG_DOUBLE = 1 / DEG_TO_RAD_DOUBLE;
 
 #define RadiansToCentiDegrees(x) (static_cast<float>(x) * RAD_TO_DEG * static_cast<float>(100))
 
-// acceleration due to gravity in m/s/s
+// acceleration due to gravity in m/s/s and cm/s/s
 #define GRAVITY_MSS     9.80665f
+#define GRAVITY_CMSS    980.665f
 
 // radius of earth in meters
 #define RADIUS_OF_EARTH 6378100
