@@ -239,10 +239,11 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
 
     // @Param: _FWD_BCOEF
     // @DisplayName: Profile drag ballistic coefficient for forward flight.
-    // @Range: 100.0 1000.0
+    // @Description: Is equivalent to mass / (area * drag_coef)
+    // @Range: 10.0 100.0
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 500.0f),
+    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 25.0f),
 
     AP_GROUPEND
 };
@@ -739,7 +740,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
         // use forward velocity to calculate a profile drag that needs to be overcome by the rotors
         float rho = 1.225f / sqrtf(_ahrs.get_EAS2TAS());
-        float fwd_g_trim = (rho / (2.0f * MAX(_fwd_bcoef, 1.0f))) * _vel_forward_filt * _vel_forward_filt;
+        float fwd_g_trim = (rho / (2.0f * MAX(_fwd_bcoef, 1.0f))) * (_vel_forward_filt * _vel_forward_filt) / GRAVITY_MSS;
         if (_vel_forward_filt < 0.0f) {
             fwd_g_trim = - fwd_g_trim;
         }
@@ -750,13 +751,14 @@ void AC_PosControl::calc_roll_pitch_throttle()
         fwd_g_trim = constrain_float(fwd_g_trim, -1.0f, 1.0f);
 
         // rotate position controller accelerations into body forward-right frame
-        float accel_forward_feedback = _accel_target.x*_ahrs.cos_yaw() + _accel_target.y*_ahrs.sin_yaw();
-        float accel_right = -_accel_target.x*_ahrs.sin_yaw() + _accel_target.y*_ahrs.cos_yaw();
+        float fwd_g_posctl = (_accel_target.x*_ahrs.cos_yaw() + _accel_target.y*_ahrs.sin_yaw()) / GRAVITY_CMSS;
+        fwd_g_posctl = constrain_float(fwd_g_posctl, -1.0f, 1.0f);
+        float right_g_posctl = (-_accel_target.x*_ahrs.sin_yaw() + _accel_target.y*_ahrs.cos_yaw()) / GRAVITY_CMSS;
+        right_g_posctl = constrain_float(right_g_posctl, -1.0f, 1.0f);
 
         // combine fwd and vertical g demands to obtain the required thrust g vector
-        float forward_g_feedback = _fwd_acc_gain * constrain_float(accel_forward_feedback / (GRAVITY_MSS * 100.0f), -1.0f, 1.0f);
-        float fwd_g_demand = fwd_g_trim + forward_g_feedback;
-        float pitch_target_rad = atanf(- fwd_g_demand / lift_g_demand);
+        float fwd_g_demand = fwd_g_trim + fwd_g_posctl;
+        float pitch_target_rad = atan2f(-fwd_g_demand , lift_g_demand);
         float thrust_g_demand = sqrtf(fwd_g_demand * fwd_g_demand + lift_g_demand * lift_g_demand);
 
         // Limit the pitch target
@@ -772,7 +774,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
         // calculate the roll assuming only rotor  provides significant force in that direction
         float cos_pitch_target = cosf(pitch_target_rad);
         _pitch_target_cd = 100.0f *  degrees(pitch_target_rad);
-        _roll_target_cd = atanf(accel_right*cos_pitch_target/(GRAVITY_MSS * 100.0f))*(180.0f/M_PI);
+        _roll_target_cd = degrees(atanf(right_g_posctl * cos_pitch_target)) ;
         _roll_target_cd = 100.0f * constrain_float(_roll_target_cd, -_attitude_control.lean_angle_max_lat(), _attitude_control.lean_angle_max_lat());
 
         // send throttle to attitude controller without angle boost
@@ -782,17 +784,17 @@ void AC_PosControl::calc_roll_pitch_throttle()
         if (now - _last_log_time_ms >= 50 || now == _last_log_time_ms) {
             _last_log_time_ms = now;
 
-            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,AFF,AR,FGT,FGF,TGD,PTC", "Qfffffffff",
+            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,FGP,RGP,FGT,TGD,PTC,RTC", "Qfffffffff",
                                                    AP_HAL::micros64(),
                                                    (double)(0.01f*_vel_xy_error_integ.x),
                                                    (double)(0.01f*_vel_xy_error_integ.y),
                                                    (double)_vel_forward_filt,
-                                                   (double)accel_forward_feedback,
-                                                   (double)accel_right,
+                                                   (double)fwd_g_posctl,
+                                                   (double)right_g_posctl,
                                                    (double)fwd_g_trim,
-                                                   (double)forward_g_feedback,
                                                    (double)thrust_g_demand,
-                                                   (double)_pitch_target_cd);
+                                                   (double)_pitch_target_cd,
+                                                   (double)_roll_target_cd);
 
             // write generic multicopter position control message
             write_log();
