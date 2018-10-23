@@ -1693,6 +1693,13 @@ void QuadPlane::update(void)
         // ensure that tailsitter attitude controllers are reset on the first frame when arming
         attitude_control->relax_attitude_controllers();
     }
+
+    // Initialise takeoff states when arming becasue we may have spent significant time armed prior to takeoff
+    if (soft_arm_status && !soft_arm_status_prev) {
+        init_takeoff_this_frame = true;
+    } else {
+        init_takeoff_this_frame = false;
+    }
     soft_arm_status_prev = soft_arm_status;
 
     check_yaw_reset();
@@ -2326,9 +2333,7 @@ void QuadPlane::setup_target_position(void)
  */
 void QuadPlane::takeoff_controller(void)
 {
-    /*
-      for takeoff we use the position controller
-    */
+    // for takeoff we use the position controller
     check_attitude_relax();
 
     // ensure motor throttle limits are removed
@@ -2428,6 +2433,10 @@ void QuadPlane::control_auto(const Location &loc)
     case MAV_CMD_NAV_VTOL_TAKEOFF:
     case MAV_CMD_NAV_TAKEOFF:
         if (is_vtol_takeoff(id)) {
+            // Initialise the takeoff when the vehicle arms
+            if (init_takeoff_this_frame) {
+                do_vtol_takeoff(plane.mission.get_current_nav_cmd());
+            }
             takeoff_controller();
         }
         break;
@@ -2521,6 +2530,7 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
     }
     throttle_wait = false;
     takeoff_reset_complete = false;
+    init_takeoff_this_frame = false;
 
     // set target to current position
     loiter_nav->clear_pilot_desired_acceleration();
@@ -2538,6 +2548,9 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
     pos_control->set_desired_accel_xy(0.0f,0.0f);
     takeoff_alt_cm = plane.current_loc.alt;
     pos_control->set_desired_velocity_z(0.0f);
+
+    // tell position controller to prepare for takeoff
+    pos_control->init_takeoff();
 
     // also update nav_controller for status output
     plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);
