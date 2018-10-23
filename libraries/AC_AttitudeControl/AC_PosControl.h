@@ -394,6 +394,7 @@ protected:
     AP_Float    _aft_spd_max;           // trim speed in m/s at max rearward lean specified by _aft_lean_max
     AP_Float    _fwd_az_gf;             // AZ PD gain reduction applied during forward flight
     AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
+    AP_Float    _fwd_inflow_thrust_factor; // prop throttle inflow correction factor 1/(m/s)
 
 
     // internal variables

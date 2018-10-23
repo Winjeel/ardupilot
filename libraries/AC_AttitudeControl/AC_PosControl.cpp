@@ -234,17 +234,24 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @DisplayName: Vertical PD Gain Reduction Factor.
     // @Description: Used to compensate for the increased sensitivity from rotor tilt angle to vertical g during high speed VTOL operation due to wing lift.
     // @Range: 0.0 0.9
-    // @Increment: 1
+    // @Increment: 0.05
     // @User: Advanced
     AP_GROUPINFO("_FWD_AZ_GF",  17, AC_PosControl, _fwd_az_gf, 0.5f),
 
     // @Param: _FWD_BCOEF
     // @DisplayName: Profile drag ballistic coefficient for forward flight.
-    // @Description: Is equivalent to mass / (area * drag_coef)
-    // @Range: 10.0 50.0
-    // @Increment: 1
+    // @Description: Is equivalent to mass / (area * drag_coef). Set initially to a value consistent with profile drag at _FWD_SPD_MAX.
+    // @Range: 10.0 1000.0
+    // @Increment: 5
     // @User: Advanced
-    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 30.0f),
+    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 110.0f),
+
+    // @Param: _FWD_INFLOW
+    // @DisplayName: Propeller inflow correction factor.
+    // @Description: Gain from estimated inflow to demanded throttle and normalised using hover throttle. Used to correct for reduction in thrust when flying forward. For example a value of 0.01 will increase the throttle by 0.1 (10%) when flying with props tilted forward into a 10m/s airflow.
+    // @Range: 0.0 0.05
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_INFLOW",  19, AC_PosControl, _fwd_inflow_thrust_factor, 0.007f),
 
     AP_GROUPEND
 };
@@ -788,8 +795,10 @@ void AC_PosControl::calc_roll_pitch_throttle()
         pitch_target_rad = constrain_float(pitch_target_rad, min_pitch_angle, max_pitch_angle);
 
         // calculate throttle required to generate thrust
-        // TODO better method of scaling that compensates for airspeed and rotor tilt
-        throttle_demand = thrust_g_demand * _motors.get_throttle_hover();
+        // rough correction for prop inflow is included - needs refinement
+        float vel_inflow = MAX(- _vel_forward_filt * sinf(pitch_target_rad), 0.0f);
+        float thrust_g_inflow = _fwd_inflow_thrust_factor * vel_inflow;
+        throttle_demand = constrain_float((thrust_g_demand + thrust_g_inflow) * _motors.get_throttle_hover(), 0.0f, 1.0f);
 
         // rotate the thrust vector and adjust the magnitude to maintain lift and achieve the required forward acceleration
         // calculate the roll assuming only rotor  provides significant force in that direction
@@ -805,7 +814,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
         if (now - _last_log_time_ms >= 50 || now == _last_log_time_ms) {
             _last_log_time_ms = now;
 
-            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,FGP,RGP,FGT,TGD,PTC,RTC", "Qfffffffff",
+            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,FGP,RGP,FGT,TGD,TGI,PTC,RTC", "Qffffffffff",
                                                    AP_HAL::micros64(),
                                                    (double)(0.01f*_vel_xy_error_integ.x),
                                                    (double)(0.01f*_vel_xy_error_integ.y),
@@ -814,6 +823,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
                                                    (double)right_g_posctl,
                                                    (double)fwd_g_trim,
                                                    (double)thrust_g_demand,
+                                                   (float)thrust_g_inflow,
                                                    (double)_pitch_target_cd,
                                                    (double)_roll_target_cd);
 
@@ -829,9 +839,6 @@ void AC_PosControl::calc_roll_pitch_throttle()
         _attitude_control.set_throttle_out(throttle_demand, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
 
     }
-
-
-
 }
 
 ///
