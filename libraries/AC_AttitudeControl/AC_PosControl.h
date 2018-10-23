@@ -393,6 +393,7 @@ protected:
     AP_Float    _fwd_spd_max;           // trim speed in m/s at max forward lean specified by _fwd_lean_max
     AP_Float    _aft_spd_max;           // trim speed in m/s at max rearward lean specified by _aft_lean_max
     AP_Float    _fwd_acc_gain;          // gain applied to longitudinal acceleraton demands in throttle and tilt calculation
+    AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
 
 
     // internal variables
@@ -427,7 +428,6 @@ protected:
     Vector2f    _vel_xy_error_integ;    // integral of error between NE desired and actual velocity in cm/s and equivalent to reciprocal of wind velocity vector
     float       _vel_xy_integ_length_prev;
     float       _distance_to_target;    // distance to position target - for reporting only
-    float       _wing_lift_accel_g;     // estimated wing contribution to acceleration in lift direction in g
     float       _pitch_trim_rad;        // feed forward pitch trim angle in radians
     float       _thr_trim;              // feed forward throttle trim [0 ... 1]
     LowPassFilterFloat _vel_error_filter;   // low-pass-filter on z-axis velocity error

@@ -237,6 +237,12 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_FWD_ACC_GAIN",  17, AC_PosControl, _fwd_acc_gain, 1.0f),
 
+    // @Param: _FWD_BCOEF
+    // @DisplayName: Profile drag ballistic coefficient for forward flight.
+    // @Range: 100.0 1000.0
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 500.0f),
 
     AP_GROUPEND
 };
@@ -271,7 +277,6 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing,
     _pitch_target_cd(0.0f),
     _vel_xy_integ_length_prev(0.0f),
     _distance_to_target(0.0f),
-    _wing_lift_accel_g(0.0f),
     _pitch_trim_rad(0.0f),
     _accel_target_xy_updated(false),
     _vel_forward_filt(0.0f),
@@ -695,104 +700,98 @@ void AC_PosControl::calc_roll_pitch_throttle()
     // get d term
     d = _pid_accel_z.get_d();
 
-    float throttle_lift_pid = (p+i+d)*0.001f;
-    float throttle_lift_demand = throttle_lift_pid +_motors.get_throttle_hover();
+    // calculate the lift g demand scaled as an equivalent throttle
+    float lift_g_pid = (p+i+d)*0.001f;
+    float lift_g_demand = (1.0f + lift_g_pid);
 
-    // get wing normal g in lift direction
-    float K_z_to_d = _ahrs_wing.cos_pitch() * _ahrs_wing.cos_roll();
-    float lift_accel = - K_z_to_d * AP::ins().get_accel().z;
-    lift_accel -= 0.01f * z_accel_meas * K_z_to_d * K_z_to_d;
-    _wing_lift_accel_g = _wing_lift_accel_filter.apply(lift_accel / GRAVITY_MSS, _dt);
+    // estimate wing force normal g in lift direction
+    float wing_lift_g = _accel_z_wing_k * _ahrs_wing.cos_pitch() * _ahrs_wing.cos_pitch();
+    wing_lift_g = _wing_lift_accel_filter.apply(wing_lift_g, _dt);
+    wing_lift_g = constrain_float(wing_lift_g, 0.0f, 1.0f);
 
-    // multiply by gain, scale using hover throttle, constrain and subtract from throttle out
-    float wing_lift_scaler = constrain_float(_wing_lift_accel_g * _accel_z_wing_k, 0.0f, 0.5f);
-    throttle_lift_demand -= _motors.get_throttle_hover() * wing_lift_scaler;
+    // get the lift g required from the rotors taking wing lift into account
+    lift_g_demand -=  wing_lift_g;
+    lift_g_demand = constrain_float(lift_g_demand, 0.0f, 2.0f);
 
+    // Logging for debug and tuning of TVBS positon controller mods
+    uint32_t now = AP_HAL::millis();
+    if (now - _last_log_time_ms >= 50) {
+        _last_log_time_ms = now;
+        DataFlash_Class::instance()->Log_Write("TVB1", "TimeUS,TLP,HT,WLG,LGD", "Qffff",
+                                               AP_HAL::micros64(),
+                                               (double)lift_g_pid,
+                                               (double)_motors.get_throttle_hover(),
+                                               (double)wing_lift_g,
+                                               (double)lift_g_demand);
+
+    }
+
+    // calculate the throttle demand using one of two methods
+    // the first combines the horizontal velocity and acceleration demand from the positon controller with the lift_g_demand
+    // the second is if there is no horizontal demand, and the pilot is demanding rotor tilt directly.
     float throttle_demand;
     if (_accel_target_xy_updated) {
         _accel_target_xy_updated = false;
         // get component of velocity demand forward in wind coordinates
-        // use lookup table to calculate trim pitch required for level flight at that speed
         float vel_forward = 0.01f * ((_vel_target.x + _vel_xy_error_integ.x) * _ahrs.cos_yaw() + (_vel_target.y + _vel_xy_error_integ.y) * _ahrs.sin_yaw());
         float alpha_coef = constrain_float(_dt / MAX(_trim_tau,0.1f),0.0f,1.0f);
         _vel_forward_filt = alpha_coef * vel_forward + (1.0f - alpha_coef) * _vel_forward_filt;
 
-        if (_trim_method == 2) {
-            // use lookup table method
-            get_pitch_thr_trim(_vel_forward_filt, _pitch_trim_rad, _thr_trim);
-        } else if (_trim_method == 1) {
-            // use a blend of a linear and quadratic function
-            float x; // normalised speed demand varying between -1.0 at _aft_spd_max to +1.0 at _fwd-spd_max
-            float y; //normalised pitch trim demand varying between -1.0 at _aft_spd_max to +1.0 at _fwd-spd_max
-            if (_vel_forward_filt >= 0.0f) {
-                x = MIN((_vel_forward_filt / _fwd_spd_max), 1.0f);
-                y = (1.0f - _spd_to_lean_exp)*x + _spd_to_lean_exp*sq(x);
-            } else {
-                x = MAX((_vel_forward_filt / _fwd_spd_max), -1.0f);
-                y = (1.0f - _spd_to_lean_exp)*x - _spd_to_lean_exp*sq(x);
-            }
-            y = constrain_float(y, -1.0f, 1.0f);
-            if (y >= 0.0f) {
-                // lean forwards
-                _pitch_trim_rad = - radians(_attitude_control.lean_angle_max_fwd() * y);
-            } else {
-                // lean backwards
-                _pitch_trim_rad = - radians(_attitude_control.lean_angle_max_aft() * y);
-            }
-            _thr_trim = _motors.get_throttle_hover();
-        } else {
-            // Don't do trim compensation here
-            _pitch_trim_rad = 0.0f;
-            _thr_trim = _motors.get_throttle_hover();
+        // use forward velocity to calculate a profile drag that needs to be overcome by the rotors
+        float rho = 1.225f / sqrtf(_ahrs.get_EAS2TAS());
+        float fwd_g_trim = (rho / (2.0f * MAX(_fwd_bcoef, 1.0f))) * _vel_forward_filt * _vel_forward_filt;
+        if (_vel_forward_filt < 0.0f) {
+            fwd_g_trim = - fwd_g_trim;
         }
 
-        // rotate accelerations into body forward-right frame
+        // compensate for wing normal force in the forward flight direction that needs to be overcome by the rotors
+        fwd_g_trim += _accel_z_wing_k * _ahrs_wing.sin_pitch() * _ahrs_wing.cos_pitch() * _ahrs_wing.cos_roll();
+        fwd_g_trim = _wing_drag_accel_filter.apply(fwd_g_trim, _dt);
+        fwd_g_trim = constrain_float(fwd_g_trim, -1.0f, 1.0f);
+
+        // rotate position controller accelerations into body forward-right frame
         float accel_forward_feedback = _accel_target.x*_ahrs.cos_yaw() + _accel_target.y*_ahrs.sin_yaw();
         float accel_right = -_accel_target.x*_ahrs.sin_yaw() + _accel_target.y*_ahrs.cos_yaw();
 
-        // rotate thrust vector about the trim condition to achieve required vertical and horizontal accel
-        float lift_g_demand = constrain_float(throttle_lift_demand / _motors.get_throttle_hover(), 0.25f, 2.0f);
-        float forward_g_trim = -constrain_float(lift_g_demand * tanf(_pitch_trim_rad), -2.0f, 2.0f);
-        float forward_g_feedback = constrain_float(accel_forward_feedback / (GRAVITY_MSS * 100.0f), -2.0f, 2.0f);
-        float pitch_target_unlimited = atanf(-(forward_g_trim + _fwd_acc_gain * forward_g_feedback) / lift_g_demand);
+        // combine fwd and vertical g demands to obtain the required thrust g vector
+        float forward_g_feedback = _fwd_acc_gain * constrain_float(accel_forward_feedback / (GRAVITY_MSS * 100.0f), -1.0f, 1.0f);
+        float fwd_g_demand = fwd_g_trim + forward_g_feedback;
+        float pitch_target_rad = atanf(- fwd_g_demand / lift_g_demand);
+        float thrust_g_demand = sqrtf(fwd_g_demand * fwd_g_demand + lift_g_demand * lift_g_demand);
 
         // Limit the pitch target
         float min_pitch_angle = -radians(_attitude_control.lean_angle_max_fwd());
         float max_pitch_angle = radians(_attitude_control.lean_angle_max_aft());
-        _pitch_target_cd = constrain_float(pitch_target_unlimited, min_pitch_angle, max_pitch_angle);
+        pitch_target_rad = constrain_float(pitch_target_rad, min_pitch_angle, max_pitch_angle);
 
-        // calculate throttle required to generate lift
-        throttle_demand = throttle_lift_demand / cosf(_pitch_target_cd);
+        // calculate throttle required to generate thrust
+        // TODO better method of scaling that compensates for airspeed and rotor tilt
+        throttle_demand = thrust_g_demand * _motors.get_throttle_hover();
 
         // rotate the thrust vector and adjust the magnitude to maintain lift and achieve the required forward acceleration
         // calculate the roll assuming only rotor  provides significant force in that direction
-        float cos_pitch_target = cosf(_pitch_target_cd);
-        _pitch_target_cd *= (18000.0f/M_PI);
+        float cos_pitch_target = cosf(pitch_target_rad);
+        _pitch_target_cd = 100.0f *  degrees(pitch_target_rad);
         _roll_target_cd = atanf(accel_right*cos_pitch_target/(GRAVITY_MSS * 100.0f))*(180.0f/M_PI);
         _roll_target_cd = 100.0f * constrain_float(_roll_target_cd, -_attitude_control.lean_angle_max_lat(), _attitude_control.lean_angle_max_lat());
 
-        // Logging for debug and tuning of TVBS positon controller mods
-        uint32_t now = AP_HAL::millis();
-        if (now - _last_log_time_ms >= 50) {
-            _last_log_time_ms = now;
-            DataFlash_Class::instance()->Log_Write("TVB1", "TimeUS,TLP,TLH,WLS,TD", "Qffff",
-                                                   AP_HAL::micros64(),
-                                                   (double)throttle_lift_pid,
-                                                   (double)_motors.get_throttle_hover(),
-                                                   (double)wing_lift_scaler,
-                                                   (double)throttle_demand);
+        // send throttle to attitude controller without angle boost
+        _attitude_control.set_throttle_out(throttle_demand, false, POSCONTROL_THROTTLE_CUTOFF_FREQ);
 
-            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,PTR,AFF,AR,LGD,FGT,FGF,PTC", "Qffffffffff",
+        // Logging for debug and tuning of TVBS positon controller mods
+        if (now - _last_log_time_ms >= 50 || now == _last_log_time_ms) {
+            _last_log_time_ms = now;
+
+            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,AFF,AR,FGT,FGF,TGD,PTC", "Qfffffffff",
                                                    AP_HAL::micros64(),
                                                    (double)(0.01f*_vel_xy_error_integ.x),
                                                    (double)(0.01f*_vel_xy_error_integ.y),
                                                    (double)_vel_forward_filt,
-                                                   (double)_pitch_trim_rad,
                                                    (double)accel_forward_feedback,
                                                    (double)accel_right,
-                                                   (double)lift_g_demand,
-                                                   (double)forward_g_trim,
+                                                   (double)fwd_g_trim,
                                                    (double)forward_g_feedback,
+                                                   (double)thrust_g_demand,
                                                    (double)_pitch_target_cd);
 
             // write generic multicopter position control message
@@ -800,12 +799,14 @@ void AC_PosControl::calc_roll_pitch_throttle()
         }
 
     } else {
-        throttle_demand = throttle_lift_demand;
+        // multiply by hover throttle (only works properly when motors are pointing up)
+        throttle_demand = lift_g_demand * _motors.get_throttle_hover();
+
+        // send throttle to attitude controller with angle boost
+        _attitude_control.set_throttle_out(throttle_demand, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
 
     }
 
-    // send throttle to attitude controller with angle boost
-    _attitude_control.set_throttle_out(throttle_demand, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
 
 
 }
