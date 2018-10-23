@@ -283,7 +283,8 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing,
     _accel_target_xy_updated(false),
     _vel_forward_filt(0.0f),
     _last_log_time_ms(0),
-    _vel_err_i_gain_scale(1.0f)
+    _vel_err_i_gain_scale(1.0f),
+    _taking_off(false)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -520,9 +521,12 @@ void AC_PosControl::get_stopping_point_z(Vector3f& stopping_point) const
 /// init_takeoff - initialises target altitude if we are taking off
 void AC_PosControl::init_takeoff()
 {
+    // Set demanded position to current value
     const Vector3f& curr_pos = _inav.get_position();
-
     _pos_target.z = curr_pos.z;
+
+    // tell the position controller to keep rotors level until takeoff is confirmed
+    _taking_off = true;
 
     // freeze feedforward to avoid jump
     freeze_ff_z();
@@ -532,6 +536,7 @@ void AC_PosControl::init_takeoff()
 
     // initialise ekf reset handler
     init_ekf_z_reset();
+
 }
 
 // is_active_z - returns true if the z-axis position controller has been run very recently
@@ -706,6 +711,20 @@ void AC_PosControl::calc_roll_pitch_throttle()
     float az_pd_gain = constrain_float(1.0f - _fwd_az_gf * _ahrs_wing.cos_pitch(), 0.1f, 1.0f);
     float lift_g_pid = (az_pd_gain * p + i + az_pd_gain * d) * 0.001f;
     float lift_g_demand = (1.0f + lift_g_pid);
+
+    if (_taking_off) {
+        // send lift demand direct to throttle and keep rotors level
+        _attitude_control.set_throttle_out(lift_g_demand * _motors.get_throttle_hover(), false, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+        _pitch_target_cd = 0.0f;
+        _roll_target_cd = 0.0f;
+
+        // if wing has pitched up past 45 degrees, assume we have cleared the ground
+        if (_ahrs_wing.cos_pitch() < 0.7071f) {
+            _taking_off = false;
+        }
+
+        return;
+    }
 
     // estimate wing force normal g in lift direction
     float wing_lift_g = _accel_z_wing_k * _ahrs_wing.cos_pitch() * _ahrs_wing.cos_pitch();

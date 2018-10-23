@@ -436,7 +436,8 @@ protected:
     bool _accel_target_xy_updated;      // true when the accel target has been updated on the last cycle and has not been converted toa tit and throttle demand
     float _vel_forward_filt;            // filtered forward velocity (m/s)
     uint32_t _last_log_time_ms;         // system time of last position controller log
-    float _vel_err_i_gain_scale;
+    float _vel_err_i_gain_scale;        // scaler applied to wind drift integrator - asymptotes to 1 if not changed
+    bool _taking_off;                   // set to true prior to takeoff and cleared when in-air checks pass
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 
