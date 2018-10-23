@@ -284,7 +284,7 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing,
     _vel_forward_filt(0.0f),
     _last_log_time_ms(0),
     _vel_err_i_gain_scale(1.0f),
-    _taking_off(false)
+    _taking_off(true)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
