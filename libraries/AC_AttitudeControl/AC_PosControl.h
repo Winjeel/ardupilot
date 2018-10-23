@@ -392,7 +392,7 @@ protected:
     AP_Float    _vel_err_i_gain;        // gain from integral of ground velocity error to demanded airspeed
     AP_Float    _fwd_spd_max;           // trim speed in m/s at max forward lean specified by _fwd_lean_max
     AP_Float    _aft_spd_max;           // trim speed in m/s at max rearward lean specified by _aft_lean_max
-    AP_Float    _fwd_acc_gain;          // gain applied to longitudinal acceleraton demands in throttle and tilt calculation
+    AP_Float    _fwd_az_gf;             // AZ PD gain reduction applied during forward flight
     AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
 
 

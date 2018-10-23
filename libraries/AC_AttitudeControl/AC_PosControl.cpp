@@ -230,20 +230,21 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_AFT_SPD_MAX",  16, AC_PosControl, _aft_spd_max, 15.0f),
 
-    // @Param: _FWD_ACC_GAIN
-    // @DisplayName: Gain applied to longitudinal accel demands from position controller.
-    // @Range: 0.0 1.0
+    // @Param: _FWD_AZ_GF
+    // @DisplayName: Vertical PD Gain Reduction Factor.
+    // @Description: Used to compensate for the increased sensitivity from rotor tilt angle to vertical g during high speed VTOL operation due to wing lift.
+    // @Range: 0.0 0.9
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("_FWD_ACC_GAIN",  17, AC_PosControl, _fwd_acc_gain, 1.0f),
+    AP_GROUPINFO("_FWD_AZ_GF",  17, AC_PosControl, _fwd_az_gf, 0.5f),
 
     // @Param: _FWD_BCOEF
     // @DisplayName: Profile drag ballistic coefficient for forward flight.
     // @Description: Is equivalent to mass / (area * drag_coef)
-    // @Range: 10.0 100.0
+    // @Range: 10.0 50.0
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 25.0f),
+    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 30.0f),
 
     AP_GROUPEND
 };
@@ -702,7 +703,8 @@ void AC_PosControl::calc_roll_pitch_throttle()
     d = _pid_accel_z.get_d();
 
     // calculate the lift g demand scaled as an equivalent throttle
-    float lift_g_pid = (p+i+d)*0.001f;
+    float az_pd_gain = constrain_float(1.0f - _fwd_az_gf * _ahrs_wing.cos_pitch(), 0.1f, 1.0f);
+    float lift_g_pid = (az_pd_gain * p + i + az_pd_gain * d) * 0.001f;
     float lift_g_demand = (1.0f + lift_g_pid);
 
     // estimate wing force normal g in lift direction
@@ -718,7 +720,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
     uint32_t now = AP_HAL::millis();
     if (now - _last_log_time_ms >= 50) {
         _last_log_time_ms = now;
-        DataFlash_Class::instance()->Log_Write("TVB1", "TimeUS,TLP,HT,WLG,LGD", "Qffff",
+        DataFlash_Class::instance()->Log_Write("TVB1", "TimeUS,LGP,HT,WLG,LGD", "Qffff",
                                                AP_HAL::micros64(),
                                                (double)lift_g_pid,
                                                (double)_motors.get_throttle_hover(),
