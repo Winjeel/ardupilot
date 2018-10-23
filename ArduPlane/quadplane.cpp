@@ -2359,7 +2359,7 @@ void QuadPlane::takeoff_controller(void)
                                                                       get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
     }
 
-    pos_control->set_alt_target_from_climb_rate_ff(pilot_velocity_z_max, plane.G_Dt, false);
+    pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
     run_z_controller();
 
     // trigger a position controller wind drift state reset if vehicle drits outside a +- 45 degree cone centred on the takeoff location.
