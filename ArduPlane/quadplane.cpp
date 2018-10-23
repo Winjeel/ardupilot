@@ -1702,6 +1702,11 @@ void QuadPlane::update(void)
     }
     soft_arm_status_prev = soft_arm_status;
 
+    // Initialise controller states in perparation for a takeoff when the vehicle arms
+    if (init_takeoff_this_frame) {
+        do_vtol_takeoff(plane.mission.get_current_nav_cmd());
+    }
+
     check_yaw_reset();
     
     if (!in_vtol_mode()) {
@@ -2433,10 +2438,6 @@ void QuadPlane::control_auto(const Location &loc)
     case MAV_CMD_NAV_VTOL_TAKEOFF:
     case MAV_CMD_NAV_TAKEOFF:
         if (is_vtol_takeoff(id)) {
-            // Initialise the takeoff when the vehicle arms
-            if (init_takeoff_this_frame) {
-                do_vtol_takeoff(plane.mission.get_current_nav_cmd());
-            }
             takeoff_controller();
         }
         break;
