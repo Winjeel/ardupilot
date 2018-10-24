@@ -386,12 +386,9 @@ protected:
     AC_PID      _pid_accel_z;
     AC_P        _p_pos_xy;
     AC_PID_2D   _pid_vel_xy;
-    AP_Float    _spd_to_lean_exp;       // amount of exponential applied to speed to lean function
-    AP_Int8     _trim_method;           // 0: No trim compensation, 1: Use linear gain method, 2: Use wing normal g, 3 Use lookup table
     AP_Float    _trim_tau;              // time constant applied to trim corrections
     AP_Float    _vel_err_i_gain;        // gain from integral of ground velocity error to demanded airspeed
     AP_Float    _fwd_spd_max;           // trim speed in m/s at max forward lean specified by _fwd_lean_max
-    AP_Float    _aft_spd_max;           // trim speed in m/s at max rearward lean specified by _aft_lean_max
     AP_Float    _fwd_az_gf;             // AZ PD gain reduction applied during forward flight
     AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
     AP_Float    _fwd_inflow_thrust_factor; // prop throttle inflow correction factor 1/(m/s)

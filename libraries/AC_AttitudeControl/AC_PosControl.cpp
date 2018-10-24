@@ -181,21 +181,9 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
 
     // 8 unused. Used previously by _TRIM_SPD which was deprecated.
 
-    // @Param: _TRIM_EXP
-    // @DisplayName: Exponential applied to lean trim function
-    // @Description: Use this to specify the amount of exponent in the angle to speed relationship when using _TRIM_METHOD = 1. A vaue of 0.0 gives a linear relationship between speed demand and lean angle trim. A value of +1.0 gives a zero gain from speed demand to lean angle trim around zero. A value of -1.0 gives a gain from speed demand to lean angle trim around zero that is double the linear gain.
-    // @Range: -1.0 1.0
-    // @Units: m/s
-    // @Increment: 0.5
-    // @User: Advanced
-    AP_GROUPINFO("_TRIM_EXP", 10, AC_PosControl, _spd_to_lean_exp, 0.5f),
+    // 10 unused. Used previously by _TRIM_EXP which was deprecated.
 
-    // @Param: _TRIM_METHOD
-    // @DisplayName: Select the method used to set a trim tilt angle
-    // @Description: 0: No trim compensation, 1: Use equation method, 2: Use hard coded lookup table
-    // @Range: 0 2
-    // @User: Advanced
-    AP_GROUPINFO("_TRIM_METHOD", 11, AC_PosControl, _trim_method, 1),
+    // 11 unused. Used previously by _TRIM_METHOD which was deprecated.
 
     // 12 unused. Used previously by _TRIM_BIAS which was deprecated.
 
@@ -215,20 +203,14 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     AP_GROUPINFO("_AIRSPD_I", 14, AC_PosControl, _vel_err_i_gain, 1.0f),
 
     // @Param: _FWD_SPD_MAX
-    // @DisplayName: Speed At Forward Lean Angle Limit.
+    // @DisplayName: Maximum forward airspeed in VTOL mode.
     // @Units: m/s
     // @Range: 10 20
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("_FWD_SPD_MAX",  15, AC_PosControl, _fwd_spd_max, 15.0f),
 
-    // @Param: _AFT_SPD_MAX
-    // @DisplayName: Speed At Rearwards Lean Angle Limit.
-    // @Units: m/s
-    // @Range: 10 20
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("_AFT_SPD_MAX",  16, AC_PosControl, _aft_spd_max, 15.0f),
+    // 16 unused. Used previously by _AFT_SPD_MAX which was deprecated.
 
     // @Param: _FWD_AZ_GF
     // @DisplayName: Vertical PD Gain Reduction Factor.
