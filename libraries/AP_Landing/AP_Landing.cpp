@@ -140,7 +140,7 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // @Group: DS_
     // @Path: AP_Landing_VTOL.cpp
-    AP_SUBGROUPINFO(vtol, "DS_", 15, AP_Landing, AP_Landing_VTOL),
+    AP_SUBGROUPINFO(vtol, "VT_", 15, AP_Landing, AP_Landing_VTOL),
     
     // @Param: TD_ALT
     // @DisplayName: Touch down altitude
