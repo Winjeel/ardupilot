@@ -2349,6 +2349,12 @@ void QuadPlane::takeoff_controller(void)
     pos_control->set_desired_velocity_xy(0.0f,0.0f);
     pos_control->set_desired_accel_xy(0.0f,0.0f);
 
+    // Prevent strong winds dragging the vehicle downwind from the takeoff point due to the pos control internally calculated
+    // leash length being too small. Setting the pos control accel limit and speed limit higher prevents this and is OK becasue
+    // we are starting at the correct position.
+    pos_control->set_max_accel_xy(1000.0f);
+    pos_control->set_max_speed_xy(100.0f * pos_control->get_max_fwd_airspd());
+
     // set position control target and update
     pos_control->set_xy_target(takeoff_pos_cm.x, takeoff_pos_cm.y);
     pos_control->update_xy_controller();
