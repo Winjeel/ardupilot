@@ -174,6 +174,8 @@ public:
     void set_max_speed_xy(float speed_cms);
     float get_max_speed_xy() const { return _speed_cms; }
 
+    float get_max_fwd_airspd() const { return _fwd_spd_max; }
+
     /// set_limit_accel_xy - mark that accel has been limited
     ///     this prevents integrator buildup
     void set_limit_accel_xy(void) { _limit.accel_xy = true; }
