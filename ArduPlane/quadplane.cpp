@@ -2350,7 +2350,7 @@ void QuadPlane::takeoff_controller(void)
     pos_control->set_desired_accel_xy(0.0f,0.0f);
 
     // set position control target and update
-    pos_control->set_xy_target(poscontrol.target.x, poscontrol.target.y);
+    pos_control->set_xy_target(takeoff_pos_cm.x, takeoff_pos_cm.y);
     pos_control->update_xy_controller();
 
     // nav roll and pitch are taken from the position controller
