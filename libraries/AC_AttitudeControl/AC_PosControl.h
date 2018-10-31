@@ -233,8 +233,11 @@ public:
     /// resets the wind drift integrator state - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
     void reset_wind_drift_integ();
 
-    // is_active_xy - returns true if the xy position controller has been run very recently
+    /// is_active_xy - returns true if the xy position controller has been run very recently
     bool is_active_xy() const;
+
+    /// The position controller will run the VTOL landing detection for 1000 msec after this is called.
+    void set_vtol_landing_expected() { _land_expect_time_ms = AP_HAL::millis(); }
 
     /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
     ///     when use_desired_velocity is true the desired velocity (i.e. feed forward) is incorporated at the pos_to_rate step
@@ -394,6 +397,9 @@ protected:
     AP_Float    _fwd_az_gf;             // AZ PD gain reduction applied during forward flight
     AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
     AP_Float    _fwd_inflow_thrust_factor; // prop throttle inflow correction factor 1/(m/s)
+    AP_Float    _landed_gyro_y;         // Landed detector wing pitch rate threshold (rad/sec)
+    AP_Float    _landed_pitch;          // Landed detector wing pitch angle threshold (rad)
+    AP_Float    _landed_accel;          // Landed detector accceleration threshold
 
 
     // internal variables
@@ -438,6 +444,13 @@ protected:
     uint32_t _last_log_time_ms;         // system time of last position controller log
     float _vel_err_i_gain_scale;        // scaler applied to wind drift integrator - asymptotes to 1 if not changed
     bool _taking_off;                   // set to true prior to takeoff and cleared when in-air checks pass
+    bool _landing_expected;             // set to true when a landing is expected
+    uint32_t _land_expect_time_ms;      // last time land_expected() was called (msec)
+    uint32_t _land_detect_time_ms;      // time ground contact was first detected when _landing_expected true (msec)
+    uint32_t _land_pitch_rate_time_ms;  // last time a touchdown wing pitch rate was detected (msec)
+    uint32_t _land_pitch_ang_time_ms;   // last time a landed wing pitch angle was detected (msec)
+    uint32_t _land_accz_time_ms;        // last time a landed accel shock was detected (msec)
+    bool _is_landed;                    // true when landed detection has activated and rotors are being held vertical
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 

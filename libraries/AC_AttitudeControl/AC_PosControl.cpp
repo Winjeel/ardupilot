@@ -235,6 +235,30 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_FWD_INFLOW",  19, AC_PosControl, _fwd_inflow_thrust_factor, 0.007f),
 
+    // @Param: _LAND_GYRY
+    // @DisplayName: Landed detector wing pitch rate threshold.
+    // @Description: Wing pitch rate required to trigger landed detector.
+    // @Range: 0.5 5.0
+    // @Units: rad/sec
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_GYRY",  20, AC_PosControl, _landed_gyro_y, 2.0f),
+
+    // @Param: _LAND_PITCH
+    // @DisplayName: Landed detector wing pitch threshold.
+    // @Description: Wing pitch angle required to trigger landed detector.
+    // @Range: 0.0 0.05
+    // @Units: rad
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_PITCH",  21, AC_PosControl, _landed_pitch, 0.25f),
+
+    // @Param: _LAND_ACCEL
+    // @DisplayName: Landed detector accceleration threshold.
+    // @Description: IMU acceleration required to trigger landed detector.
+    // @Range: 15.0 30.0
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_ACCEL",  22, AC_PosControl, _landed_accel, 20.0f),
+
     AP_GROUPEND
 };
 
@@ -273,7 +297,13 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing,
     _vel_forward_filt(0.0f),
     _last_log_time_ms(0),
     _vel_err_i_gain_scale(1.0f),
-    _taking_off(true)
+    _taking_off(true),
+    _land_expect_time_ms(0),
+    _land_detect_time_ms(0),
+    _land_pitch_rate_time_ms(0),
+    _land_pitch_ang_time_ms(0),
+    _land_accz_time_ms(0),
+    _is_landed(false)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -766,6 +796,65 @@ void AC_PosControl::calc_roll_pitch_throttle()
         float right_g_posctl = (-_accel_target.x*_ahrs.sin_yaw() + _accel_target.y*_ahrs.cos_yaw()) / GRAVITY_CMSS;
         right_g_posctl = constrain_float(right_g_posctl, -1.0f, 1.0f);
 
+
+        // Check if a touchdown is expected and if detected, set fwd and lateral g demnds to zero
+        if ((now - _land_expect_time_ms) < 1000) {
+            // wing pitch rate on touchdown
+            float pitch_rate_mag = fabsf(_ahrs_wing.get_gyro_latest().y);
+            if (pitch_rate_mag > _landed_gyro_y) {
+                _land_pitch_rate_time_ms = now;
+            }
+
+            // wing within touchdown pitch angle range
+            float wing_pitch_ang = _ahrs_wing.pitch;
+            if (wing_pitch_ang < _landed_pitch) {
+                _land_pitch_ang_time_ms = now;
+            }
+
+            // landing shock detected.
+            float accel_mag = _ahrs_wing.get_accel_ef_blended().length();
+            if (accel_mag > _landed_accel) {
+                _land_accz_time_ms = now;
+            }
+
+            // declare landing detected if 2 out of 3 criteria were met in the last second
+            // only require one check if already detected
+            uint8_t counter = 0;
+            if ((now - _land_pitch_rate_time_ms) < 1000) {
+                counter++;
+            }
+            if ((now - _land_pitch_ang_time_ms) < 1000) {
+                counter++;
+            }
+            if ((now - _land_accz_time_ms) < 1000) {
+                counter++;
+            }
+            if ((counter >= 2) || ((counter >= 1) && _is_landed)) {
+                _is_landed = true;
+                _land_detect_time_ms = now;
+            } else {
+                _is_landed = false;
+            }
+
+            // if landing detected, zero horizontal g maneouvre demands to point rotors up and prevent horizontal dragging and prop strike
+            if ((now - _land_detect_time_ms) < 3000) {
+                fwd_g_trim = fwd_g_posctl = right_g_posctl = 0.0f;
+            }
+
+            DataFlash_Class::instance()->Log_Write("VLND", "TimeUS,GYRY,PITCH,ACCEL,COUNT", "QfffB",
+                                                       AP_HAL::micros64(),
+                                                       (double)pitch_rate_mag,
+                                                       (double)wing_pitch_ang,
+                                                       (double)accel_mag,
+                                                       (uint8_t)counter);
+        } else {
+            _land_detect_time_ms = 0;
+            _land_pitch_rate_time_ms = 0;
+            _land_pitch_ang_time_ms = 0;
+            _land_accz_time_ms = 0;
+            _is_landed = false;
+        }
+
         // combine fwd and vertical g demands to obtain the required thrust g vector
         float fwd_g_demand = fwd_g_trim + fwd_g_posctl;
         float pitch_target_rad = atan2f(-fwd_g_demand , lift_g_demand);
@@ -788,6 +877,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
         _pitch_target_cd = 100.0f *  degrees(pitch_target_rad);
         _roll_target_cd = degrees(atanf(right_g_posctl * cos_pitch_target)) ;
         _roll_target_cd = 100.0f * constrain_float(_roll_target_cd, -_attitude_control.lean_angle_max_lat(), _attitude_control.lean_angle_max_lat());
+
 
         // send throttle to attitude controller without angle boost
         _attitude_control.set_throttle_out(throttle_demand, false, POSCONTROL_THROTTLE_CUTOFF_FREQ);
@@ -1334,7 +1424,6 @@ void AC_PosControl::reset_wind_drift_integ()
         _vel_xy_error_integ = _vel_xy_error_integ * (_max_airspeed_cms / _vel_xy_error_integ_norm);
     }
 }
-
 
 // get_lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
 void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss, float& roll_target, float& pitch_target) const
