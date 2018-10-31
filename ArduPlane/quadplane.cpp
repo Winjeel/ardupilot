@@ -2213,22 +2213,25 @@ void QuadPlane::vtol_position_controller(void)
 
     case QPOS_POSITION2:
     case QPOS_LAND_DESCEND:
-        /*
-          for final land repositioning and descent we run the position controller
-         */
-
+    {
+        // for final land repositioning and descent we run the position controller
         // also run fixed wing navigation
         plane.nav_controller->update_waypoint(plane.prev_WP_loc, loc);
-        FALLTHROUGH;
+    }
+    FALLTHROUGH;
 
     case QPOS_LAND_FINAL:
-
+    {
         // set position controller desired velocity and acceleration to zero
         pos_control->set_desired_velocity_xy(0.0f,0.0f);
         pos_control->set_desired_accel_xy(0.0f,0.0f);
 
         // set position control target and update
+        // also let controller know to expect touchdown
         pos_control->set_xy_target(poscontrol.target.x, poscontrol.target.y);
+        if (poscontrol.state == QPOS_LAND_FINAL) {
+            pos_control->set_vtol_landing_expected();
+        }
         pos_control->update_xy_controller();
 
         // nav roll and pitch are controller by position controller
