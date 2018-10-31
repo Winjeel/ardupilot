@@ -444,15 +444,4 @@ protected:
     // ekf reset handling
     uint32_t    _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset
     uint32_t    _ekf_z_reset_ms;       // system time of last recorded ekf altitude reset
-
-#define SPD_N_BP        13
-
-    const float pitch_table[SPD_N_BP] =
-    {80.0f,  70.0f, 60.0f, 45.0f, 0.0f, -45.0f, -60.0f, -70.0f, -75.0f, -80.0f, -85.0f, -88.0f, -90.0f};
-    const float spd_table[SPD_N_BP] =
-    {-10.0f, -9.0f, -7.0f, -5.0f, 0.0f,   5.0f,   7.0f,   8.0f,   9.0f,  11.0f,  13.0f,  15.0f,  20.0f};
-    const float thr_table[SPD_N_BP] =
-    { 0.4f,   0.4f,  0.4f,  0.4f, 0.4f,   0.35f,  0.32f,  0.3f,   0.3f,   0.3f,   0.35f,  0.5f,   0.7f};
-
-    void get_pitch_thr_trim(float spd, float &pitch_trim_rad, float &thr_trim);
 };

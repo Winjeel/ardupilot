@@ -1461,35 +1461,3 @@ Vector3f AC_PosControl::sqrt_controller(const Vector3f& error, float p, float se
         return Vector3f(error.x*p, error.y*p, error.z);
     }
 }
-
-
-void AC_PosControl::get_pitch_thr_trim(float spd, float &pitch_trim_rad, float &thr_trim) {
-
-
-    spd = constrain_float(spd, spd_table[0], spd_table[SPD_N_BP-1]);
-
-    /* find index of nearest low breakpoint */
-    int8_t low_index;
-    for (low_index=1; low_index<SPD_N_BP; low_index++) {
-        if (spd <= spd_table[low_index]) {
-            low_index--;
-            break;
-        }
-    }
-
-    if (low_index >= (SPD_N_BP-1)) {
-        pitch_trim_rad = radians(pitch_table[SPD_N_BP-1]);
-        thr_trim = thr_table[SPD_N_BP-1];
-    } else if (low_index <= -1) {
-        pitch_trim_rad = radians(pitch_table[0]);
-        thr_trim = thr_table[0];
-    } else {
-        float spd_delta = spd - spd_table[low_index];
-        float frac = spd_delta / (spd_table[low_index+1]-spd_table[low_index]);
-        pitch_trim_rad = radians(pitch_table[low_index]);
-        pitch_trim_rad += frac * radians((pitch_table[low_index+1] - pitch_table[low_index]));
-        thr_trim = thr_table[low_index];
-        thr_trim += frac * ((thr_table[low_index+1] - thr_table[low_index]));
-    }
-}
-
