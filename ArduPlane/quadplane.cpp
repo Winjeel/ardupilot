@@ -2066,6 +2066,11 @@ void QuadPlane::vtol_position_controller(void)
         dt = 0.0f;
     }
 
+    // Prevent strong winds dragging the vehicle downwind due to the pos control internally calculated
+    // leash length being too small.
+    pos_control->set_max_accel_xy(1000.0f);
+    pos_control->set_max_speed_xy(100.0f * pos_control->get_max_fwd_airspd());
+
     // horizontal position control
     switch (poscontrol.state) {
 
@@ -2247,6 +2252,7 @@ void QuadPlane::vtol_position_controller(void)
                                                                           get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
         }
         break;
+    }
 
     case QPOS_LAND_COMPLETE:
         // nothing to do
