@@ -31,7 +31,7 @@ const AP_Param::GroupInfo AP_Landing_VTOL::var_info[] = {
     // @Range: 0.0 10.0
     // @Units m/s/s
     // @User: Advanced
-    AP_GROUPINFO("DECEL", 1, AP_Landing_VTOL, _vtol_decel, 3.0f),
+    AP_GROUPINFO("DECEL", 1, AP_Landing_VTOL, _vtol_decel, 2.5f),
 
     // @Param: XWIND
     // @DisplayName: Maximum allowed cross wind during VTOL transition
