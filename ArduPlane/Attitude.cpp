@@ -387,10 +387,10 @@ void Plane::stabilize()
                 control_mode == QRTL)) {
         if (quadplane.reverse_transition_pullup_active) {
             /*
-              during transition to vtol in a tailsitter raise the nose to the max tilt allowed during VTOL
-              with throttle closed and wait for speed to decay before transitioning
+              during transition to vtol in a tailsitter raise the nose to the specified value,
+              close throttle and wait for speed to decay before transitioning
              */
-            nav_pitch_cd = 9000 - (int32_t)(100.0f * quadplane.attitude_control->lean_angle_max_fwd());
+            nav_pitch_cd = 100 * (int32_t)quadplane.tailsitter.tvbs_bt_pitch;
             nav_roll_cd = 0;
             stabilize_roll(speed_scaler);
             stabilize_pitch(speed_scaler);

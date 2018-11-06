@@ -669,11 +669,11 @@ void Plane::update_flight_mode(void)
     case QLOITER:
     case QLAND:
     case QRTL: {
-        // set nav_roll and nav_pitch using sticks
-        int16_t roll_limit = MIN(roll_limit_cd, quadplane.aparm.angle_max);
+        // set nav_roll and nav_pitch initially using control stick inputs - these can be subsequently overwritten
 
         // Apply a separate roll limit for TVBS airframes which normally require
         // more pitch than roll movement range due to wing drag
+        int16_t roll_limit = MIN(roll_limit_cd, quadplane.aparm.angle_max);
         if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) {
             roll_limit = MIN(roll_limit, 100 * quadplane.attitude_control->lean_angle_max_lat());
         }
@@ -687,13 +687,6 @@ void Plane::update_flight_mode(void)
                 nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_fwd(), quadplane.aparm.angle_max));
             } else {
                 nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_aft(), quadplane.aparm.angle_max));
-            }
-            if (quadplane.reverse_transition_active) {
-                // keep wings level through reverse transition and perform an initial pullup to reduce speed
-                nav_roll_cd = 0;
-                if (quadplane.reverse_transition_pullup_active) {
-                    nav_pitch_cd = 100 * (int32_t)quadplane.tailsitter.tvbs_bt_pitch;
-                }
             }
         } else {
             // pitch is further constrained by LIM_PITCH_MIN/MAX which may impose
