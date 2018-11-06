@@ -497,7 +497,14 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Advanced
     AP_GROUPINFO("TVBS_SLEW_TAU", 25, QuadPlane, tailsitter.tvbs_slew_tau_msec, 100),
 
-    // 27 unassigned - used previously by TVBS_ROLL_MAX
+    // @Param: TVBS_BT_PITCH
+    // @DisplayName: Back transition initial pullup pitch angle
+    // @Description: During the first part of back transition, the vehicle pulls up to this pitch angle and closes the throttle to decelerate prior to switching to VTOL control ans tilting rotors up. TVBS frame class only.
+    // @Units: deg
+    // @Range: 0 45
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("TVBS_BT_PITCH", 26, QuadPlane, tailsitter.tvbs_bt_pitch, 10),
 
     // 27 unassigned - used previously by TVBS_LPF_GAIN
 

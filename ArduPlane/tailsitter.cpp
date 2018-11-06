@@ -190,7 +190,7 @@ bool QuadPlane::tailsitter_transition_pullup_complete(void) const
     } else if (AP_HAL::millis() - transition_start_ms > 1000 &&
                labs(ahrs_view->roll_sensor) > 1500) {
         // After 1 second, start checking to see if we have lost roll control which would
-        // indiate stall onset.
+        // indicate stall onset.
         return true;
     } else if (AP_HAL::millis() - transition_start_ms > 2000 &&
                (ahrs_view->pitch_sensor < 0 || inertial_nav.get_velocity_z() > 0.5f)) {

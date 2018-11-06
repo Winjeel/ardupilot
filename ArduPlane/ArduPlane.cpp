@@ -683,16 +683,17 @@ void Plane::update_flight_mode(void)
         float pitch_input = channel_pitch->norm_input();
         // Scale from normalized input [-1,1] to centidegrees
         if (quadplane.tailsitter_active()) {
-            if (quadplane.reverse_transition_active) {
-                nav_roll_cd = 0;
-                if (quadplane.reverse_transition_pullup_active) {
-                    nav_pitch_cd = 9000 - (int32_t)(100.0f * quadplane.attitude_control->lean_angle_max_fwd());
-                }
-            }
             if (pitch_input >= 0.0f) {
                 nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_fwd(), quadplane.aparm.angle_max));
             } else {
                 nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_aft(), quadplane.aparm.angle_max));
+            }
+            if (quadplane.reverse_transition_active) {
+                // keep wings level through reverse transition and perform an initial pullup to reduce speed
+                nav_roll_cd = 0;
+                if (quadplane.reverse_transition_pullup_active) {
+                    nav_pitch_cd = 100 * (int32_t)quadplane.tailsitter.tvbs_bt_pitch;
+                }
             }
         } else {
             // pitch is further constrained by LIM_PITCH_MIN/MAX which may impose

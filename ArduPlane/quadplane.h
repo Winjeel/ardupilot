@@ -459,6 +459,7 @@ private:
         AP_Float tvbs_elev_hpf_tau_sec;     // time constant in seconds used to filter the tilt servo derivative
         AP_Float tvbs_roll_gain;            // gain factor that modifies the amount of roll demand from the position controller used by the attitude controller
         AP_Int16 tvbs_bt_time_msec;         // number of milliseconds taken to slew the rotors back to the hover position when doing a back transition
+        AP_Int8 tvbs_bt_pitch;              // initial pullup pitch angle used during back transition (deg)
         AP_Int8  tvbs_elev_trim_pcnt;       // elevator as a percentage of full throw used to trim the wing during hover so that it produces zero normal force
         AP_Int8 tvbs_ail_gf;                // gain factor percentage reduction applied to the aileron deflection when the wing is at a horizontal flying orientation
         AP_Int8 tvbs_elev_gf;               // gain factor percentage reduction applied to the elevator deflection when the wing is at a horizontal flying orientation
