@@ -1765,6 +1765,7 @@ void QuadPlane::update(void)
                 transition_state = TRANSITION_ANGLE_WAIT_FW;
                 transition_start_ms = now;
                 reverse_transition_active =  false;
+                init_mode();
             }
         } else {
             /*
