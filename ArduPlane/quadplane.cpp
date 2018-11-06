@@ -509,13 +509,13 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // 27 unassigned - used previously by TVBS_LPF_GAIN
 
     // @Param: TVBS_BT_TIME
-    // @DisplayName: Time in msec to transition back from FW to RW operation
-    // @Description: Sets the number of milliseconds taken to slew the rotors back to the hover position when doing a back transition
+    // @DisplayName: Maximum time in msec to transition back from FW to RW operation
+    // @Description: Sets the maximum number of milliseconds required to compete the FW to RW transition. Transition will complete sooner if vehicle forward speed is less than 1 m/s or the wing has dropped to within 10 deg of vertical
     // @Units: msec
     // @Range: 0 6000
     // @Increment: 100
     // @User: Standard
-    AP_GROUPINFO("TVBS_BT_TIME", 28, QuadPlane, tailsitter.tvbs_bt_time_msec, 3000),
+    AP_GROUPINFO("TVBS_BT_TIME", 28, QuadPlane, tailsitter.tvbs_bt_time_msec, 5000),
 
     // @Param: TVBS_ELEV_TRIM
     // @DisplayName: Elevator trim percentage used during RW operation

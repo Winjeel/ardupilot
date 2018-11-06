@@ -217,7 +217,9 @@ bool QuadPlane::tailsitter_transition_vtol_complete(void) const
     if (ahrs_view->get_velocity_NED(velNED)) {
         fwd_spd =  velNED.x * ahrs_view->cos_yaw() + velNED.y * ahrs_view->sin_yaw();
     }
-    if (AP_HAL::millis() - transition_start_ms > (uint32_t)tailsitter.tvbs_bt_time_msec || fwd_spd < 1.0f) {
+    if (AP_HAL::millis() - transition_start_ms > (uint32_t)tailsitter.tvbs_bt_time_msec
+            || fwd_spd < 1.0f
+            || fabsf(ahrs_view->get_pitch_312_wing()) < radians (10.0f)) {
         return true;
     } else {
         return false;
