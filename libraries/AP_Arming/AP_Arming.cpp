@@ -76,6 +76,14 @@ const AP_Param::GroupInfo AP_Arming::var_info[] = {
                                                                                            AP_PARAM_FRAME_COPTER |
                                                                                            AP_PARAM_FRAME_TRICOPTER |
                                                                                            AP_PARAM_FRAME_HELI),
+
+    // @Param: EKFTHRESH
+    // @DisplayName: EKF variance threshold
+    // @Description: Allows setting the maximum acceptable normalised innovation levels.
+    // @Values: 0.25:Strict, 0.5:Default, 1.0:Relaxed
+    // @User: Advanced
+    AP_GROUPINFO("EKFTHRESH", 7, AP_Arming, _ekf_thresh, 0.25),
+
     AP_GROUPEND
 };
 
@@ -294,6 +302,12 @@ bool AP_Arming::ins_checks(bool report)
         // check all gyros are giving consistent readings
         if (!ins_gyros_consistent(ins)) {
             check_failed(ARMING_CHECK_INS, report, "Gyros inconsistent");
+            return false;
+        }
+
+        // check EKF innovation levels
+        if (!ekf_checks()) {
+            check_failed(ARMING_CHECK_INS, report, "EKF inconsistent data");
             return false;
         }
     }
@@ -716,4 +730,42 @@ bool AP_Arming::rc_checks_copter_sub(const bool display_failure, const RC_Channe
         }
     }
     return ret;
+}
+
+// returns false if the EKF innovations levels are too high
+bool AP_Arming::ekf_checks()
+{
+    // return false immediately if disabled by parameter
+    if (_ekf_thresh <= 0.0f) {
+        return true;
+    }
+
+    // get normalised EKF innovation variance levels, where 1.0 is the maximum before the EKF starts rejecting measurements
+    float pos_variance, vel_variance, hgt_variance, tas_variance;
+    Vector3f mag_variance;
+    Vector2f offset;
+    AP::ahrs().get_variances(vel_variance, pos_variance, hgt_variance, mag_variance, tas_variance, offset);
+
+    // return false if sum of failed checks exceeds 1.5 x threshold
+    // this allows two slghtly failed measurements to fail or one larger failure
+    float innov_var_level_sum = 0.0f;
+    float mag_var_length = mag_variance.length();
+    if (mag_var_length >= _ekf_thresh) {
+        innov_var_level_sum += mag_var_length;
+    }
+    if (vel_variance >= _ekf_thresh) {
+        innov_var_level_sum += vel_variance;
+    }
+    if (pos_variance >= _ekf_thresh) {
+        innov_var_level_sum += pos_variance;
+    }
+    if (hgt_variance >= _ekf_thresh) {
+        innov_var_level_sum += hgt_variance;
+    }
+
+    if (innov_var_level_sum >= (1.5f * _ekf_thresh)) {
+        return false;
+    }
+
+    return true;
 }

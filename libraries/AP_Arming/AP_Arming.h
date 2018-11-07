@@ -84,6 +84,7 @@ protected:
     AP_Int16                checks_to_perform;      // bitmask for which checks are required
     AP_Float                accel_error_threshold;
     AP_Int8                 _rudder_arming;
+    AP_Float                _ekf_thresh;
 
     // internal members
     bool                    armed:1;
@@ -125,9 +126,13 @@ protected:
     // handle the case where a check fails
     void check_failed(const enum AP_Arming::ArmingChecks check, bool report, const char *fmt, ...) const;
 
+
 private:
 
     bool ins_accels_consistent(const AP_InertialSensor &ins);
     bool ins_gyros_consistent(const AP_InertialSensor &ins);
+
+    // returns false if the EKF innovations levels are too high
+    bool ekf_checks();
 
 };
