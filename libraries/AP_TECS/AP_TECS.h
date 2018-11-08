@@ -113,6 +113,23 @@ public:
         _pitch_max_limit = pitch_limit;
     }
 
+    // state reset required immediately after completing transition from VTOL to FW flight
+    void vtol_fw_transition_reset() {
+        _integTHR_state    = 0.0f;
+        _integSEB_state    = 0.0f;
+        _last_throttle_dem = aparm.throttle_cruise * 0.01f;
+        _last_pitch_dem    = 0.0f;
+        _ahrs.get_relative_position_D_home(_hgt_dem_adj_last);
+        _hgt_dem_adj_last *= -1.0f;
+        _hgt_dem_adj       = _hgt_dem_adj_last;
+        _hgt_dem_prev      = _hgt_dem_adj_last;
+        _hgt_dem_in_old    = _hgt_dem_adj_last;
+        _TAS_dem_last      = _TAS_dem;
+        _TAS_dem_adj       = _TAS_dem;
+        _flags.underspeed  = false;
+        _flags.badDescent  = false;
+    }
+
     // force use of synthetic airspeed for one loop
     void use_synthetic_airspeed(void) {
         _use_synthetic_airspeed_once = true;
