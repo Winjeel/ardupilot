@@ -403,6 +403,10 @@ private:
     // Difference between current altitude and desired altitude.  Centimeters
     int32_t altitude_error_cm;
 
+    // Used to prevent initial dive after FW transition
+    int32_t fw_trans_alt_floor_cm = 0;
+    uint32_t fw_trans_time_ms = 0;
+
     // Battery Sensors
     AP_BattMonitor battery{MASK_LOG_CURRENT,
                            FUNCTOR_BIND_MEMBER(&Plane::handle_battery_failsafe, void, const char*, const int8_t),

@@ -855,13 +855,22 @@ void Plane::update_alt()
             soaring_active = true;
         }
 #endif
-        
-        SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
+
+        // customisation to prevent diving immediately after FW transition due to overshoot of takeoff height
+        // also nudge throttle 10% to ensure adequate airspeed
+        int32_t rel_alt_demand_cm = relative_target_altitude_cm();
+        int16_t net_throttle_nudge = throttle_nudge;
+        if ((millis() - fw_trans_time_ms) < 3000) {
+            rel_alt_demand_cm = MAX(rel_alt_demand_cm , fw_trans_alt_floor_cm);
+            net_throttle_nudge += 10;
+        }
+
+        SpdHgt_Controller->update_pitch_throttle(rel_alt_demand_cm,
                                                  target_airspeed_cm,
                                                  flight_stage,
                                                  distance_beyond_land_wp,
                                                  get_takeoff_pitch_min_cd(),
-                                                 throttle_nudge,
+                                                 net_throttle_nudge,
                                                  tecs_hgt_afe(),
                                                  aerodynamic_load_factor,
                                                  soaring_active);

@@ -1535,6 +1535,13 @@ void QuadPlane::update_transition_to_fw(void)
             gcs().send_text(MAV_SEVERITY_INFO, "Transition FW done");
             transition_state = TRANSITION_DONE;
             fwd_transition = false;
+
+            // reset TECS states prior to hand over to FW control loops
+            plane.TECS_controller.vtol_fw_transition_reset();
+
+            // set temporary floor on height demand to prevent unwanted initial diving due to overshoot.
+            plane.fw_trans_time_ms = millis();
+            plane.fw_trans_alt_floor_cm = plane.relative_target_altitude_cm();
         }
     }
     
