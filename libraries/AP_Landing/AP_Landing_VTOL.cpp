@@ -251,8 +251,8 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
         {
             landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1, Vector2f(0.0f,0.0f));
             _timeout_count = 0;
-            // Ensure we have done a full circle before landing to give a reliable approach angle.
-            if ((_loiter_sum_cd < 36000) && !_low_wind_overshoot) {
+            // Ensure we have done a half circle before landing to give a reliable approach angle.
+            if ((_loiter_sum_cd < 18000) && !_low_wind_overshoot) {
                 // Adjust the loiter centre
                 memcpy(&_loiter_point, &_landing_point, sizeof(Location));
                 Vector3f wind = landing.ahrs.wind_estimate();
