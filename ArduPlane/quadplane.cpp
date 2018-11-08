@@ -1647,7 +1647,7 @@ void QuadPlane::update_transition_to_fw(void)
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
                                                                       ahrs_view->pitch_sensor,
                                                                       0);}
-        attitude_control->set_throttle_out(motors->get_throttle_hover(), true, 0);
+        attitude_control->set_throttle_out((motors->get_throttle_hover() + 0.1f), true, 0);
         break;
     }
 
