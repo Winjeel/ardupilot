@@ -434,10 +434,22 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
     InitialiseVariables();
 
     // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
-    Vector3f initAccVec;
+    // TODO we should accumulate accel readings over several cycles, use average and check variance
+    Vector3f initAccVec = AP::ins().get_accel(imu_index);
 
-    // TODO we should average accel readings over several cycles
-    initAccVec = AP::ins().get_accel(imu_index);
+    // angular rate vector in XYZ body axes measured by the IMU (rad/s)
+    Vector3f initAngRateVec =  AP::ins().get_gyro(imu_index);
+
+    // require upright and not rotating too fast
+    float xy_length_sq = initAccVec.x*initAccVec.x + initAccVec.y*initAccVec.y;
+    float accel_length = initAccVec.length();
+    if (initAngRateVec.length() > 0.5f
+            || (initAccVec.z > 0.0f)
+            || (accel_length > 1.1f * GRAVITY_MSS)
+            || (accel_length < 0.9f * GRAVITY_MSS)
+            || (xy_length_sq > sq(0.5f * GRAVITY_MSS))) {
+        return false;
+    }
 
     // normalise the acceleration vector
     float pitch=0, roll=0;
