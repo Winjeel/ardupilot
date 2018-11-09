@@ -1283,6 +1283,7 @@ void QuadPlane::control_loiter()
         float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
         if (height_above_ground < land_final_alt && poscontrol.state < QPOS_LAND_FINAL) {
             poscontrol.state = QPOS_LAND_FINAL;
+            descent_delay_time_sec = 0.0f;
             // cut IC engine if enabled
             if (land_icengine_cut != 0) {
                 plane.g2.ice_control.engine_control(0, 0, 0);
@@ -2315,9 +2316,17 @@ void QuadPlane::vtol_position_controller(void)
         break;
     }
 
-    case QPOS_LAND_FINAL:
-        pos_control->set_alt_target_from_climb_rate(-land_speed_cms, plane.G_Dt, true);
+    case QPOS_LAND_FINAL: {
+        if (!weathervane.tip_warning || descent_delay_time_sec > 30.0f) {
+            // complete descent if tipover conditon alert is not active or we have delayed the descent for more than 30 seconds in total
+            pos_control->set_alt_target_from_climb_rate(-land_speed_cms, plane.G_Dt, true);
+        } else {
+            // conditions not good for touchdown so arrest descent
+            pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, true);
+            descent_delay_time_sec += dt;
+        }
         break;
+    }
         
     case QPOS_LAND_COMPLETE:
         break;
@@ -2708,6 +2717,7 @@ bool QuadPlane::verify_vtol_land(void)
     float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
     if (poscontrol.state == QPOS_LAND_DESCEND && height_above_ground < land_final_alt) {
         poscontrol.state = QPOS_LAND_FINAL;
+        descent_delay_time_sec = 0.0f;
 
         // cut IC engine if enabled
         if (land_icengine_cut != 0) {
@@ -2954,6 +2964,13 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
             output = constrain_float(-lateral_g * weathervane.gain, -1, 1);
         }
         weathervane.last_output = 0.98f * weathervane.last_output + 0.02f * output;
+    }
+
+    // check if there is  a landing tipover risk
+    if (rear_g > 0.05f || weathervane.moving_backwards) {
+        weathervane.tip_warning = true;
+    } else {
+        weathervane.tip_warning = false;
     }
 
     // when wind is from front, allow yaw demand to go to zero if bank angle is within specified limits

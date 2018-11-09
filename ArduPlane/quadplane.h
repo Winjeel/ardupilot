@@ -321,9 +321,14 @@ private:
         uint32_t last_frame_ms;
         float gain_modifier;
         float last_output;
-        bool moving_backwards;
-        uint32_t last_move_back_ms;
+        bool moving_backwards; // true when moving backwards rel to ground
+        uint32_t last_move_back_ms; // last system time in msec that we were moving backwards rel to ground
+        bool tip_warning; // true when tilted backwards and there is a tipover risk
+
     } weathervane;
+
+    // total time the finallanding descent has been delayed
+    float descent_delay_time_sec = 0;
     
     bool initialised;
     
