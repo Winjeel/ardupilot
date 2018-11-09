@@ -2861,6 +2861,7 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
         return 0;
     }
 
+    // check if we are flying backwards relative to the wind
     bool is_flying_backwards;
     if (weathervane.gain > 0.0f) {
         // the pilots is flying backwards which is opposite to the desired wind relative yaw
@@ -2876,6 +2877,7 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
             || plane.channel_roll->get_control_in() != 0
             || is_flying_backwards) {
         weathervane.last_pilot_input_ms = AP_HAL::millis();
+        weathervane.last_output = 0.0f;
     }
 
     // reduce the gain when the pilot is attempting to yaw, move sideways or move backwards
@@ -2901,19 +2903,64 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
         }
     }
 
+    // check if we are moving backwards rel to ground
+    Vector3f vel_ned;
+    if (plane.ahrs.get_velocity_NED(vel_ned)) {
+        float fwd_gnd_vel = vel_ned.x * plane.ahrs.cos_yaw() + vel_ned.y * plane.ahrs.sin_yaw();
+        if (weathervane.moving_backwards && fwd_gnd_vel > -0.5f) {
+            weathervane.moving_backwards = false;
+        } else if (!weathervane.moving_backwards && fwd_gnd_vel < -1.0f) {
+            weathervane.moving_backwards = true;
+            weathervane.last_move_back_ms = weathervane.last_frame_ms;
+        }
+    } else {
+        weathervane.moving_backwards = true;
+        weathervane.last_move_back_ms = weathervane.last_frame_ms;
+    }
 
+    // Calculate a yaw rate proportional to lateral g when wind is from the front. When wind from the back use the
+    // maximum of the lateral and longitudinal g with hysteresis to prevent getting stuck with back to wind
     float roll = wp_nav->get_roll() / 100.0f;
     float lateral_g = AP::ins().get_accel().y / GRAVITY_MSS;
-    if (fabsf(roll) < weathervane.min_roll) {
-        weathervane.last_output = 0;
-        return 0;        
+    float rear_g = AP::ins().get_accel().z / GRAVITY_MSS;
+    bool tailwind = rear_g > 0.05f;
+    float error_g;
+    if (tailwind && ((weathervane.last_frame_ms - weathervane.last_move_back_ms) > 3000)) {
+        // hovering with a tailwind
+        if (lateral_g * weathervane.last_output <= 0.0f) {
+            // demanded yaw is consistent with lateral g so use
+            if (lateral_g >= 0.0f)  {
+                error_g = - MAX(lateral_g, rear_g);
+            } else {
+                error_g = MAX(-lateral_g, rear_g);
+            }
+        } else {
+            // lateral g is inconsistent with previous demanded yaw, so continue yaw in same direction to avoid
+            // indecision when back is facing directly into wind
+            if (weathervane.last_output < 0.0f) {
+                error_g = - rear_g;
+            } else {
+                error_g = rear_g;
+            }
+        }
+        // integrate rate so that max yaw rate is achieved until facing wind even for small tail wind values
+        weathervane.last_output += error_g * weathervane.gain * delta_time;
+        weathervane.last_output = constrain_float(weathervane.last_output,-1.0f, 1.0f);
+    } else {
+        float output;
+        if (should_relax()) {
+            output = 0.0f;
+        } else {
+            output = constrain_float(-lateral_g * weathervane.gain, -1, 1);
+        }
+        weathervane.last_output = 0.98f * weathervane.last_output + 0.02f * output;
     }
 
-    float output = constrain_float(-lateral_g * weathervane.gain, -1, 1);
-    if (should_relax()) {
-        output = 0;
+    // when wind is from front, allow yaw demand to go to zero if bank angle is within specified limits
+    if (fabsf(roll) < weathervane.min_roll && !tailwind) {
+        weathervane.last_output = 0;
+        return 0;
     }
-    weathervane.last_output = 0.98f * weathervane.last_output + 0.02f * output;
 
     // scale over half of yaw_rate_max. This gives the pilot twice the
     // authority of the weathervane controller

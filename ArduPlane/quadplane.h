@@ -321,6 +321,8 @@ private:
         uint32_t last_frame_ms;
         float gain_modifier;
         float last_output;
+        bool moving_backwards;
+        uint32_t last_move_back_ms;
     } weathervane;
     
     bool initialised;
