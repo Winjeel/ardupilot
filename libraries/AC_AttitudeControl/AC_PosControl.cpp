@@ -259,6 +259,15 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_LAND_ACCEL",  22, AC_PosControl, _landed_accel, 20.0f),
 
+    // @Param: _FWD_DB_THR
+    // @DisplayName: Rotor Drag Brake Threshold.
+    // @Description: Decel due to aero drag has to fall below this value before rotors will tilt rearwards to perform a braking manoeuvre. Smaller values make the controller wait for longer before rotors are tilted back past vertical to complete a braking or reversal manoevre which prevents loss of control due to reverse flow through rotors. Increase value if time spent with rotors level during braking manoeuvres is excessive.
+    // @Range: 0.05 0.5
+    // @Units: g
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_DB_THR",  23, AC_PosControl, _drag_brake_g_thrhld, 0.15f),
+
+
     AP_GROUPEND
 };
 
@@ -855,8 +864,15 @@ void AC_PosControl::calc_roll_pitch_throttle()
             _is_landed = false;
         }
 
-        // combine fwd and vertical g demands to obtain the required thrust g vector
+        // Combine fwd and vertical g demands to obtain the required thrust g vector. Prevent loss of control due to
+        // reverse flow during braking maneouvres by waiting until g due to aero drag has fallen before allowing
+        // rotors to tilt past vertical.
         float fwd_g_demand = fwd_g_trim + fwd_g_posctl;
+        if (fwd_g_trim > _drag_brake_g_thrhld) {
+            fwd_g_demand = fmaxf(fwd_g_demand, 0.0f);
+        } else if (fwd_g_trim < -_drag_brake_g_thrhld) {
+            fwd_g_demand = fminf(fwd_g_demand, 0.0f);
+        }
         float pitch_target_rad = atan2f(-fwd_g_demand , lift_g_demand);
         float thrust_g_demand = sqrtf(fwd_g_demand * fwd_g_demand + lift_g_demand * lift_g_demand);
 

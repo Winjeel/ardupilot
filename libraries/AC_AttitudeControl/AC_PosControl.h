@@ -400,6 +400,7 @@ protected:
     AP_Float    _landed_gyro_y;         // Landed detector wing pitch rate threshold (rad/sec)
     AP_Float    _landed_pitch;          // Landed detector wing pitch angle threshold (rad)
     AP_Float    _landed_accel;          // Landed detector accceleration threshold
+    AP_Float    _drag_brake_g_thrhld;   // Rotor drag brake threshold (g)
 
 
     // internal variables
