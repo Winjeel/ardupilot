@@ -761,7 +761,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
     // get the lift g required from the rotors taking wing lift into account
     lift_g_demand -=  wing_lift_g;
-    lift_g_demand = constrain_float(lift_g_demand, 0.0f, 2.0f);
+    lift_g_demand = constrain_float(lift_g_demand, -0.25f, 2.0f);
 
     // Logging for debug and tuning of TVBS positon controller mods
     uint32_t now = AP_HAL::millis();
