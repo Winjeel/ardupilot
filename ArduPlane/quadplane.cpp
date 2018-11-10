@@ -1738,9 +1738,12 @@ void QuadPlane::update(void)
         // output to motors
         motors_output();
 
+        // When entering a VTOL mode with motors armed go through the normal back transition procesure unless recvering from loss of control.
+        // When disarmed, we want to transition immediately to facilitate rapid mode selection prior to flight.
         if (now - last_vtol_mode_ms > 1000 &&
                 is_tailsitter() &&
-                transition_state != TRANSITION_ANGLE_WAIT_VTOL) {
+                transition_state != TRANSITION_ANGLE_WAIT_VTOL &&
+                plane.arming.is_armed()) {
             if (!control_loss_declared) {
                 /*
                   we are just entering a VTOL mode as a tailsitter, set
@@ -1753,7 +1756,7 @@ void QuadPlane::update(void)
                 gcs().send_text(MAV_SEVERITY_INFO, "Transition VTOL - pullup start");
             } else {
                 gcs().send_text(MAV_SEVERITY_INFO, "Transition VTOL - emergency recovery");
-                // Emergency loss of control recviery so do not go through normal pullup in FW mode
+                // Emergency loss of control recovery so do not go through normal pullup in FW mode
             }
         } else if (is_tailsitter() &&
                    transition_state == TRANSITION_ANGLE_WAIT_VTOL) {
