@@ -765,6 +765,14 @@ void Plane::servos_output(void)
     
     SRV_Channels::calc_pwm();
 
+    // do not drive elevon and tilt servos until pre-arm checks have passed
+    if (!arming.is_armed() && !AP_Notify::flags.pre_arm_check) {
+        SRV_Channels::set_output_pwm(SRV_Channel::k_elevon_left, 0);
+        SRV_Channels::set_output_pwm(SRV_Channel::k_elevon_right, 0);
+        SRV_Channels::set_output_pwm(SRV_Channel::k_tiltMotorLeft, 0);
+        SRV_Channels::set_output_pwm(SRV_Channel::k_tiltMotorRight, 0);
+    }
+
     SRV_Channels::output_ch_all();
     
     SRV_Channels::push();
