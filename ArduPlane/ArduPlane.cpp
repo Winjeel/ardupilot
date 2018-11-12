@@ -723,6 +723,7 @@ void Plane::update_navigation()
         if (ahrs.home_is_set()) {
             mission.update();
         }
+        loiter.radius = 0;
         break;
             
     case RTL:
@@ -784,6 +785,7 @@ void Plane::update_navigation()
 
     case CRUISE:
         update_cruise();
+        loiter.radius = 0;
         break;
 
     case MANUAL:
@@ -801,6 +803,7 @@ void Plane::update_navigation()
     case QLAND:
     case QRTL:
         // nothing to do
+        loiter.radius = 0;
         break;
     }
 }
