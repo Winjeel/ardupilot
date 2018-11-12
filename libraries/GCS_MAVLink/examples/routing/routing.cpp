@@ -42,7 +42,7 @@ protected:
 private:
 
     void handleMessage(mavlink_message_t * msg) { }
-    bool handle_guided_request(AP_Mission::Mission_Command &cmd) override { return false ; }
+    bool handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius) override { return false ; }
     void handle_change_alt_request(AP_Mission::Mission_Command &cmd) override { }
     bool try_send_message(enum ap_message id) override { return false; }
 
