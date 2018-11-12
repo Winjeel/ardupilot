@@ -768,11 +768,16 @@ void Plane::update_navigation()
         if (radius > 0) {
             loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
         }
+        loiter.radius = 0;
         // fall through to LOITER
         FALLTHROUGH;
 
     case LOITER:
+        loiter.radius = 0;
+        FALLTHROUGH;
     case AVOID_ADSB:
+        loiter.radius = 0;
+        FALLTHROUGH;
     case GUIDED:
         update_loiter(radius);
         break;

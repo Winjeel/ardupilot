@@ -690,11 +690,10 @@ bool GCS_MAVLINK_Plane::in_hil_mode() const
   handle a request to switch to guided mode. This happens via a
   callback from handle_mission_item()
  */
-bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd)
+bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius)
 {
     if (plane.control_mode != GUIDED) {
-        // only accept position updates when in GUIDED mode
-        return false;
+        plane.set_mode(GUIDED, MODE_REASON_GCS_COMMAND);
     }
     plane.guided_WP_loc = cmd.content.location;
     
@@ -702,6 +701,19 @@ bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd)
     if (plane.guided_WP_loc.flags.relative_alt) {
         plane.guided_WP_loc.alt += plane.home.alt;
         plane.guided_WP_loc.flags.relative_alt = 0;
+    }
+
+    plane.loiter.velNE.x = velNE.x;
+    plane.loiter.velNE.y = velNE.y;
+
+    if (radius > 1.0f) {
+        plane.guided_WP_loc.flags.loiter_ccw = 0;
+        plane.loiter.radius = (uint16_t)radius;
+    } else if (radius < 1.0f) {
+        plane.guided_WP_loc.flags.loiter_ccw = 1;
+        plane.loiter.radius = (uint16_t)(-radius);
+    } else {
+        plane.loiter.radius = 0;
     }
 
     plane.set_guided_WP();

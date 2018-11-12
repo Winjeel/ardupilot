@@ -702,6 +702,9 @@ private:
         // Time the loiter waypoint position was last updated
         uint32_t last_update_ms;
 
+        // radius in metres - a positive value > 1 will override the parameter set value
+        uint16_t radius;
+
     } loiter;
 
 

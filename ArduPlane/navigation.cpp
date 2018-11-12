@@ -196,14 +196,17 @@ void Plane::update_loiter(uint16_t radius)
     location_offset(next_WP_loc, time_delta * loiter.velNE.x, time_delta * loiter.velNE.y);
     loiter.last_update_ms = millis();
 
-    if (radius <= 1) {
-        // if radius is <=1 then use the general loiter radius. if it's small, use default
-        radius = (abs(aparm.loiter_radius) <= 1) ? LOITER_RADIUS_DEFAULT : abs(aparm.loiter_radius);
-        if (next_WP_loc.flags.loiter_ccw == 1) {
-            loiter.direction = -1;
-        } else {
-            loiter.direction = (aparm.loiter_radius < 0) ? -1 : 1;
+    if (loiter.radius <= 1) {
+        if (radius <= 1) {
+            // if radius is <=1 then use the general loiter radius. if it's small, use default
+            loiter.radius = (abs(aparm.loiter_radius) <= 1) ? LOITER_RADIUS_DEFAULT : abs(aparm.loiter_radius);
+            if (next_WP_loc.flags.loiter_ccw == 1) {
+                loiter.direction = -1;
+            } else {
+                loiter.direction = (aparm.loiter_radius < 0) ? -1 : 1;
+            }
         }
+        loiter.radius = radius;
     }
 
     if (loiter.start_time_ms != 0 &&
@@ -230,7 +233,7 @@ void Plane::update_loiter(uint16_t radius)
         */
         nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
     } else {
-        nav_controller->update_loiter(next_WP_loc, radius, loiter.direction, loiter.velNE);
+        nav_controller->update_loiter(next_WP_loc, loiter.radius, loiter.direction, loiter.velNE);
     }
 
     if (loiter.start_time_ms == 0) {
