@@ -537,7 +537,7 @@ bool GCS_MAVLINK_Rover::in_hil_mode() const
     return false;
 }
 
-bool GCS_MAVLINK_Rover::handle_guided_request(AP_Mission::Mission_Command &cmd)
+bool GCS_MAVLINK_Rover::handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius)
 {
     if (rover.control_mode != &rover.mode_guided) {
         // only accept position updates when in GUIDED mode
