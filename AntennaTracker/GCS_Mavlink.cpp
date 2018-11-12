@@ -114,7 +114,7 @@ void Tracker::send_nav_controller_output(mavlink_channel_t chan)
 }
 
 
-bool GCS_MAVLINK_Tracker::handle_guided_request(AP_Mission::Mission_Command&)
+bool GCS_MAVLINK_Tracker::handle_guided_request(AP_Mission::Mission_Command&, Vector2f velNE, float radius)
 {
     // do nothing
     return false;
