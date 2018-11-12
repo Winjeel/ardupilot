@@ -2947,6 +2947,7 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_long_t &
         cmd.content.location.lat = roi_loc.lat;
         cmd.content.location.lng = roi_loc.lng;
         cmd.content.location.alt = roi_loc.alt + (int32_t)(packet.param3 * 100.0f);
+        cmd.content.location.flags.relative_alt = true;
         Vector2f velNE;
         velNE.x = packet.param1;
         velNE.y = packet.param2;
