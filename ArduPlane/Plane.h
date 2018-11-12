@@ -703,7 +703,7 @@ private:
         uint32_t last_update_ms;
 
         // radius in metres - a positive value > 1 will override the parameter set value
-        uint16_t radius;
+        uint16_t override_radius;
 
     } loiter;
 

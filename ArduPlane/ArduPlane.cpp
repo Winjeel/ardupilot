@@ -717,13 +717,17 @@ void Plane::update_navigation()
     if (qrtl_radius == 0) {
         qrtl_radius = abs(aparm.loiter_radius);
     }
+
+    // set over-ride radius to zero on each mode change
+    if (control_mode != previous_mode) {
+        loiter.override_radius = 0;
+    }
     
     switch(control_mode) {
     case AUTO:
         if (ahrs.home_is_set()) {
             mission.update();
         }
-        loiter.radius = 0;
         break;
             
     case RTL:
@@ -769,23 +773,17 @@ void Plane::update_navigation()
         if (radius > 0) {
             loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
         }
-        loiter.radius = 0;
         // fall through to LOITER
         FALLTHROUGH;
 
     case LOITER:
-        loiter.radius = 0;
-        FALLTHROUGH;
     case AVOID_ADSB:
-        loiter.radius = 0;
-        FALLTHROUGH;
     case GUIDED:
         update_loiter(radius);
         break;
 
     case CRUISE:
         update_cruise();
-        loiter.radius = 0;
         break;
 
     case MANUAL:
@@ -803,7 +801,6 @@ void Plane::update_navigation()
     case QLAND:
     case QRTL:
         // nothing to do
-        loiter.radius = 0;
         break;
     }
 }

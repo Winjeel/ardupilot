@@ -708,12 +708,12 @@ bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd, 
 
     if (radius > 1.0f) {
         plane.guided_WP_loc.flags.loiter_ccw = 0;
-        plane.loiter.radius = (uint16_t)radius;
+        plane.loiter.override_radius = (uint16_t)radius;
     } else if (radius < 1.0f) {
         plane.guided_WP_loc.flags.loiter_ccw = 1;
-        plane.loiter.radius = (uint16_t)(-radius);
+        plane.loiter.override_radius = (uint16_t)(-radius);
     } else {
-        plane.loiter.radius = 0;
+        plane.loiter.override_radius = 0;
     }
 
     plane.set_guided_WP();
