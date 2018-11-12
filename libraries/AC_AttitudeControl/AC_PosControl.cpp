@@ -806,8 +806,9 @@ void AC_PosControl::calc_roll_pitch_throttle()
         right_g_posctl = constrain_float(right_g_posctl, -1.0f, 1.0f);
 
 
-        // Check if a touchdown is expected and if detected, set fwd and lateral g demnds to zero
+        // Check if a touchdown is expected and if detected, set fwd and lateral g demands to zero
         if ((now - _land_expect_time_ms) < 1000) {
+
             // wing pitch rate on touchdown
             float pitch_rate_mag = fabsf(_ahrs_wing.get_gyro_latest().y);
             if (pitch_rate_mag > _landed_gyro_y) {
@@ -848,6 +849,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
             // if landing detected, zero horizontal g maneouvre demands to point rotors up and prevent horizontal dragging and prop strike
             if ((now - _land_detect_time_ms) < 3000) {
                 fwd_g_trim = fwd_g_posctl = right_g_posctl = 0.0f;
+                lift_g_demand = MAX(lift_g_demand, 1e-6f);
             }
 
             DataFlash_Class::instance()->Log_Write("VLND", "TimeUS,GYRY,PITCH,ACCEL,COUNT", "QfffB",
