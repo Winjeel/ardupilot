@@ -2876,7 +2876,7 @@ void GCS_MAVLINK::handle_command_long(mavlink_message_t *msg)
     mavlink_msg_command_ack_send_buf(msg, chan, packet.command, result);
 }
 
-MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const Location &roi_loc)
+MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const Location &roi_loc, Vector2f &roi_velNE)
 {
     AP_Mount *mount = AP::mount();
     if (mount == nullptr) {
@@ -2895,7 +2895,8 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const Location &roi_loc)
         }
     } else {
         // send the command to the camera mount
-        mount->set_roi_target(roi_loc);
+        Vector2f roi_velNE = {};
+        mount->set_roi_target(roi_loc, roi_velNE);
     }
     return MAV_RESULT_ACCEPTED;
 }
@@ -2919,7 +2920,8 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_int_t &p
     roi_loc.lat = packet.x;
     roi_loc.lng = packet.y;
     roi_loc.alt = (int32_t)(packet.z * 100.0f);
-    return handle_command_do_set_roi(roi_loc);
+    Vector2f roi_velNE = {};
+    return handle_command_do_set_roi(roi_loc, roi_velNE);
 }
 
 MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_long_t &packet)
@@ -2934,7 +2936,10 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_long_t &
     roi_loc.lat = (int32_t)(packet.param5 * 1.0e7f);
     roi_loc.lng = (int32_t)(packet.param6 * 1.0e7f);
     roi_loc.alt = (int32_t)(packet.param7 * 100.0f);
-    MAV_RESULT ret = handle_command_do_set_roi(roi_loc);
+    Vector2f velNE;
+    velNE.x = packet.param1;
+    velNE.y = packet.param2;
+    MAV_RESULT ret = handle_command_do_set_roi(roi_loc, velNE);
     if (ret != MAV_RESULT_ACCEPTED) {
         return ret;
     }
@@ -2948,9 +2953,6 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const mavlink_command_long_t &
         cmd.content.location.lng = roi_loc.lng;
         cmd.content.location.alt = roi_loc.alt + (int32_t)(packet.param3 * 100.0f);
         cmd.content.location.flags.relative_alt = true;
-        Vector2f velNE;
-        velNE.x = packet.param1;
-        velNE.y = packet.param2;
         if (!handle_guided_request(cmd, velNE, packet.param4)) {
             return MAV_RESULT_DENIED;
         }

@@ -364,7 +364,7 @@ protected:
     MAV_RESULT handle_command_do_send_banner(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_do_set_roi(const mavlink_command_int_t &packet);
     MAV_RESULT handle_command_do_set_roi(const mavlink_command_long_t &packet);
-    virtual MAV_RESULT handle_command_do_set_roi(const Location &roi_loc);
+    virtual MAV_RESULT handle_command_do_set_roi(const Location &roi_loc, Vector2f &roi_velNE);
     MAV_RESULT handle_command_do_gripper(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_do_set_mode(const mavlink_command_long_t &packet);
     MAV_RESULT handle_command_get_home_position(const mavlink_command_long_t &packet);
