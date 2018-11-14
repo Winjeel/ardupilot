@@ -182,8 +182,8 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
                 camera_mount.set_mode_to_default();
             }
         } else {
-            // set mount's target location
-            camera_mount.set_roi_target(cmd.content.location);
+            // set mount's target location and velocity
+            camera_mount.set_roi_target(cmd.content.location, loiter.velNE);
         }
         break;
 
