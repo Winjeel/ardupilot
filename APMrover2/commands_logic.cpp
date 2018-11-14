@@ -73,7 +73,8 @@ bool Rover::start_command(const AP_Mission::Mission_Command& cmd)
             }
         } else {
             // send the command to the camera mount
-            camera_mount.set_roi_target(cmd.content.location);
+            Vector_2f roi_velNE = {};
+            camera_mount.set_roi_target(cmd.content.location, roi_velNE);
         }
         break;
 #endif
