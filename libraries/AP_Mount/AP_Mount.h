@@ -111,9 +111,9 @@ public:
     void set_angle_targets(float roll, float tilt, float pan) { set_angle_targets(_primary, roll, tilt, pan); }
     void set_angle_targets(uint8_t instance, float roll, float tilt, float pan);
 
-    // set_roi_target - sets target location that mount should attempt to point towards
-    void set_roi_target(const struct Location &target_loc) { set_roi_target(_primary,target_loc); }
-    void set_roi_target(uint8_t instance, const struct Location &target_loc);
+    // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
+    void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE) { set_roi_target(_primary,target_loc, roi_velNE); }
+    void set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE);
 
     // mavlink message handling:
     MAV_RESULT handle_command_long(const mavlink_command_long_t &packet);

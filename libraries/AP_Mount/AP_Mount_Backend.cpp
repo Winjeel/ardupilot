@@ -15,7 +15,7 @@ void AP_Mount_Backend::set_angle_targets(float roll, float tilt, float pan)
 }
 
 // set_roi_target - sets target location that mount should attempt to point towards
-void AP_Mount_Backend::set_roi_target(const struct Location &target_loc)
+void AP_Mount_Backend::set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE)
 {
     // set the target gps location
     _state._roi_target = target_loc;
@@ -61,14 +61,16 @@ void AP_Mount_Backend::control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_
             break;
 
         // set lat, lon, alt position targets from mavlink message
-        case MAV_MOUNT_MODE_GPS_POINT:
-            Location target_location;
-            memset(&target_location, 0, sizeof(target_location));
-            target_location.lat = pitch_or_lat;
-            target_location.lng = roll_or_lon;
-            target_location.alt = yaw_or_alt;
-            target_location.flags.relative_alt = true;
-            set_roi_target(target_location);
+        case MAV_MOUNT_MODE_GPS_POINT: {
+                Location target_location;
+                memset(&target_location, 0, sizeof(target_location));
+                target_location.lat = pitch_or_lat;
+                target_location.lng = roll_or_lon;
+                target_location.alt = yaw_or_alt;
+                target_location.flags.relative_alt = true;
+                Vector2f roi_velNE = {};
+                set_roi_target(target_location, roi_velNE);
+            }
             break;
 
         default:

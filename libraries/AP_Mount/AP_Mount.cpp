@@ -637,11 +637,11 @@ void AP_Mount::send_mount_status(mavlink_channel_t chan)
 }
 
 // set_roi_target - sets target location that mount should attempt to point towards
-void AP_Mount::set_roi_target(uint8_t instance, const struct Location &target_loc)
+void AP_Mount::set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE)
 {
     // call instance's set_roi_cmd
     if (instance < AP_MOUNT_MAX_INSTANCES && _backends[instance] != nullptr) {
-        _backends[instance]->set_roi_target(target_loc);
+        _backends[instance]->set_roi_target(target_loc, roi_velNE);
     }
 }
 
