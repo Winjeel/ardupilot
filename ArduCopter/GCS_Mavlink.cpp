@@ -573,7 +573,7 @@ MAV_RESULT GCS_MAVLINK_Copter::_handle_command_preflight_calibration(const mavli
 }
 
 
-MAV_RESULT GCS_MAVLINK_Copter::handle_command_do_set_roi(const Location &roi_loc)
+MAV_RESULT GCS_MAVLINK_Copter::handle_command_do_set_roi(const Location &roi_loc, Vector2f &roi_velNE)
 {
     if (!check_latlng(roi_loc)) {
         return MAV_RESULT_FAILED;
