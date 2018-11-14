@@ -554,7 +554,8 @@ void Sub::set_auto_yaw_roi(const Location &roi_location)
             set_auto_yaw_mode(AUTO_YAW_ROI);
         }
         // send the command to the camera mount
-        camera_mount.set_roi_target(roi_location);
+        Vector2f roi_velNE = {};
+        camera_mount.set_roi_target(roi_location, roi_velNE);
 
         // TO-DO: expand handling of the do_nav_roi to support all modes of the MAVLink.  Currently we only handle mode 4 (see below)
         //      0: do nothing
