@@ -270,10 +270,11 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
                 int32_t target_bearing = landing.nav_controller->target_bearing_cd();
                 int32_t delta = wrap_180_cd(target_bearing - _last_target_bearing);
                 _last_target_bearing = target_bearing;
-                if (delta > 0) {
-                    _loiter_sum_cd += delta;
-                } else {
+                // only accumulate turn angle in the correct loiter direction.
+                if (_loiter_point.flags.loiter_ccw) {
                     _loiter_sum_cd -= delta;
+                } else {
+                    _loiter_sum_cd += delta;
                 }
                 return false;
             }
