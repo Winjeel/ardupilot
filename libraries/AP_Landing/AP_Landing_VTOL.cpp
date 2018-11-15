@@ -85,22 +85,53 @@ void AP_Landing_VTOL::do_land(const AP_Mission::Mission_Command& cmd, const floa
     // Calculate position offset from the landing point to start of braking/transition maneouvre
     _predicted_decel_distance = 0.5f * approach_gndspeed * approach_gndspeed / _vtol_decel;
     float vec_arg = atan2f(-wind.y, -wind.x);
-    Vector2f offset_vec = {-_predicted_decel_distance * cosf(vec_arg) , -_predicted_decel_distance * sinf(vec_arg)};
-    vec_arg += _loiter_point.flags.loiter_ccw ? radians(90.0f) : radians(-90.0f);
+    Vector2f decel_offset_vec = {-_predicted_decel_distance * cosf(vec_arg) , -_predicted_decel_distance * sinf(vec_arg)};
 
     // Increase the loiter radius if necessary to prevent bank angle saturating
     _loiter_radius = landing.nav_controller->loiter_radius(fabsf(landing.aparm.loiter_radius));
 
+    // Choose the loiter turn direction that gives the distance to the loiter centre that is closest to 2 turn radii
+    // from a CW or CCW loiter circle
+
     // calculate the radial offset and add to positon offset from landing point to loiter centre
-    offset_vec.x -= _loiter_radius * cosf(vec_arg);
-    offset_vec.y -= _loiter_radius * sinf(vec_arg);
+    Vector2f offset_vec_CW;
+    Vector2f offset_vec_CCW;
+    vec_arg += radians(90.0f);
+    float cos_arg = cosf(vec_arg);
+    float sin_arg = sinf(vec_arg);
+    offset_vec_CW.x = decel_offset_vec.x + _loiter_radius * cos_arg;
+    offset_vec_CW.y = decel_offset_vec.y + _loiter_radius * sin_arg;
+    offset_vec_CCW.x = decel_offset_vec.x - _loiter_radius * cos_arg;
+    offset_vec_CCW.y = decel_offset_vec.y - _loiter_radius * sin_arg;
 
     // Apply total offset to get loiter centre
-    location_offset(_loiter_point, offset_vec.x, offset_vec.y);
+    Location loiter_point_CW;
+    memcpy(&loiter_point_CW, &_loiter_point, sizeof(Location));
+    location_offset(loiter_point_CW, offset_vec_CW.x, offset_vec_CW.y);
+
+    Location loiter_point_CCW;
+    memcpy(&loiter_point_CCW, &_loiter_point, sizeof(Location));
+    location_offset(loiter_point_CCW, offset_vec_CCW.x, offset_vec_CCW.y);
 
     // initialise current location
     Location current_loc;
     landing.ahrs.get_position(current_loc);
+
+    // Get distance to each loiter centre
+    float radial_distance_CW = get_distance(current_loc, loiter_point_CW);
+    float radial_distance_CCW = get_distance(current_loc, loiter_point_CCW);
+
+    // Use option closest to 2 x _loiter_radius
+    float target_radius = 2.0f * _loiter_radius;
+    if (fabsf(radial_distance_CW - target_radius) < fabsf(radial_distance_CCW - target_radius)) {
+        memcpy(&_loiter_point, &loiter_point_CW, sizeof(Location));
+       _loiter_point.flags.loiter_ccw = false;
+        _use_CCW_loiter = false;
+    } else {
+        memcpy(&_loiter_point, &loiter_point_CCW, sizeof(Location));
+        _loiter_point.flags.loiter_ccw = true;
+        _use_CCW_loiter = true;
+    }
 
     // initialise control variables
     _low_wind_overshoot = false;
@@ -151,7 +182,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
                 // is into wind and close to the landing waypoint
                 next_WP_loc.lat = _loiter_point.lat;
                 next_WP_loc.lng = _loiter_point.lng;
-                if (get_distance(current_loc, _loiter_point) > fabsf(2 * _loiter_radius)) {
+                if (get_distance(current_loc, _loiter_point) > fabsf(2.0f * _loiter_radius)) {
                     landing.nav_controller->update_waypoint(current_loc, _loiter_point);
                     _timeout_count = 0;
                     return false;
@@ -255,6 +286,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
             if ((_loiter_sum_cd < 18000) && !_low_wind_overshoot) {
                 // Adjust the loiter centre
                 memcpy(&_loiter_point, &_landing_point, sizeof(Location));
+                _loiter_point.flags.loiter_ccw = _use_CCW_loiter;
                 Vector3f wind = landing.ahrs.wind_estimate();
                 float approach_speed = MAX(15.0f - sqrtf(wind.x*wind.x+wind.y*wind.y), 0.0f);
                 float decel_distance = 0.5f * approach_speed * approach_speed / _vtol_decel;

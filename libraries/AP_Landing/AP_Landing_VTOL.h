@@ -72,7 +72,8 @@ private:
     Vector2f _approach_vec_unit; // NE vector from landing entry to desired touchdown point
     int16_t _timeout_count;      // Counter used to determine if a mode transtion is taking too long
     bool _commanded_go_around;   // true when a go around and continuation in loiter for one more turn has been requested.
-    float _loiter_radius;       // radius in metres used for the recovery loiter pattern - adjusts to accomodate wind
+    float _loiter_radius;        // radius in metres used for the recovery loiter pattern - adjusts to accomodate wind
+    bool _use_CCW_loiter;        // true if a CCW loiter has been automatically selected
 
     //public AP_Landing interface
     void do_land(const AP_Mission::Mission_Command& cmd, const float relative_altitude);
