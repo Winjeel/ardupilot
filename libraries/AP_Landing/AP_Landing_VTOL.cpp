@@ -89,7 +89,7 @@ void AP_Landing_VTOL::do_land(const AP_Mission::Mission_Command& cmd, const floa
     vec_arg += _loiter_point.flags.loiter_ccw ? radians(90.0f) : radians(-90.0f);
 
     // Increase the loiter radius if necessary to prevent bank angle saturating
-    _loiter_radius = landing.nav_controller->loiter_radius(landing.aparm.loiter_radius);
+    _loiter_radius = landing.nav_controller->loiter_radius(fabsf(landing.aparm.loiter_radius));
 
     // calculate the radial offset and add to positon offset from landing point to loiter centre
     offset_vec.x -= _loiter_radius * cosf(vec_arg);
