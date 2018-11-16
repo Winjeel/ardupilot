@@ -705,27 +705,15 @@ float AP_TECS::_get_i_gain(void)
  */
 void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
 {
-    // Use the demanded rate of change of total energy as the feed-forward demand, but add
-    // component which scales with (1/cos(bank angle) - 1) to compensate for induced
-    // drag increase and reduced stall margin during turns.
-    const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
-    float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
-    float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
-
-    // Use throttle nudge to set the minimum throttle increment rather than being additve to the turn
-    // throttle increment. This improves endurance during loiter.
-    float throttle_increment = MAX(STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf), 0.01f * (float)throttle_nudge);
-
     // Calculate throttle demand by interpolating between pitch and throttle limits
+    // If landing and we don't have an airspeed sensor and we have a non-zero
+    // TECS_LAND_THR param then use it
     float nomThr;
-    //If landing and we don't have an airspeed sensor and we have a non-zero
-    //TECS_LAND_THR param then use it
     if (_flags.is_doing_auto_land && _landThrottle >= 0) {
-        nomThr = 0.01f * _landThrottle + throttle_increment;
+        nomThr = 0.01f * _landThrottle;
     } else { //not landing or not using TECS_LAND_THR parameter
-        nomThr = 0.01f * aparm.throttle_cruise + throttle_increment;
+        nomThr = 0.01f * aparm.throttle_cruise;
     }
-
     if (_pitch_dem > 0.0f && _PITCHmaxf > 0.0f)
     {
         _throttle_dem = nomThr + (_THRmaxf - nomThr) * _pitch_dem / _PITCHmaxf;
@@ -739,6 +727,20 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
         _throttle_dem = nomThr;
     }
 
+    // Use the demanded rate of change of total energy as the feed-forward demand, but add
+    // component which scales with (1/cos(bank angle) - 1) to compensate for induced
+    // drag increase and reduced stall margin during turns.
+    const Matrix3f &rotMat = _ahrs.get_rotation_body_to_ned();
+    float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
+    float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
+
+    // Use throttle nudge to set the minimum throttle increment rather than being additve to the turn
+    // throttle increment. This improves endurance during loiter.
+    float turn_thr_inc = STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
+    _throttle_dem += MAX(turn_thr_inc, 0.01f * (float)throttle_nudge);
+
+    // Constrain throttle demand but adjust upper limit to allow for additonal throttle required in turns
+    _throttle_dem = constrain_float(_throttle_dem, _THRminf, (_THRmaxf + turn_thr_inc));
 }
 
 void AP_TECS::_detect_bad_descent(void)
