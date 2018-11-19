@@ -302,6 +302,7 @@ void NavEKF3_core::InitialiseVariables()
     posOffsetNED.zero();
     posResetSource = DEFAULT;
     velResetSource = DEFAULT;
+    externalEasDefault = frontend->_easDefault;
 
     // range beacon fusion variables
     memset((void *)&rngBcnDataNew, 0, sizeof(rngBcnDataNew));

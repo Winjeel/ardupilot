@@ -355,6 +355,9 @@ public:
     // get timing statistics structure
     void getTimingStatistics(int8_t instance, struct ekf_timing &timing) const;
 
+    // set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+    void set_default_airspeed(float spd);
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
