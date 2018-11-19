@@ -1756,7 +1756,11 @@ void QuadPlane::update(void)
                 gcs().send_text(MAV_SEVERITY_INFO, "Transition VTOL - pullup start");
             } else {
                 gcs().send_text(MAV_SEVERITY_INFO, "Transition VTOL - emergency recovery");
-                // Emergency loss of control recovery so do not go through normal pullup in FW mode
+                // Emergency loss of control recovery so switch straight to VTOL mode and setup for transition back to fixed wing
+                transition_start_ms = now;
+                transition_state = TRANSITION_ANGLE_WAIT_FW;
+                reverse_transition_active =  false;
+                init_mode();
             }
         } else if (is_tailsitter() &&
                    transition_state == TRANSITION_ANGLE_WAIT_VTOL) {

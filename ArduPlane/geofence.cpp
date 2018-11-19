@@ -287,19 +287,29 @@ bool Plane::geofence_check_maxalt(void)
 void Plane::geofence_check(bool altitude_check_only)
 {
     // This is a speciality check for TVBS airframes to enable regaining control if lost during fixed wing flight testing
-    if (geofence_state != nullptr &&
-            (g.fence_action == 5) &&
+    if ((g.fence_action == 5) &&
             hal.util->get_soft_armed() &&
             (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) &&
-            geofence_state->is_enabled &&
-            !quadplane.in_vtol_mode() &&
-            (g.fence_minalt > 0) &&
-            (adjusted_altitude_cm() < (g.fence_minalt*100.0f) + home.alt)) {
-        set_mode(QHOVER, MODE_REASON_FENCE_BREACH);
-        // declare loss of control to force immediate transition into VTOL and use of the attitude recovery gains and throttle
-        quadplane.control_loss_declared = true;
-        quadplane.time_control_lost_ms = AP_HAL::millis();
-        return;
+            !quadplane.in_vtol_mode()) {
+        // check if below the geo fence
+        float hagl_m = 0.01f * (adjusted_altitude_cm() - home.alt);
+        bool hgt_low = (g.fence_minalt > 0) && (hagl_m < g.fence_minalt);
+
+        // check if sinking too fast
+        bool sink_high = false;
+        Vector3f velned;
+        if (ahrs.get_velocity_NED(velned)) {
+            sink_high = (hagl_m / MAX(velned.z, 0.001f)) < 3.0f;
+        }
+
+        // switch to QHOVER and indicate control lost so that switchover is immediate
+        if (hgt_low || sink_high) {
+            set_mode(QHOVER, MODE_REASON_FENCE_BREACH);
+            // declare loss of control to force immediate transition into VTOL and use of the attitude recovery gains and throttle
+            quadplane.control_loss_declared = true;
+            quadplane.time_control_lost_ms = AP_HAL::millis();
+            return;
+        }
     }
 
     if (!geofence_enabled()) {
