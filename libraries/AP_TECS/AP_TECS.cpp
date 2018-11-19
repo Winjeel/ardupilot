@@ -238,6 +238,14 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Values: 0:Disable,1:Enable
     // @User: Advanced
     AP_GROUPINFO("SYNAIRSPEED", 27, AP_TECS, _use_synthetic_airspeed, 0),
+
+    // @Param: DASH_THR
+    // @DisplayName: Dash throttle increment (percentage)
+    // @Description: Use this parameter if your platform does not have an airspeed sensor.  It is the additional throttle above TRIM_THROTTLE required to fly straight and level at ARSPD_FBW_MAX. Set THROTTLE_NUDGE = 0 when using this. Adjust TRIM_THROTTLE so that the vehicle flies at ARSPD_FBW_MIN and adjust TECS_DASH_THR so that the vehicle flies at ARSPD_FBW_MAX when that speed is demanded. If TECS_DASH_THR is negative then the ability to control airspeed without an airspeed sensor is disabled and THROTTLE_NUDGE should be set to 1.
+    // @Range: -1 100
+    // @Increment: 0.1
+    // @User: User
+    AP_GROUPINFO("DASH_THR", 28, AP_TECS, _dashThrIncr, -1.0f),
     
     AP_GROUPEND
 };
@@ -340,7 +348,7 @@ void AP_TECS::_update_speed(float load_factor)
 
     // Convert equivalent airspeeds to true airspeeds
 
-    float EAS2TAS = _ahrs.get_EAS2TAS();
+    float EAS2TAS = constrain_float(_ahrs.get_EAS2TAS(), 0.1f, 1.1f);
     _TAS_dem = _EAS_dem * EAS2TAS;
     _TASmax   = aparm.airspeed_max * EAS2TAS;
     _TASmin   = aparm.airspeed_min * EAS2TAS;
@@ -734,10 +742,18 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     float cosPhi = sqrtf((rotMat.a.y*rotMat.a.y) + (rotMat.b.y*rotMat.b.y));
     float STEdot_dem = _rollComp * (1.0f/constrain_float(cosPhi * cosPhi , 0.1f, 1.0f) - 1.0f);
 
+    // if enabled, calculate throttle increment required to fly at demanded speed
+    float thrSpdIncr;
+    if (_dashThrIncr > 0.0f) {
+        thrSpdIncr = 0.01f * _dashThrIncr * MAX(_TAS_dem_adj - _TASmin, 0.0f) / MAX(_TASmax - _TASmin, 1.0f);
+    } else {
+        thrSpdIncr = 0.0f;
+    }
+
     // Use throttle nudge to set the minimum throttle increment rather than being additve to the turn
     // throttle increment. This improves endurance during loiter.
     float turn_thr_inc = STEdot_dem / (_STEdot_max - _STEdot_min) * (_THRmaxf - _THRminf);
-    _throttle_dem += MAX(turn_thr_inc, 0.01f * (float)throttle_nudge);
+    _throttle_dem += MAX(turn_thr_inc, MAX(0.01f * (float)throttle_nudge, thrSpdIncr));
 
     // Constrain throttle demand but adjust upper limit to allow for additonal throttle required in turns
     _throttle_dem = constrain_float(_throttle_dem, _THRminf, (_THRmaxf + turn_thr_inc));
