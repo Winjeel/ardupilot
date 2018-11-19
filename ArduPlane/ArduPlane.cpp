@@ -870,6 +870,11 @@ void Plane::update_alt()
             net_throttle_nudge += 10;
         }
 
+        if (!ahrs.airspeed_sensor_enabled()) {
+            // send the demanded airspeed to the EKF to use as a default observation value when there is no direct measurement
+            ahrs.set_default_airspeed(0.01f * target_airspeed_cm);
+        }
+
         SpdHgt_Controller->update_pitch_throttle(rel_alt_demand_cm,
                                                  target_airspeed_cm,
                                                  flight_stage,
