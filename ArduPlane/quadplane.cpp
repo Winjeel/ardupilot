@@ -2326,7 +2326,13 @@ void QuadPlane::vtol_position_controller(void)
     case QPOS_LAND_FINAL: {
         if (!weathervane.tip_warning || descent_delay_time_sec > 30.0f) {
             // complete descent if tipover conditon alert is not active or we have delayed the descent for more than 30 seconds in total
-            pos_control->set_alt_target_from_climb_rate(-land_speed_cms, plane.G_Dt, true);
+            // slow further to half the kinetic energy at the expected touchdown point allowing for expected 2m height error
+            float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+            float kinetic_energy_ratio = linear_interpolate(0.5f, 1.0f,
+                                              height_above_ground,
+                                              2.0f, MAX(land_final_alt, 2.0f));
+            float hgt_rate_dem_cms = - sqrtf(kinetic_energy_ratio) * (float)land_speed_cms;
+            pos_control->set_alt_target_from_climb_rate(hgt_rate_dem_cms, plane.G_Dt, true);
         } else {
             // conditions not good for touchdown so arrest descent
             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, true);
