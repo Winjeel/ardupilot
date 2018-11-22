@@ -2301,6 +2301,16 @@ void QuadPlane::vtol_position_controller(void)
     }
 
     // now height control
+
+    // determine if inside or outside the landing recovery cone using hysteresis
+    float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+    float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
+    if (plane.auto_state.wp_distance < (cone_radius - 0.5f)) {
+        poscontrol.outside_cone = false;
+    } else if (plane.auto_state.wp_distance > (cone_radius + 0.5f)) {
+        poscontrol.outside_cone = true;
+    }
+
     switch (poscontrol.state) {
     case QPOS_POSITION1:
     case QPOS_POSITION2: {
@@ -2315,7 +2325,7 @@ void QuadPlane::vtol_position_controller(void)
                 break;
             }
         }
-        if (plane.control_mode == QRTL || plane.control_mode == GUIDED || vtol_loiter_auto) {
+        if (plane.control_mode == GUIDED || vtol_loiter_auto) {
             plane.ahrs.get_position(plane.current_loc);
             float target_altitude = plane.next_WP_loc.alt;
             if (poscontrol.slow_descent) {
@@ -2328,14 +2338,25 @@ void QuadPlane::vtol_position_controller(void)
                                                      0, 1);
             }
             adjust_alt_target(target_altitude - plane.home.alt);
-        } else {
-            // allow descent if inside the landing cone
-            float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
-            float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
-            if (plane.auto_state.wp_distance < cone_radius) {
-                pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
+        } else if (plane.control_mode == QRTL || plane.control_mode == QLAND) {
+            plane.ahrs.get_position(plane.current_loc);
+            float target_altitude = plane.next_WP_loc.alt;
+            if (poscontrol.slow_descent) {
+                // gradually descend as we approach target
+                plane.auto_state.wp_proportion = location_path_proportion(plane.current_loc,
+                                                                          plane.prev_WP_loc, plane.next_WP_loc);
+                target_altitude = linear_interpolate(plane.prev_WP_loc.alt,
+                                                     plane.next_WP_loc.alt,
+                                                     plane.auto_state.wp_proportion,
+                                                     0, 1);
+                adjust_alt_target(target_altitude - plane.home.alt);
             } else {
-                pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+                // allow descent if inside the landing cone
+                if (poscontrol.outside_cone) {
+                    pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+                } else {
+                    pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
+                }
             }
         }
         break;
@@ -2343,23 +2364,17 @@ void QuadPlane::vtol_position_controller(void)
 
     case QPOS_LAND_DESCEND: {
         // allow descent if inside the landing cone
-        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
-        float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
-        if (plane.auto_state.wp_distance < cone_radius) {
-            pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
-        } else {
+        if (poscontrol.outside_cone) {
             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+        } else {
+            pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
         }
         break;
     }
 
     case QPOS_LAND_FINAL: {
-        // inhibit descent if outside the landing cone
-        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
-        float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
-        bool bad_position = plane.auto_state.wp_distance > cone_radius;
-        if ((!weathervane.tip_warning && !bad_position) || descent_delay_time_sec > 30.0f) {
-            // complete descent if tipover conditon alert is not active or we have delayed the descent for more than 30 seconds in total
+        if ((!weathervane.tip_warning && !poscontrol.outside_cone) || descent_delay_time_sec > 30.0f) {
+            // complete descent if landing conditions are met or we have delayed the descent for more than 30 seconds in total
             // slow further to half the kinetic energy at the expected touchdown point allowing for expected 2m height error
             float kinetic_energy_ratio = linear_interpolate(0.5f, 1.0f,
                                               height_above_ground,

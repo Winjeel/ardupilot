@@ -396,6 +396,7 @@ private:
         Vector3f target;
         bool slow_descent:1;
         uint32_t time_ms;
+        bool outside_cone:1;
     } poscontrol;
 
     struct {
