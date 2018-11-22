@@ -607,6 +607,24 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_WPE_GAIN", 39, QuadPlane, tailsitter.tvbs_wpe_gain, 0.0f),
 
+    // @Param: TVBS_LND_CONE
+    // @DisplayName: Elevation angle of the landing recovery cone.
+    // @Description: The vehicle is not allowed to descend if outside an inverted cone with a truncated vertex located on the landing point. This parameter specifies the elevation angle of the cone above the horizon.
+    // @Range: 0 80
+    // @Increment: 1
+    // @Units: deg
+    // @User: Standard
+    AP_GROUPINFO("TVBS_LND_CONE", 40, QuadPlane, tailsitter.tvbs_land_cone_elev, 60),
+
+    // @Param: TVBS_LND_RAD
+    // @DisplayName: Vertex radius of the landing recovery cone.
+    // @Description: The vehicle is not allowed to descend if outside an inverted cone with a truncated vertex located on the landing point. This parameter specifies the radius of the cone vertex.
+    // @Range: 0 10
+    // @Increment: 1
+    // @Units: m
+    // @User: Standard
+    AP_GROUPINFO("TVBS_LND_RAD", 41, QuadPlane, tailsitter.tvbs_land_cone_radius, 5),
+
     AP_GROUPEND
 };
 
@@ -2311,23 +2329,38 @@ void QuadPlane::vtol_position_controller(void)
             }
             adjust_alt_target(target_altitude - plane.home.alt);
         } else {
-            pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+            // allow descent if inside the landing cone
+            float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+            float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
+            if (plane.auto_state.wp_distance < cone_radius) {
+                pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
+            } else {
+                pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+            }
         }
         break;
     }
 
     case QPOS_LAND_DESCEND: {
+        // allow descent if inside the landing cone
         float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
-        pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground),
-                                                    plane.G_Dt, true);
+        float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
+        if (plane.auto_state.wp_distance < cone_radius) {
+            pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground), plane.G_Dt, true);
+        } else {
+            pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+        }
         break;
     }
 
     case QPOS_LAND_FINAL: {
-        if (!weathervane.tip_warning || descent_delay_time_sec > 30.0f) {
+        // inhibit descent if outside the landing cone
+        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+        float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (height_above_ground / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
+        bool bad_position = plane.auto_state.wp_distance > cone_radius;
+        if ((!weathervane.tip_warning && !bad_position) || descent_delay_time_sec > 30.0f) {
             // complete descent if tipover conditon alert is not active or we have delayed the descent for more than 30 seconds in total
             // slow further to half the kinetic energy at the expected touchdown point allowing for expected 2m height error
-            float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
             float kinetic_energy_ratio = linear_interpolate(0.5f, 1.0f,
                                               height_above_ground,
                                               2.0f, MAX(land_final_alt, 2.0f));
