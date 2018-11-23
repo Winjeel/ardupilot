@@ -396,6 +396,7 @@ private:
         Vector3f target;
         bool slow_descent:1;
         uint32_t time_ms;
+        bool outside_cone:1;
     } poscontrol;
 
     struct {
@@ -478,6 +479,8 @@ private:
         AP_Float tvbs_fw_ail_fwd_gain;      // the gain from equivalent aileron deflection to thrust vectoring used in forward flight
         AP_Float tvbs_to_scaler;            // scaler applied to position controller wind drift integrator during first part of takeoff
         AP_Float tvbs_wpe_gain;             // gain from wing pitch error to elevator
+        AP_Int8 tvbs_land_cone_elev;        // Elevation of the landing cone in degrees
+        AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
 
     } tailsitter;
 
