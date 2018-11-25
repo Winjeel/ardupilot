@@ -107,14 +107,20 @@ bool Plane::have_reverse_thrust(void) const
 int16_t Plane::get_throttle_input(bool no_deadzone) const
 {
     int16_t ret;
-    if (no_deadzone) {
-        ret = channel_throttle->get_control_in_zero_dz();
+    if (quadplane.tailsitter.input_type == 2 && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
+        // handle special case where corvo hand controller is being used where the pitch stick is used to accel/decel the vehicle
+        // forward/down stick is positive/faster
+        ret = -channel_pitch->get_control_in_zero_dz();
     } else {
-        ret = channel_throttle->get_control_in();
-    }
-    if (reversed_throttle) {
-        // RC option for reverse throttle has been set
-        ret = -ret;
+        if (no_deadzone) {
+            ret = channel_throttle->get_control_in_zero_dz();
+        } else {
+            ret = channel_throttle->get_control_in();
+        }
+        if (reversed_throttle) {
+            // RC option for reverse throttle has been set
+            ret = -ret;
+        }
     }
     return ret;
 }
