@@ -276,7 +276,7 @@ const AP_Param::GroupInfo QuadPlane::var_info[] = {
 
     // @Param: TAILSIT_INPUT
     // @DisplayName: Tailsitter input type
-    // @Description: This controls whether stick input when hovering as a tailsitter follows the conventions for fixed wing hovering or multicopter hovering. When multicopter input is selected the roll stick will roll the aircraft in earth frame and yaw stick will yaw in earth frame. When using fixed wing input the roll and yaw sticks will control the aircraft in body frame. When corvo inout mode is selected, this follows the multicopter convention when in VTOL modes, and when in FW modes follows a convention where pitch stick is integrated to calculate a speed demand between ARSPD_FBW_MIN and ARSPD_FBW_MAX, throttle stick is used to calculate a vertical velocity demand  between FBWB_SINK_RATE and FBWB_CLIMB_RATE.
+    // @Description: This controls whether stick input when hovering as a tailsitter follows the conventions for fixed wing hovering or multicopter hovering. When multicopter input is selected the roll stick will roll the aircraft in earth frame and yaw stick will yaw in earth frame. When using fixed wing input the roll and yaw sticks will control the aircraft in body frame. When corvo input mode is selected, this follows the multicopter convention when in VTOL modes, and when in FBWB and CRUISE modes follows a convention where pitch stick integrates to calculate a persistent speed demand between ARSPD_FBW_MIN and ARSPD_FBW_MAX and throttle stick is used to calculate a vertical velocity demand between FBWB_SINK_RATE and FBWB_CLIMB_RATE.
     // @Values: 0:MultiCopterInput,1:FixedWingInput,2:CorvoInput
     AP_GROUPINFO("TAILSIT_INPUT", 50, QuadPlane, tailsitter.input_type, TAILSITTER_INPUT_MULTICOPTER),
 
