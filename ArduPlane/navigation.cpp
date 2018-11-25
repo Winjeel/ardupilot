@@ -109,7 +109,12 @@ void Plane::calc_airspeed_errors()
 
     // FBW_B/cruise airspeed target
     if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
-        if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
+        if (quadplane.tailsitter.input_type == 2) {
+            // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
+            const float control_in = get_throttle_input();
+            target_airspeed_cm += 10.0f * control_in;
+            target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
+        } else if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
             float control_min = 0.0f;
             float control_mid = 0.0f;
             const float control_max = channel_throttle->get_range();
@@ -303,7 +308,34 @@ void Plane::update_fbwb_speed_height(void)
 
         target_altitude.last_elev_check_us = now;
         
-        float elevator_input = channel_pitch->get_control_in() / 4500.0f;
+        float elevator_input;
+        if (quadplane.tailsitter.input_type == 2) {
+            // handle special case where the Corvo hand controller is being used where the up/down buttons
+            // mapped to throttle channel are used to make the vehicle climb or descend
+            float control_min = 0.0f;
+            float control_mid = 0.0f;
+            const float control_max = channel_throttle->get_range();
+            const float control_in = channel_throttle->get_control_in_zero_dz();
+            switch (channel_throttle->get_type()) {
+                case RC_Channel::RC_CHANNEL_TYPE_ANGLE:
+                    control_min = -control_max;
+                    break;
+                case RC_Channel::RC_CHANNEL_TYPE_RANGE:
+                    control_mid = channel_throttle->get_control_mid();
+                    break;
+            }
+            if (control_in <= control_mid) {
+                elevator_input = linear_interpolate(-1.0f, 0.0f,
+                                                    control_in,
+                                                    control_min, control_mid);
+            } else {
+                elevator_input = linear_interpolate(0.0f, 1.0f,
+                                                    control_in,
+                                                    control_mid, control_max);
+            }
+        } else {
+            elevator_input = channel_pitch->get_control_in() / 4500.0f;
+        }
     
         if (g.flybywire_elev_reverse) {
             elevator_input = -elevator_input;

@@ -383,7 +383,7 @@ private:
     // Airspeed
     // The calculated airspeed to use in FBW-B.  Also used in higher modes for insuring min ground speed is met.
     // Also used for flap deployment criteria.  Centimeters per second.
-    int32_t target_airspeed_cm;
+    float target_airspeed_cm;
 
     // The difference between current and desired airspeed.  Used in the pitch controller.  Meters per second.
     float airspeed_error;

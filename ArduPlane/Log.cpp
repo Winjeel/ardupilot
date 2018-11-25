@@ -142,7 +142,7 @@ void Plane::Log_Write_Nav_Tuning()
         target_lat          : next_WP_loc.lat,
         target_lng          : next_WP_loc.lng,
         target_alt          : next_WP_loc.alt,
-        target_airspeed     : target_airspeed_cm,
+        target_airspeed     : (int32_t)target_airspeed_cm,
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
 }
