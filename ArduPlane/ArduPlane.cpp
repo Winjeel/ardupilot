@@ -779,7 +779,21 @@ void Plane::update_navigation()
     case LOITER:
     case AVOID_ADSB:
     case GUIDED:
-        update_loiter(radius);
+        {
+            // TODO only enable this when payload handset control is active
+            if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+                // when in guided mode, allow stick inputs to move point
+                const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
+                plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
+                plane.loiter.velNE.y = scaler * channel_roll->get_control_in();
+            }
+            // Move guided mode waypoint at constant velocity and set the loiter waypoint to the guided waypoint location
+            float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
+            location_offset(guided_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
+            loiter.last_update_ms = millis();
+            set_guided_WP();
+            update_loiter(radius);
+        }
         break;
 
     case CRUISE:
