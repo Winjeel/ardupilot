@@ -782,15 +782,43 @@ void Plane::update_navigation()
         {
             // TODO only enable this when payload handset control is active
             if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
-                // when in guided mode, allow stick inputs to move point
+                // When in guided mode, allow stick inputs to move point
                 const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
                 plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
                 plane.loiter.velNE.y = scaler * channel_roll->get_control_in();
+
                 // Move target waypoint at constant velocity
                 float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
                 location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
+
+                // The up/down buttons are mapped to throttle channel and used to make the vehicle climb or descend
+                float control_min = 0.0f;
+                float control_mid = 0.0f;
+                const float control_max = channel_throttle->get_range();
+                const float control_in = channel_throttle->get_control_in_zero_dz();
+                switch (channel_throttle->get_type()) {
+                    case RC_Channel::RC_CHANNEL_TYPE_ANGLE:
+                        control_min = -control_max;
+                        break;
+                    case RC_Channel::RC_CHANNEL_TYPE_RANGE:
+                        control_mid = channel_throttle->get_control_mid();
+                        break;
+                }
+                float climb_rate_ms;
+                if (control_in <= control_mid) {
+                    climb_rate_ms = linear_interpolate(-g.flybywire_sink_rate, 0.0f,
+                                                        control_in,
+                                                        control_min, control_mid);
+                } else {
+                    climb_rate_ms = linear_interpolate(0.0f, g.flybywire_climb_rate,
+                                                        control_in,
+                                                        control_mid, control_max);
+                }
+                next_WP_loc.alt += 100.0f * time_delta * climb_rate_ms;
+
                 loiter.last_update_ms = millis();
                 guided_WP_loc = next_WP_loc;
+
             }
             update_loiter(radius);
         }
