@@ -786,12 +786,12 @@ void Plane::update_navigation()
                 const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
                 plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
                 plane.loiter.velNE.y = scaler * channel_roll->get_control_in();
+                // Move target waypoint at constant velocity
+                float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
+                location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
+                loiter.last_update_ms = millis();
+                guided_WP_loc = next_WP_loc;
             }
-            // Move guided mode waypoint at constant velocity and set the loiter waypoint to the guided waypoint location
-            float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
-            location_offset(guided_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
-            loiter.last_update_ms = millis();
-            set_guided_WP();
             update_loiter(radius);
         }
         break;
