@@ -791,7 +791,7 @@ void Plane::update_navigation()
                 float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
                 location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
 
-                // The up/down buttons are mapped to throttle channel and used to make the vehicle climb or descend
+                // The up/down buttons are mapped to throttle channel and used to make the target location move up or down
                 float control_min = 0.0f;
                 float control_mid = 0.0f;
                 const float control_max = channel_throttle->get_range();
@@ -814,23 +814,25 @@ void Plane::update_navigation()
                                                         control_in,
                                                         control_mid, control_max);
                 }
-                next_WP_loc.alt += 100.0f * time_delta * climb_rate_ms;
+                // TODO - means of adjusting vehicle height to maintain terrain clearance
+                //next_WP_loc.alt += 100.0f * time_delta * climb_rate_ms;
 
                 loiter.last_update_ms = millis();
                 guided_WP_loc = next_WP_loc;
 
                 // Set mount's target location and velocity using an estimated height of terrain above home if available
                 // Note: set_roi_target() function assumes target height is relative to home
-                // TODO give operator some means of raising or lowering the target height
-                Location target_loc = guided_WP_loc;
-                float terrain_difference_m = 0.0f;
+                 Location target_loc_demand = camera_mount.get_roi_target();
+                 target_loc_demand.lat = guided_WP_loc.lat;
+                 target_loc_demand.lng = guided_WP_loc.lng;
+                 target_loc_demand.alt += 100.0f * time_delta * climb_rate_ms;
+                 float terrain_difference_m = 0.0f;
 #if AP_TERRAIN_AVAILABLE
                 if (terrain.status() == AP_Terrain::TerrainStatusOK) {
                     terrain.height_terrain_difference_home(terrain_difference_m, false);
                 }
 #endif
-                target_loc.alt = ahrs.get_home().alt + 100.0f * terrain_difference_m;
-                camera_mount.set_roi_target(target_loc, plane.loiter.velNE);
+                camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
 
             }
             update_loiter(radius);
