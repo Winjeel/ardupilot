@@ -819,6 +819,19 @@ void Plane::update_navigation()
                 loiter.last_update_ms = millis();
                 guided_WP_loc = next_WP_loc;
 
+                // Set mount's target location and velocity using an estimated height of terrain above home if available
+                // Note: set_roi_target() function assumes target height is relative to home
+                // TODO give operator some means of raising or lowering the target height
+                Location target_loc = guided_WP_loc;
+                float terrain_difference_m = 0.0f;
+#if AP_TERRAIN_AVAILABLE
+                if (terrain.status() == AP_Terrain::TerrainStatusOK) {
+                    terrain.height_terrain_difference_home(terrain_difference_m, false);
+                }
+#endif
+                target_loc.alt = ahrs.get_home().alt + 100.0f * terrain_difference_m;
+                camera_mount.set_roi_target(target_loc, plane.loiter.velNE);
+
             }
             update_loiter(radius);
         }
