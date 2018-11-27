@@ -24,6 +24,12 @@ void AP_Mount_Backend::set_roi_target(const struct Location &target_loc, Vector2
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_GPS_POINT);
 }
 
+// get_roi_target - gets target location that mount is attempting to point towards
+Location AP_Mount_Backend::get_roi_target()
+{
+    return _state._roi_target;
+}
+
 // process MOUNT_CONFIGURE messages received from GCS.  deprecated.
 void AP_Mount_Backend::handle_mount_configure(const mavlink_mount_configure_t &packet)
 {

@@ -56,6 +56,9 @@ public:
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     virtual void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE);
 
+    // get_roi_target - gets target location that mount should attempt to point towards
+    virtual Location get_roi_target();
+
     // control - control the mount
     virtual void control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, MAV_MOUNT_MODE mount_mode);
     
