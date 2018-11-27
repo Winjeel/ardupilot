@@ -2895,7 +2895,6 @@ MAV_RESULT GCS_MAVLINK::handle_command_do_set_roi(const Location &roi_loc, Vecto
         }
     } else {
         // send the command to the camera mount
-        Vector2f roi_velNE = {};
         mount->set_roi_target(roi_loc, roi_velNE);
     }
     return MAV_RESULT_ACCEPTED;
