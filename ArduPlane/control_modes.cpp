@@ -240,6 +240,10 @@ void Plane::reset_control_switch()
     oldChangeMode = false;
     changeModeCount = 0;
     read_change_mode_select_switch();
+
+    if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+        previous_mode = control_mode = QLOITER;
+    }
 }
 
 /*
