@@ -196,6 +196,7 @@ void Plane::read_corvo_control_switch()
         } else {
             // we are in the camera control mode so switch to default vehicle control mode
             set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+            camera_mount.set_mode(MAV_MOUNT_MODE_NEUTRAL);
         }
      }
 }
