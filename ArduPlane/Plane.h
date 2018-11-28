@@ -315,6 +315,16 @@ private:
     // This is set to 254 when we need to re-read the switch
     uint8_t oldSwitchPosition = 254;
 
+    // Used to monitor the corvo controller 'control select' switch
+    bool oldControlSelect = false;
+    int8_t controlSelectCount = 0;
+    uint32_t controlSelectTime_ms = 0;
+    bool vtolCameraControlMode = false;
+
+    // Used to monitor the corvo controller 'change mode select' switch
+    bool oldChangeMode = false;
+    int8_t changeModeCount = 0;
+
     // This is used to enable the inverted flight feature
     bool inverted_flight;
 
@@ -896,6 +906,9 @@ private:
     void mavlink_delay(uint32_t ms);
     void read_control_switch();
     uint8_t readSwitch(void);
+    void read_corvo_control_switch();
+    uint8_t read_change_mode_select_switch();
+    uint8_t read_control_select_switch();
     void reset_control_switch();
     void autotune_start(void);
     void autotune_restore(void);
