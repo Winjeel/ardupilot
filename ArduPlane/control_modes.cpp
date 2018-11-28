@@ -188,14 +188,16 @@ void Plane::read_corvo_control_switch()
         }
     }
 
-    // perform the mode change between between CRUISE (vehicle control) and GUIDED (camera control)
-    if (toggle_fw_flight_mode) {
-        if (control_mode == GUIDED) {
-            set_mode(CRUISE, MODE_REASON_TX_COMMAND);
-        } else if (control_mode == CRUISE) {
+    // perform the FW mode change between between vehicle control and camera control
+    if (toggle_fw_flight_mode && !quadplane.in_vtol_mode()) {
+        if (control_mode != GUIDED) {
+            // switch to camera control mode
             set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+        } else {
+            // we are in the camera control mode so switch to default vehicle control mode
+            set_mode(CRUISE, MODE_REASON_TX_COMMAND);
         }
-    }
+     }
 }
 
 uint8_t Plane::read_change_mode_select_switch(void)
