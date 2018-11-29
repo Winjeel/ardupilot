@@ -117,6 +117,10 @@ public:
     void set_elev_park(bool park) { set_elev_park(_primary, park); }
     void set_elev_park(uint8_t instance, bool park);
 
+    // reset the mount LOS elevation angle to the parameter defined value
+    void reset_elev() { reset_elev(_primary); }
+    void reset_elev(uint8_t instance);
+
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE) { set_roi_target(_primary,target_loc, roi_velNE); }
     void set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE);

@@ -58,6 +58,9 @@ public:
     // when called with park = false, causes the mount to revert to normal RC targeting operation
     virtual void set_elev_park(bool park);
 
+    // reset the mount LOS elevation angle to the parameter defined value
+    virtual void reset_elev();
+
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     virtual void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE);
 

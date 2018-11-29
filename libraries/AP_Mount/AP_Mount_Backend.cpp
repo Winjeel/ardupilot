@@ -24,6 +24,12 @@ void AP_Mount_Backend::set_elev_park(bool park)
     _angle_ef_target_rad.x = 0.0f;
 }
 
+// reset the mount LOS elevation angle to the parameter defined value
+void AP_Mount_Backend::reset_elev()
+{
+    _angle_ef_target_rad.y = radians(_frontend._ef_elev_deg);
+}
+
 // set_roi_target - sets target location that mount should attempt to point towards
 void AP_Mount_Backend::set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE)
 {

@@ -579,6 +579,17 @@ void AP_Mount::set_elev_park(uint8_t instance, bool park)
     _backends[instance]->set_elev_park(park);
 }
 
+// reset the mount LOS elevation angle to the parameter defined value
+void AP_Mount::reset_elev(uint8_t instance)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->reset_elev();
+}
+
 MAV_RESULT AP_Mount::handle_command_do_mount_configure(const mavlink_command_long_t &packet)
 {
     if (_primary >= AP_MOUNT_MAX_INSTANCES || _backends[_primary] == nullptr) {
