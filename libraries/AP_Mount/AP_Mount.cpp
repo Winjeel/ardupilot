@@ -73,14 +73,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: enable roll stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 0),
+    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 1),
 
     // @Param: _STAB_TILT
     // @DisplayName: Stabilize mount's pitch/tilt angle
     // @Description: enable tilt/pitch stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  0),
+    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  1),
 
     // @Param: _STAB_PAN
     // @DisplayName: Stabilize mount pan/yaw angle
@@ -94,7 +94,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control roll movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_ROLL",  7, AP_Mount, state[0]._roll_rc_in, 0),
+    AP_GROUPINFO("_RC_IN_ROLL",  7, AP_Mount, state[0]._roll_rc_in, 1),
 
     // @Param: _ANGMIN_ROL
     // @DisplayName: Minimum roll angle
@@ -119,7 +119,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control tilt (pitch) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    0),
+    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    2),
 
     // @Param: _ANGMIN_TIL
     // @DisplayName: Minimum tilt angle
@@ -170,7 +170,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 0),
+    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 50),
 
     // @Param: _LEAD_RLL
     // @DisplayName: Roll stabilization lead time
