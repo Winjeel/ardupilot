@@ -198,7 +198,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_TYPE", 19, AP_Mount, state[0]._type, 0),
 
-    // 20 formerly _OFF_JNT
+    // @Param: _INIT_ELEV
+    // @DisplayName: Initial elevation angle
+    // @Description: When entering AHRS stabilised pointing modes, the target elevation angle will be set to this value
+    // @Units: deg
+    // @Range: -90 0
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("_INIT_ELEV", 20, AP_Mount, _ef_elev_deg, -15),
 
     // 21 formerly _OFF_ACC
 
@@ -557,6 +564,19 @@ void AP_Mount::set_angle_targets(uint8_t instance, float roll, float tilt, float
 
     // send command to backend
     _backends[instance]->set_angle_targets(roll, tilt, pan);
+}
+
+// specialised mode that uses RC targeting
+// when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+// when called with park = false, causes the mount to revert to normal RC targeting operation
+void AP_Mount::set_elev_park(uint8_t instance, bool park)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->set_elev_park(park);
 }
 
 MAV_RESULT AP_Mount::handle_command_do_mount_configure(const mavlink_command_long_t &packet)

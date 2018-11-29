@@ -142,9 +142,17 @@ void AP_Mount_Servo::stabilize()
         // roll/tilt attitude, plus any requested angle
         _angle_bf_output_deg.x = degrees(_angle_ef_target_rad.x);
         _angle_bf_output_deg.y = degrees(_angle_ef_target_rad.y);
-        _angle_bf_output_deg.z = degrees(_angle_ef_target_rad.z);
+        if (_slave_yaw_roll) {
+            _angle_bf_output_deg.z = - degrees(ahrs.yaw);
+        } else {
+            _angle_bf_output_deg.z = degrees(_angle_ef_target_rad.z);
+        }
         if (_state._stab_roll) {
-            _angle_bf_output_deg.x -= degrees(ahrs.roll);
+            if (_slave_yaw_roll) {
+                _angle_bf_output_deg.x = - degrees(ahrs.roll);
+            } else {
+                _angle_bf_output_deg.x -= degrees(ahrs.roll);
+            }
         }
         if (_state._stab_tilt) {
             _angle_bf_output_deg.y -= degrees(ahrs.pitch);

@@ -111,6 +111,12 @@ public:
     void set_angle_targets(float roll, float tilt, float pan) { set_angle_targets(_primary, roll, tilt, pan); }
     void set_angle_targets(uint8_t instance, float roll, float tilt, float pan);
 
+    // specialised mode that uses RC targeting
+    // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+    // when called with park = false, causes the mount to revert to normal RC targeting operation
+    void set_elev_park(bool park) { set_elev_park(_primary, park); }
+    void set_elev_park(uint8_t instance, bool park);
+
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE) { set_roi_target(_primary,target_loc, roi_velNE); }
     void set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE);
@@ -142,6 +148,7 @@ protected:
 
     // frontend parameters
     AP_Int8             _joystick_speed;    // joystick gain
+    AP_Int8             _ef_elev_deg;       // default earth frame elevation angle when entering stabilised modes
 
     // front end members
     uint8_t             _num_instances;     // number of mounts instantiated
@@ -175,6 +182,7 @@ protected:
 
         AP_Float        _roll_stb_lead;     // roll lead control gain
         AP_Float        _pitch_stb_lead;    // pitch lead control gain
+
 
         MAV_MOUNT_MODE  _mode;              // current mode (see MAV_MOUNT_MODE enum)
         struct Location _roi_target;        // roi target location

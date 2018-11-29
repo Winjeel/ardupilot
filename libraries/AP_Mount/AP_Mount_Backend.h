@@ -53,6 +53,11 @@ public:
     // set_angle_targets - sets angle targets in degrees
     virtual void set_angle_targets(float roll, float tilt, float pan);
 
+    // specialised mode that uses RC targeting
+    // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+    // when called with park = false, causes the mount to revert to normal RC targeting operation
+    virtual void set_elev_park(bool park);
+
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     virtual void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE);
 
@@ -99,6 +104,7 @@ protected:
     AP_Mount::mount_state &_state;    // references to the parameters and state for this backend
     uint8_t     _instance;  // this instance's number
     Vector3f    _angle_ef_target_rad;   // desired earth-frame roll, tilt and vehicle-relative pan angles in radians
+    bool _slave_yaw_roll = false; // when set to true the earth frame yaw angle aligns with vehicle yaw and roll is set to zero
 
 private:
 

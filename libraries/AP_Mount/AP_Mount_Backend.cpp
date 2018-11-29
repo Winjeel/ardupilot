@@ -14,6 +14,16 @@ void AP_Mount_Backend::set_angle_targets(float roll, float tilt, float pan)
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_MAVLINK_TARGETING);
 }
 
+// specialised mode that uses RC targeting
+// when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+// when called with park = false, causes the mount to revert to normal RC targeting operation
+void AP_Mount_Backend::set_elev_park(bool park)
+{
+    set_mode(MAV_MOUNT_MODE_RC_TARGETING);
+    _slave_yaw_roll = park;
+    _angle_ef_target_rad.x = 0.0f;
+}
+
 // set_roi_target - sets target location that mount should attempt to point towards
 void AP_Mount_Backend::set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE)
 {
