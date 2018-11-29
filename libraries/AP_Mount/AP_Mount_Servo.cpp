@@ -61,7 +61,9 @@ void AP_Mount_Servo::update()
         case MAV_MOUNT_MODE_RC_TARGETING:
         {
             // update targets using pilot's rc inputs
-            update_targets_from_rc();
+            if (!_slave_yaw_roll) {
+                update_targets_from_rc();
+            }
             stabilize();
             break;
         }
