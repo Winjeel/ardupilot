@@ -1260,9 +1260,14 @@ void QuadPlane::control_loiter()
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // process pilot's roll and pitch input
-    loiter_nav->set_pilot_desired_acceleration(plane.channel_roll->get_control_in(),
-                                               plane.channel_pitch->get_control_in(),
-                                               plane.G_Dt);
+    if (plane.vtolCameraControlMode) {
+        // don't move vehicle becasue we are using sticks to control camera
+        loiter_nav->set_pilot_desired_acceleration(0, 0, plane.G_Dt);
+    } else {
+        loiter_nav->set_pilot_desired_acceleration(plane.channel_roll->get_control_in(),
+                                                   plane.channel_pitch->get_control_in(),
+                                                   plane.G_Dt);
+    }
 
     // run loiter controller
     loiter_nav->update();

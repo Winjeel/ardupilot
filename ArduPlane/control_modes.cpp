@@ -144,6 +144,8 @@ void Plane::read_corvo_control_switch()
         } else {
             // in FW mode so change to VTOL QLOITER
             set_mode(QLOITER, MODE_REASON_TX_COMMAND);
+            // ensure the operator has control of vehicle position when entering this mode
+            vtolCameraControlMode = false;
         }
     } else if (changeModeCount == 0 && oldChangeMode) {
         // switch release confirmed
@@ -151,6 +153,8 @@ void Plane::read_corvo_control_switch()
     }
 
     // When in FW operation use the 'Control Select' button to toggle between CRUISE (vehicle control) and GUIDED (camera control) modes
+    // When in default VTOL mode QLOITER, toggle the 'vtolCameraControlMode' flag which casues roll/pitch stick inputs to switch between
+    // control of positon and control of camera pan/elevation.
 
     // increment/decrement counter based on switch position.
     if ((controlSelect == 1) && (controlSelectCount < 5)) {
@@ -160,6 +164,7 @@ void Plane::read_corvo_control_switch()
     }
 
     bool toggle_fw_flight_mode = false;
+    bool resetVtolCameraControl = false;
     if (controlSelectCount == 5 && !oldControlSelect) {
         // switch press confirmed
         oldControlSelect = true;
@@ -169,8 +174,11 @@ void Plane::read_corvo_control_switch()
         } else if (control_mode == QLOITER) {
             // in QLOITER we transfer operator control between positon to camera
             vtolCameraControlMode = !vtolCameraControlMode;
+            resetVtolCameraControl = true;
         } else {
+            // we don't do camera control in other VTOL modes
             vtolCameraControlMode = false;
+            resetVtolCameraControl = true;
         }
     } else if (controlSelectCount == 0 && oldControlSelect) {
         // switch release confirmed
@@ -180,11 +188,25 @@ void Plane::read_corvo_control_switch()
             if (!quadplane.in_vtol_mode()) {
                 toggle_fw_flight_mode = true;
             } else if (control_mode == QLOITER) {
-                // allow
+                // in QLOITER we transfer operator control between positon to camera
                 vtolCameraControlMode = !vtolCameraControlMode;
+                resetVtolCameraControl = true;
             } else {
+                // we don't do camera control in other VTOL modes
                 vtolCameraControlMode = false;
+                resetVtolCameraControl = true;
             }
+        }
+    }
+
+    // switch camera mount mode control
+    if (resetVtolCameraControl) {
+        if (vtolCameraControlMode) {
+            // camera yaw/elevation pointing is controlled by the roll/pitch stick and vehicle holds at previous horizontal position
+            camera_mount.set_elev_park(false);
+        } else  {
+            // yaw moves with vehicle
+            camera_mount.set_elev_park(true);
         }
     }
 
