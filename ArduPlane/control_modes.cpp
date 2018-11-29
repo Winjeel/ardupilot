@@ -144,9 +144,11 @@ void Plane::read_corvo_control_switch()
         } else {
             // in FW mode so change to VTOL QLOITER
             set_mode(QLOITER, MODE_REASON_TX_COMMAND);
-            // ensure the operator has control of vehicle position when entering this mode
-            vtolCameraControlMode = false;
         }
+        // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
+        vtolCameraControlMode = false;
+        camera_mount.set_elev_park(true);
+        camera_mount.reset_elev();
     } else if (changeModeCount == 0 && oldChangeMode) {
         // switch release confirmed
         oldChangeMode = false;
@@ -267,7 +269,12 @@ void Plane::reset_control_switch()
     read_change_mode_select_switch();
 
     if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+        // start corvo in QLOITER mode
         previous_mode = control_mode = QLOITER;
+
+        // Run payload pointing in park mode where yaw follows vehicle and elevation is set to value set by MNT_INIT_ELEV parmeter
+        camera_mount.set_elev_park(true);
+        camera_mount.reset_elev();
     }
 }
 
