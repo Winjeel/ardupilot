@@ -107,14 +107,17 @@ void Plane::calc_airspeed_errors()
     // may be using synthetic airspeed
     ahrs.airspeed_estimate(&airspeed_measured);
 
-    // FBW_B/cruise airspeed target
-    if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
-        if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
-            // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
-            const float control_in = get_throttle_input();
-            target_airspeed_cm += 10.0f * control_in;
-            target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
-        } else if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
+    // airspeed target
+    if (!failsafe.rc_failsafe
+            && (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX)
+            && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
+        // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
+        // allow the operator to adjust speed in all auto-throttle modes
+        const float control_in = get_throttle_input();
+        target_airspeed_cm += 10.0f * control_in;
+        target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
+    } else if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
+        if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
             float control_min = 0.0f;
             float control_mid = 0.0f;
             const float control_max = channel_throttle->get_range();
