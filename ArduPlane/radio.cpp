@@ -202,7 +202,11 @@ void Plane::read_radio()
 
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, get_throttle_input());
 
-    if (g.throttle_nudge && SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) > 50 && geofence_stickmixing()) {
+    // corvo cotroller can't nudge using throttle stick
+    if ((quadplane.tailsitter.input_type != 2)
+            && g.throttle_nudge
+            && SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) > 50
+            && geofence_stickmixing()) {
         float nudge = (SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) - 50) * 0.02f;
         if (ahrs.airspeed_sensor_enabled()) {
             airspeed_nudge_cm = (aparm.airspeed_max * 100 - aparm.airspeed_cruise_cm) * nudge;
