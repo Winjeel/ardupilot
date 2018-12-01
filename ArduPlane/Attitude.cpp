@@ -159,13 +159,23 @@ void Plane::stabilize_stick_mixing_direct()
         control_mode == TRAINING) {
         return;
     }
-    int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
-    stick_mix_channel(channel_roll, aileron);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
 
-    int16_t elevator = SRV_Channels::get_output_scaled(SRV_Channel::k_elevator);
-    stick_mix_channel(channel_pitch, elevator);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    if (quadplane.tailsitter.input_type == 2) {
+        // When using the corvo hand controller allow x stick axis to roll only becasue y stick axis  stick is not associated with pitch/height
+        int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
+        stick_mix_channel(channel_roll, aileron);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
+
+        // y-axis / pitch stick is used to adjust speed - see calc_airspeed_errors() function for how this is achieved
+    } else {
+        int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
+        stick_mix_channel(channel_roll, aileron);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
+
+        int16_t elevator = SRV_Channels::get_output_scaled(SRV_Channel::k_elevator);
+        stick_mix_channel(channel_pitch, elevator);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    }
 }
 
 /*
