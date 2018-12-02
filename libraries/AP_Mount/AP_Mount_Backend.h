@@ -21,6 +21,7 @@
 
 #include <AP_Common/AP_Common.h>
 #include "AP_Mount.h"
+#include <AP_AHRS/AP_AHRS_View.h>
 
 class AP_Mount_Backend
 {
@@ -47,11 +48,17 @@ public:
     // has_pan_control - returns true if this mount can control it's pan (required for multicopters)
     virtual bool has_pan_control() const = 0;
 
+    // return the earth frame yaw of the payload in radians
+    virtual float get_ef_yaw();
+
     // set_mode - sets mount's mode
     virtual void set_mode(enum MAV_MOUNT_MODE mode) = 0;
 
     // set_angle_targets - sets angle targets in degrees
     virtual void set_angle_targets(float roll, float tilt, float pan);
+
+    // set yaw target in degrees
+    virtual void set_yaw_target(float pan);
 
     // specialised mode that uses RC targeting
     // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
@@ -90,6 +97,9 @@ public:
 
 protected:
 
+    // the attitude view of the VTOL attitude controller which is aligned with the rotors
+    AP_AHRS_View *ahrs_view;
+
     // update_targets_from_rc - updates angle targets (i.e. _angle_ef_target_rad) using input from receiver
     void update_targets_from_rc();
 
@@ -111,5 +121,5 @@ protected:
 
 private:
 
-    void rate_input_rad(float &out, const RC_Channel *ch, float min, float max) const;
+    void rate_input_rad(float &out, const RC_Channel *ch, int16_t min, int16_t max) const;
 };

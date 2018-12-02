@@ -94,7 +94,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control roll movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_ROLL",  7, AP_Mount, state[0]._roll_rc_in, 1),
+    AP_GROUPINFO("_RC_IN_ROLL",  7, AP_Mount, state[0]._roll_rc_in, 0),
 
     // @Param: _ANGMIN_ROL
     // @DisplayName: Minimum roll angle
@@ -144,7 +144,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control pan (yaw) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       0),
+    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       1),
 
     // @Param: _ANGMIN_PAN
     // @DisplayName: Minimum pan angle
@@ -536,6 +536,17 @@ MAV_MOUNT_MODE AP_Mount::get_mode(uint8_t instance) const
     return state[instance]._mode;
 }
 
+// return the earth frame yaw of the payload in radians
+float AP_Mount::get_ef_yaw(uint8_t instance) const
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return 0.0f;
+    }
+
+    // get value from backend
+    return _backends[instance]->get_ef_yaw();
+}
+
 // set_mode_to_default - restores the mode to it's default mode held in the MNT_MODE parameter
 //      this operation requires 60us on a Pixhawk/PX4
 void AP_Mount::set_mode_to_default(uint8_t instance)
@@ -564,6 +575,17 @@ void AP_Mount::set_angle_targets(uint8_t instance, float roll, float tilt, float
 
     // send command to backend
     _backends[instance]->set_angle_targets(roll, tilt, pan);
+}
+
+// set yaw target in degrees
+void AP_Mount::set_yaw_target(uint8_t instance, float pan)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->set_yaw_target(pan);
 }
 
 // specialised mode that uses RC targeting

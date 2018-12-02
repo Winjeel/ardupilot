@@ -14,6 +14,12 @@ void AP_Mount_Backend::set_angle_targets(float roll, float tilt, float pan)
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_MAVLINK_TARGETING);
 }
 
+// set yaw target in degrees
+void AP_Mount_Backend::set_yaw_target(float pan)
+{
+    _angle_ef_target_rad.z = radians(pan);
+}
+
 // specialised mode that uses RC targeting
 // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
 // when called with park = false, causes the mount to revert to normal RC targeting operation
@@ -101,13 +107,17 @@ void AP_Mount_Backend::control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_
     }
 }
 
-void AP_Mount_Backend::rate_input_rad(float &out, const RC_Channel *chan, float min, float max) const
+void AP_Mount_Backend::rate_input_rad(float &out, const RC_Channel *chan, int16_t min, int16_t max) const
 {
     if (chan == nullptr) {
         return;
     }
     out += chan->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
-    out = constrain_float(out, radians(min*0.01f), radians(max*0.01f));
+    if (min != 0 && max != 0) {
+        out = constrain_float(out, radians((float)min*0.01f), radians((float)max*0.01f));
+    } else {
+        out = wrap_PI(out);
+    }
 }
 
 // update_targets_from_rc - updates angle targets using input from receiver
@@ -130,10 +140,10 @@ void AP_Mount_Backend::update_targets_from_rc()
                        _state._tilt_angle_max);
         rate_input_rad(_angle_ef_target_rad.z,
                        pan_ch,
-                       _state._pan_angle_min,
-                       _state._pan_angle_max);
+                       0,
+                       0);
     } else {
-        // allow pilot rate input to come directly from an RC_Channel
+        // allow pilot angle input to come directly from an RC_Channel
         if (roll_ch) {
             _angle_ef_target_rad.x = angle_input_rad(roll_ch, _state._roll_angle_min, _state._roll_angle_max);
         }
@@ -177,10 +187,16 @@ void AP_Mount_Backend::calc_angle_to_location(const struct Location &target, Vec
 
     // pan calcs
     if (calc_pan) {
-        // calc absolute heading and then onvert to vehicle relative yaw
+        // calc absolute heading and then convert to vehicle relative yaw
         angles_to_target_rad.z = atan2f(GPS_vector_x, GPS_vector_y);
         if (relative_pan) {
             angles_to_target_rad.z = wrap_PI(angles_to_target_rad.z - AP::ahrs().yaw);
         }
     }
+}
+
+// return the earth frame yaw of the payload in radians
+float AP_Mount_Backend::get_ef_yaw()
+{
+    return _angle_ef_target_rad.z;
 }

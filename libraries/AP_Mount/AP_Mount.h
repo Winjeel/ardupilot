@@ -97,6 +97,10 @@ public:
     enum MAV_MOUNT_MODE get_mode() const { return get_mode(_primary); }
     enum MAV_MOUNT_MODE get_mode(uint8_t instance) const;
 
+    // return the earth frame yaw of the payload in radians
+    float get_ef_yaw() const {return get_ef_yaw(_primary); };
+    float get_ef_yaw(uint8_t instance) const;
+
     // set_mode - sets mount's mode
     //  returns true if mode is successfully set
     void set_mode(enum MAV_MOUNT_MODE mode) { return set_mode(_primary, mode); }
@@ -110,6 +114,10 @@ public:
     // set_angle_targets - sets angle targets in degrees
     void set_angle_targets(float roll, float tilt, float pan) { set_angle_targets(_primary, roll, tilt, pan); }
     void set_angle_targets(uint8_t instance, float roll, float tilt, float pan);
+
+    // set yaw target in degrees
+    void set_yaw_target(float pan) { set_yaw_target(_primary, pan); }
+    void set_yaw_target(uint8_t instance, float pan);
 
     // specialised mode that uses RC targeting
     // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
