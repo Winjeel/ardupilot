@@ -1622,6 +1622,7 @@ bool GCS_MAVLINK_Plane::set_mode(const uint8_t mode)
             return false;
         }
     }
+        FALLTHROUGH;
     case FLY_BY_WIRE_B:
     case CRUISE:
     case AVOID_ADSB:
