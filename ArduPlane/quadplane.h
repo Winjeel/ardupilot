@@ -82,7 +82,10 @@ public:
     }
 
     // return desired forward throttle percentage
-    int8_t forward_throttle_pct(void);        
+    int8_t forward_throttle_pct(void);
+
+    // return yaw rate demand in centi-degrees/sec required to yaw the vehicle into the wind
+    // if operating in a payload control mode return the yaw rate required to zero the payload body frame yaw angle
     float get_weathervane_yaw_rate_cds(void);
 
     // see if we are flying from vtol point of view
@@ -324,6 +327,7 @@ private:
         bool moving_backwards; // true when moving backwards rel to ground
         uint32_t last_move_back_ms; // last system time in msec that we were moving backwards rel to ground
         bool tip_warning; // true when tilted backwards and there is a tipover risk
+        bool payload_yaw_lockout; // true when a payload pointing demanded yaw is being ignored due to conditions being outside limits
 
     } weathervane;
 
@@ -482,6 +486,8 @@ private:
         AP_Float tvbs_wpe_gain;             // gain from wing pitch error to elevator
         AP_Int8 tvbs_land_cone_elev;        // Elevation of the landing cone in degrees
         AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
+        AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
+        AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
 
     } tailsitter;
 

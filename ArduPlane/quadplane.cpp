@@ -625,6 +625,22 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_LND_RAD", 41, QuadPlane, tailsitter.tvbs_land_cone_radius, 5),
 
+    // @Param: TVBS_YAW_GAIN
+    // @DisplayName: Gain from payload yaw offset to vehicle demanded yaw rate.
+    // @Description: Used during VTOL operation where the operator is yawing the camera. Enables the vehicle to yaw to enable full 360deg camera pans when the mount do has limited movement. Set to zero to disable.
+    // @Range: 0.0 3.0
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("TVBS_YAW_GAIN", 42, QuadPlane, tailsitter.tvbs_yaw_gain, 1.5f),
+
+    // @Param: TVBS_LAT_GMAX
+    // @DisplayName: Maximum lateral g allowed during yaw to payload
+    // @Description: Used during VTOL operation where the operator is yawing the camera and we want the vehicle yaw to follow the paylad yaw. This paameter sets the maximum allowed lateral acceleration before the yaw to follow payload is ignored.
+    // @Range: 0.05 0.3
+    // @Increment: 0.01
+    // @User: Standard
+    AP_GROUPINFO("TVBS_LAT_GMAX", 43, QuadPlane, tailsitter.tvbs_lat_gmax, 0.2f),
+
     AP_GROUPEND
 };
 
@@ -3064,9 +3080,28 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
         return 0;
     }
 
-    // scale over half of yaw_rate_max. This gives the pilot twice the
-    // authority of the weathervane controller
-    return weathervane.gain_modifier * weathervane.last_output * (yaw_rate_max/2) * 100;
+    // If the wind is from the back or there is excessive lateral g indicating outside crosswind limits, then ignore payload yaw pointing
+    float g_metric = MAX(fabsf(lateral_g), rear_g);
+    if (!weathervane.payload_yaw_lockout && (g_metric > tailsitter.tvbs_lat_gmax)) {
+        weathervane.payload_yaw_lockout = true;
+    } else if (weathervane.payload_yaw_lockout && (g_metric < 0.5f * tailsitter.tvbs_lat_gmax)) {
+        weathervane.payload_yaw_lockout = false;
+    }
+
+    float yaw_rate_dem_cd;
+    if (plane.vtolCameraControlMode
+            && (tailsitter.tvbs_yaw_gain > 0.1f)
+            && !weathervane.payload_yaw_lockout) {
+        // when flying in a VTOL mode where the operator is panning the payload mount, yaw the vehicle to drive vehicle relative yaw to zero
+        // enables yaw pointing of payloads with limited angular motion, eg roll tilt gimbals
+        yaw_rate_dem_cd = 100.0f * constrain_float(tailsitter.tvbs_yaw_gain * degrees(wrap_PI(plane.camera_mount.get_ef_yaw() - ahrs_view->yaw)), -yaw_rate_max, yaw_rate_max);
+    } else {
+        // do normal weather vaning over half of yaw_rate_max. This gives the pilot twice the
+        // authority of the weathervane controller
+        yaw_rate_dem_cd = weathervane.gain_modifier * weathervane.last_output * (yaw_rate_max/2) * 100;
+    }
+    return yaw_rate_dem_cd;
+
 }
 
 /*
