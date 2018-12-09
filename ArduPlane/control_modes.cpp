@@ -206,6 +206,7 @@ void Plane::read_corvo_control_switch()
         if (vtolCameraControlMode) {
             // camera yaw/elevation pointing is controlled by the roll/pitch stick and vehicle holds at previous horizontal position
             camera_mount.set_elev_park(false);
+            camera_mount.set_yaw_target(degrees(quadplane.ahrs_view->yaw));
         } else  {
             // yaw moves with vehicle
             camera_mount.set_elev_park(true);

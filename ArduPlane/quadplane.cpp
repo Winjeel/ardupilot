@@ -3086,6 +3086,7 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
         weathervane.payload_yaw_lockout = true;
     } else if (weathervane.payload_yaw_lockout && (g_metric < 0.5f * tailsitter.tvbs_lat_gmax)) {
         weathervane.payload_yaw_lockout = false;
+        plane.camera_mount.set_yaw_target(degrees(ahrs_view->yaw));
     }
 
     float yaw_rate_dem_cd;
