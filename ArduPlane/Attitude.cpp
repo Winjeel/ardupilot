@@ -160,7 +160,7 @@ void Plane::stabilize_stick_mixing_direct()
         return;
     }
 
-    if (quadplane.tailsitter.input_type == 2) {
+    if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
         // When using the corvo hand controller allow x stick axis to roll only becasue y stick axis  stick is not associated with pitch/height
         int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
         stick_mix_channel(channel_roll, aileron);
@@ -185,6 +185,7 @@ void Plane::stabilize_stick_mixing_direct()
 void Plane::stabilize_stick_mixing_fbw()
 {
     if (!stick_mixing_enabled() ||
+        ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && (control_mode == GUIDED)) ||
         control_mode == ACRO ||
         control_mode == FLY_BY_WIRE_A ||
         control_mode == AUTOTUNE ||
