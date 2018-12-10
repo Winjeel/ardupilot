@@ -399,15 +399,20 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     // if too close to the waypoint, use the velocity vector
     // if the velocity vector is too small, use the heading vector
     Vector2f A_air_unit;
+    Vector2f heading_vec = {cosf(_ahrs.yaw), sinf(_ahrs.yaw)};
     if (A_air.length() > 0.1f) {
         A_air_unit = A_air.normalized();
     } else {
         if (_groundspeed_vector.length() < 0.1f) {
-            A_air_unit = Vector2f(cosf(_ahrs.yaw), sinf(_ahrs.yaw));
+            A_air_unit = heading_vec;
         } else {
             A_air_unit = _groundspeed_vector.normalized();
         }
     }
+
+    // check if we are flying forwards
+    // dot product uses * operator overloaded
+    bool flying_forwards = heading_vec * _groundspeed_vector > 0.0f;
 
     //Calculate Nu to capture center_WP
     float xtrackVelCap = A_air_unit % _groundspeed_vector; // Velocity across line - perpendicular to radial inbound to WP
@@ -419,8 +424,16 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 
     Nu = constrain_float(Nu, -M_PI_2, M_PI_2); //Limit Nu to +- Pi/2
 
-    //Calculate lat accln demand to capture center_WP (use L1 guidance law)
-    float latAccDemCap = K_L1 * groundSpeed * groundSpeed / _L1_dist * sinf(Nu);
+    // Calculate lat accln demand to capture center_WP (use L1 guidance law)
+    float latAccDemCap;
+    if (flying_forwards) {
+        latAccDemCap = K_L1 * groundSpeed * groundSpeed / _L1_dist * sinf(Nu);
+    } else {
+        // if flying backwards relative to waypoint, point nose at waypoint
+        float yaw_dem = atan2f(-A_air.y , -A_air.x);
+        float yaw_err = wrap_PI(yaw_dem - _ahrs.yaw);
+        latAccDemCap = - yaw_err / _L1_period;
+    }
 
     //Calculate radial position and velocity errors
     float xtrackVelCirc = -ltrackVelCap; // Radial outbound velocity - reuse previous radial inbound velocity
