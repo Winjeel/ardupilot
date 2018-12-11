@@ -52,7 +52,6 @@ static const struct {
     { "RC3_MAX", 2000, true },
     { "RC4_MIN", 1000, true },
     { "RC4_MAX", 2000, true },
-    { "RC2_REVERSED", 1 }, // interlink has reversed rc2
     { "SERVO1_MIN", 1000 },
     { "SERVO1_MAX", 2000 },
     { "SERVO2_MIN", 1000 },
@@ -447,14 +446,6 @@ void FlightAxis::update(const struct sitl_input &input)
     battery_current = state.m_batteryCurrentDraw_AMPS;
     rpm1 = state.m_heliMainRotorRPM;
     rpm2 = state.m_propRPM;
-
-    /*
-      the interlink interface supports 8 input channels
-     */
-    rcin_chan_count = 8;
-    for (uint8_t i=0; i<rcin_chan_count; i++) {
-        rcin[i] = state.rcin[i];
-    }
 
     update_position();
     time_advance();
