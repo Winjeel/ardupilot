@@ -109,7 +109,7 @@ void Plane::calc_airspeed_errors()
 
     // airspeed target
     if (!failsafe.rc_failsafe
-            && (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX)
+            && (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()
             && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
         // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
         // allow the operator to adjust speed in all auto-throttle modes
@@ -312,7 +312,7 @@ void Plane::update_fbwb_speed_height(void)
         target_altitude.last_elev_check_us = now;
         
         float elevator_input;
-        if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+        if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
             // handle special case where the Corvo hand controller is being used where the up/down buttons
             // mapped to throttle channel are used to make the vehicle climb or descend
             float control_min = 0.0f;

@@ -1617,7 +1617,7 @@ bool GCS_MAVLINK_Plane::set_mode(const uint8_t mode)
     case FLY_BY_WIRE_A:
     case AUTOTUNE:
     {
-        if (plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) {
+        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
             // these modes can't be used when we have a corvo controller
             return false;
         }

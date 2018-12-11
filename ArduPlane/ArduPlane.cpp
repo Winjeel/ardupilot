@@ -781,7 +781,7 @@ void Plane::update_navigation()
     case GUIDED:
         {
             // TODO only enable this when payload handset control is active
-            if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+            if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
                 // When in guided mode, allow stick inputs to move point
                 const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
                 plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
