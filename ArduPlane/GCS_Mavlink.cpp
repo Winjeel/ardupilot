@@ -2,20 +2,23 @@
 
 #include "Plane.h"
 
+// This enum maps to the order in which buttons are reported in the MANUAL_CONTROL message
+// and may not map to the order in which buttons are reported directly by the controller.
+// QGroundControl fills the MANUAL_CONTROL message in the order that the controller reports
+// buttons to QGC.
 typedef enum CORVO_X_HHC_ButtonMap {
-    dpadPress   = (1u << 0),          
-    buttonUp    = (1u << 1),
-    buttonDown  = (1u << 2),
-    trigger     = (1u << 3),
-    multi1      = (1u << 4),
-    multi2      = (1u << 5)
+    buttonUp    = (1u << 0),
+    buttonDown  = (1u << 1),
+    trigger     = (1u << 2),
+    multi1      = (1u << 3),
+    multi2      = (1u << 4),
+    dpadPress   = (1u << 5)    
 } CORVO_X_HHC_ButtonMap;
 
 typedef enum CORVO_X_HHC_ButtonSpecialFunctionMask {
     controlSelect = trigger,
     modeChange    = (buttonUp | buttonDown)
 } CORVO_X_HHC_ButtonSpecialFunctionMask;
-
 
 MAV_TYPE GCS_MAVLINK_Plane::frame_type() const
 {
