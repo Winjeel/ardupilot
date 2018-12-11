@@ -2,6 +2,21 @@
 
 #include "Plane.h"
 
+typedef enum CORVO_X_HHC_ButtonMap {
+    dpadPress   = (1u << 0),          
+    buttonUp    = (1u << 1),
+    buttonDown  = (1u << 2),
+    trigger     = (1u << 3),
+    multi1      = (1u << 4),
+    multi2      = (1u << 5)
+} CORVO_X_HHC_ButtonMap;
+
+typedef enum CORVO_X_HHC_ButtonSpecialFunctionMask {
+    controlSelect = trigger,
+    modeChange    = (buttonUp | buttonDown)
+} CORVO_X_HHC_ButtonSpecialFunctionMask;
+
+
 MAV_TYPE GCS_MAVLINK_Plane::frame_type() const
 {
     return plane.quadplane.get_mav_type();
@@ -1178,10 +1193,18 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         int16_t throttle = (packet.z == INT16_MAX) ? 0 : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
         int16_t yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
 
+        // Derive virtual RC channels from manual control button combinations (specific to CORVO Handheld Controller)
+        //RC5 (Control Select) - Button 4
+        int16_t rc5 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) == CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) ? 2000 : 1000;
+        //RC6 (Change Mode) - Buttons 2 and 3 simultaneously.
+        int16_t rc6 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) == CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) ? 2000 : 1000;
+
         RC_Channels::set_override(uint8_t(plane.rcmap.roll() - 1), roll, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.pitch() - 1), pitch, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.throttle() - 1), throttle, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.yaw() - 1), yaw, tnow);
+        RC_Channels::set_override(4, rc5, tnow);
+        RC_Channels::set_override(5, rc6, tnow);
 
         // a manual control message is considered to be a 'heartbeat' from the ground station for failsafe purposes
         plane.failsafe.last_heartbeat_ms = tnow;
