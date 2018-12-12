@@ -218,11 +218,14 @@ void Plane::read_corvo_control_switch()
         if (control_mode != GUIDED) {
             // switch to camera control mode
             set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+            camera_mount.set_elev_park(false);
         } else {
             // we are in the camera control mode so switch to default vehicle control mode
             set_mode(CRUISE, MODE_REASON_TX_COMMAND);
-            camera_mount.set_mode(MAV_MOUNT_MODE_NEUTRAL);
-        }
+            // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
+            camera_mount.set_elev_park(true);
+            camera_mount.reset_elev();
+         }
      }
 }
 
