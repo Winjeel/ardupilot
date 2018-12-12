@@ -170,7 +170,7 @@ Vector2f AP_L1_Control::loiter_offset(const float radius) const
         float gamma = asinf(constrain_float(spd_ratio, 0.0f, sin_gamma_max));
         float delta_length = fabsf(radius) * tanf(gamma);
         wind = wind.normalized();
-        delta_vec = {-delta_length * wind.y , delta_length * wind.x};
+        delta_vec = {delta_length * wind.y , -delta_length * wind.x};
     } else {
         delta_vec.zero();
     }
