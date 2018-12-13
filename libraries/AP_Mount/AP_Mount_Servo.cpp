@@ -136,7 +136,15 @@ void AP_Mount_Servo::stabilize()
     float gimbal_roll_rad; // Outer gimbal roll rotation (rad). When zero the camera is level with the wing. When positive, camera rolls right.
     if (_slave_yaw_roll) {
         // Do option b - keep camera level and at the specified pitch angle
-        gimbal_roll_rad = ahrs.roll;
+        if (fabs(ahrs.roll) < M_PI_2) {
+            gimbal_roll_rad = -ahrs.roll;
+        } else if (ahrs.roll >= M_PI_2) {
+            gimbal_roll_rad = - M_PI + ahrs.roll;
+        } else if (ahrs.roll <= -M_PI_2) {
+            gimbal_roll_rad = M_PI + ahrs.roll;
+        } else {
+            gimbal_roll_rad = -ahrs.roll;
+        }
         gimbal_pitch_rad = _angle_ef_target_rad.y - ahrs.pitch;
 
     } else {
