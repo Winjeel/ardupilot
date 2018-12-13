@@ -278,6 +278,7 @@ protected:
 
     // saveable rate of each stream
     AP_Int16        streamRates[NUM_STREAMS];
+    AP_Int8         _corvoControllerType;
 
     virtual bool persist_streamrates() const { return false; }
     void handle_request_data_stream(mavlink_message_t *msg);
