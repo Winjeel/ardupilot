@@ -40,7 +40,7 @@ public:
     bool        get_reverse(void) const;
     void        set_default_dead_zone(int16_t dzone);
     uint16_t    get_dead_zone(void) const { return dead_zone; }
-    
+
     // get the center stick position expressed as a control_in value
     int16_t     get_control_mid() const;
 
@@ -80,12 +80,12 @@ public:
     void       set_control_in(int16_t val) { control_in = val;}
 
     void       clear_override();
-    void       set_override(const uint16_t v, const uint32_t timestamp_us);
+    void       set_override(const uint16_t val, const uint32_t timestamp_ms);
     bool       has_override() const;
 
     // get control input with zero deadzone
     int16_t     get_control_in_zero_dz(void) const;
-    
+
     int16_t    get_radio_min() const {return radio_min.get();}
     void       set_radio_min(int16_t val) { radio_min = val;}
 
@@ -213,7 +213,7 @@ private:
 
     // value generated from PWM normalised to configured scale
     int16_t    control_in;
-    
+
     AP_Int16    radio_min;
     AP_Int16    radio_trim;
     AP_Int16    radio_max;
