@@ -327,14 +327,19 @@ void Plane::update_fbwb_speed_height(void)
                     control_mid = channel_throttle->get_control_mid();
                     break;
             }
-            if (control_in <= control_mid) {
+            const float dz_frac = 0.1f;
+            float dz_up = dz_frac * (control_max - control_mid);
+            float dz_down = dz_frac * (control_mid - control_min);
+            if (control_in <= (control_mid - dz_down)) {
                 elevator_input = linear_interpolate(-1.0f, 0.0f,
                                                     control_in,
-                                                    control_min, control_mid);
-            } else {
+                                                    control_min, (control_mid - dz_down));
+            } else if (control_in >= (control_mid + dz_up)) {
                 elevator_input = linear_interpolate(0.0f, 1.0f,
                                                     control_in,
-                                                    control_mid, control_max);
+                                                    (control_mid + dz_up), control_max);
+            } else {
+                elevator_input = 0.0f;
             }
         } else {
             elevator_input = channel_pitch->get_control_in() / 4500.0f;
