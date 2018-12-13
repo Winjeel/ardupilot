@@ -125,56 +125,51 @@ void AP_Mount_Servo::send_mount_status(mavlink_channel_t chan)
 //  output: _angle_bf_output_deg (body frame angles in degrees)
 void AP_Mount_Servo::stabilize()
 {
+    /*
+     * Customised to operate with a inner pitch and outer roll drive gimbal with two modes:
+     * a) pointing along a designated LOS vector defined by _angle_ef_target_rad.z (pan) and _angle_ef_target_rad.y (tilt), or
+     * b) maintaining a zero _angle_ef_target_rad.x (level horizon) and specified _angle_ef_target_rad.y (tilt).
+     */
+
     AP_AHRS &ahrs = AP::ahrs();
-    // only do the full 3D frame transform if we are doing pan control
-    if (_state._stab_pan) {
-        Matrix3f m;                         ///< holds 3 x 3 matrix, var is used as temp in calcs
-        Matrix3f cam;                       ///< Rotation matrix earth to camera. Desired camera from input.
-        Matrix3f gimbal_target;             ///< Rotation matrix from plane to camera. Then Euler angles to the servos.
-        m = ahrs.get_rotation_body_to_ned();
-        m.transpose();
-        cam.from_euler(_angle_ef_target_rad.x, _angle_ef_target_rad.y, _angle_ef_target_rad.z);
-        gimbal_target = m * cam;
-        gimbal_target.to_euler(&_angle_bf_output_deg.x, &_angle_bf_output_deg.y, &_angle_bf_output_deg.z);
-        _angle_bf_output_deg.x  = _state._stab_roll ? degrees(_angle_bf_output_deg.x) : degrees(_angle_ef_target_rad.x);
-        _angle_bf_output_deg.y  = _state._stab_tilt ? degrees(_angle_bf_output_deg.y) : degrees(_angle_ef_target_rad.y);
-        _angle_bf_output_deg.z = degrees(_angle_bf_output_deg.z);
+    float gimbal_pitch_rad; // Inner gimbal pich rotation (rad). When zero, camera points along X body axis. When positive, camera points up.
+    float gimbal_roll_rad; // Outer gimbal roll rotation (rad). When zero the camera is level with the wing. When positive, camera rolls right.
+    if (_slave_yaw_roll) {
+        // Do option b - keep camera level and at the specified pitch angle
+        gimbal_roll_rad = ahrs.roll;
+        gimbal_pitch_rad = _angle_ef_target_rad.y - ahrs.pitch;
+
     } else {
-        // otherwise base mount roll and tilt on the ahrs
-        // roll/tilt attitude, plus any requested angle
-        _angle_bf_output_deg.x = degrees(_angle_ef_target_rad.x);
-        _angle_bf_output_deg.y = degrees(_angle_ef_target_rad.y);
-        if (_slave_yaw_roll) {
-            _angle_bf_output_deg.z = - degrees(ahrs.yaw);
+        // Do option a - calculate gimbal roll and pitch angle required to point along vector defined by the
+        // 32 Tait-Bryan sequence of _angle_ef_target_rad.z  and _angle_ef_target_rad.y
+
+        // calculate the LOS unit vector and rotate into body frame
+        float h_length = cosf(_angle_ef_target_rad.y);
+        Vector3f los_vec_ef = {h_length * cosf(_angle_ef_target_rad.z) , h_length * sinf(_angle_ef_target_rad.z) , -sinf(_angle_ef_target_rad.y)};
+        Matrix3f Tbn = ahrs.get_rotation_body_to_ned();
+        Tbn.transpose();
+        Vector3f los_vec_bf = Tbn * los_vec_ef;
+
+        // Calculate the 12 Tait Bryan sequence angles that align the X axis in the gimbal frame with los_vec_bf
+        gimbal_pitch_rad = atan2f(sqrtf(los_vec_bf.y*los_vec_bf.y + los_vec_bf.z*los_vec_bf.z) , los_vec_bf.x);
+        if (los_vec_bf.z > 0.0f) {
+            gimbal_pitch_rad = -gimbal_pitch_rad;
+            gimbal_roll_rad = atan2f(-los_vec_bf.y, los_vec_bf.z);
         } else {
-            _angle_bf_output_deg.z = degrees(_angle_ef_target_rad.z);
-        }
-        if (_state._stab_roll) {
-            if (_slave_yaw_roll) {
-                _angle_bf_output_deg.x = - degrees(ahrs.roll);
-            } else {
-                _angle_bf_output_deg.x -= degrees(ahrs.roll);
-            }
-        }
-        if (_state._stab_tilt) {
-            _angle_bf_output_deg.y -= degrees(ahrs.pitch);
+            gimbal_roll_rad = atan2f(los_vec_bf.y, -los_vec_bf.z);
         }
 
-        // lead filter
-        const Vector3f &gyro = ahrs.get_gyro();
-
-        if (_state._stab_roll && !is_zero(_state._roll_stb_lead) && fabsf(ahrs.pitch) < M_PI/3.0f) {
-            // Compute rate of change of euler roll angle
-            float roll_rate = gyro.x + (ahrs.sin_pitch() / ahrs.cos_pitch()) * (gyro.y * ahrs.sin_roll() + gyro.z * ahrs.cos_roll());
-            _angle_bf_output_deg.x -= degrees(roll_rate) * _state._roll_stb_lead;
-        }
-
-        if (_state._stab_tilt && !is_zero(_state._pitch_stb_lead)) {
-            // Compute rate of change of euler pitch angle
-            float pitch_rate = ahrs.cos_pitch() * gyro.y - ahrs.sin_roll() * gyro.z;
-            _angle_bf_output_deg.y -= degrees(pitch_rate) * _state._pitch_stb_lead;
-        }
     }
+
+    // compensate for vehicle rates sensing, computation and actuation lag
+    const Vector3f &gyro = ahrs.get_gyro();
+    gimbal_pitch_rad -= (gyro.y * cosf(gimbal_roll_rad) + gyro.z * sinf(gimbal_roll_rad)) * _state._pitch_stb_lead;
+    gimbal_roll_rad -= gyro.x * _state._roll_stb_lead;
+
+    // convert to output units
+    _angle_bf_output_deg.x = degrees(gimbal_roll_rad);
+    _angle_bf_output_deg.y = degrees(gimbal_pitch_rad);
+    _angle_bf_output_deg.z = 0.0f;
 }
 
 // closest_limit - returns closest angle to 'angle' taking into account limits.  all angles are in degrees * 10
