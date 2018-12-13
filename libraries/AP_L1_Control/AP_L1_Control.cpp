@@ -170,7 +170,7 @@ Vector2f AP_L1_Control::loiter_offset(const float radius) const
         float gamma = asinf(constrain_float(spd_ratio, 0.0f, sin_gamma_max));
         float delta_length = fabsf(radius) * tanf(gamma);
         wind = wind.normalized();
-        delta_vec = {delta_length * wind.y , -delta_length * wind.x};
+        delta_vec = {-delta_length * wind.y , delta_length * wind.x};
     } else {
         delta_vec.zero();
     }
@@ -203,7 +203,7 @@ void AP_L1_Control::_prevent_indecision(float &Nu)
 }
 
 // update L1 control for waypoint navigation
-void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min, float radius, bool wind_comp)
+void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min, float radius, bool wind_comp, int8_t loiter_direction)
 {
 
     struct Location _current_loc;
@@ -216,6 +216,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     if (wind_comp) {
         radius = loiter_radius(radius);
         Vector2f offset_vec = loiter_offset(radius);
+        offset_vec *= (float)loiter_direction;
         location_offset(next_WP_adj, offset_vec.x, offset_vec.y);
     }
 
@@ -358,6 +359,7 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     Location centre_WP_adj = center_WP;
     if (wind_comp) {
         Vector2f offset_vec = loiter_offset(radius);
+        offset_vec *= (float)loiter_direction;
         location_offset(centre_WP_adj, offset_vec.x, offset_vec.y);
     }
 

@@ -51,7 +51,7 @@ public:
     float turn_distance(float wp_radius, float turn_angle) const;
     float loiter_radius (const float loiter_radius) const;
     Vector2f loiter_offset(const float loiter_radius) const;
-    void update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min = 0.0f, float radius = 0.0f, bool wind_comp = false);
+    void update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min = 0.0f, float radius = 0.0f, bool wind_comp = false, int8_t loiter_direction = 1);
     void update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction, Vector2f center_velNE = {}, bool wind_comp = false);
     void update_heading_hold(int32_t navigation_heading_cd);
     void update_level_flight(void);
