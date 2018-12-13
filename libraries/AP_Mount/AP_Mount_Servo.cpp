@@ -146,6 +146,11 @@ void AP_Mount_Servo::stabilize()
             gimbal_roll_rad = -ahrs.roll;
         }
         gimbal_pitch_rad = _angle_ef_target_rad.y - ahrs.pitch;
+        // fade roll angle to zero as pitch approaches +-90 degrees
+        if (fabsf(ahrs.pitch) > radians(45.0f)) {
+            float gain = 1.0f - ((fabsf(ahrs.pitch) - radians(45.0f)) / radians(45.0f));
+            gimbal_roll_rad *= gain;
+        }
 
     } else {
         // Do option a - calculate gimbal roll and pitch angle required to point along vector defined by the
