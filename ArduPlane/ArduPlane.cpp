@@ -795,7 +795,7 @@ void Plane::update_navigation()
                 float control_min = 0.0f;
                 float control_mid = 0.0f;
                 const float control_max = channel_throttle->get_range();
-                const float control_in = channel_throttle->get_control_in_zero_dz();
+                const float control_in = get_throttle_input();
                 switch (channel_throttle->get_type()) {
                     case RC_Channel::RC_CHANNEL_TYPE_ANGLE:
                         control_min = -control_max;
@@ -804,36 +804,30 @@ void Plane::update_navigation()
                         control_mid = channel_throttle->get_control_mid();
                         break;
                 }
-                float climb_rate_ms;
-                if (control_in <= control_mid) {
-                    climb_rate_ms = linear_interpolate(-g.flybywire_sink_rate, 0.0f,
-                                                        control_in,
-                                                        control_min, control_mid);
-                } else {
-                    climb_rate_ms = linear_interpolate(0.0f, g.flybywire_climb_rate,
-                                                        control_in,
-                                                        control_mid, control_max);
-                }
-                // TODO - means of adjusting vehicle height to maintain terrain clearance
-                //next_WP_loc.alt += 100.0f * time_delta * climb_rate_ms;
 
                 loiter.last_update_ms = millis();
                 guided_WP_loc = next_WP_loc;
 
-                // Set mount's target location and velocity using an estimated height of terrain above home if available
-                // Note: set_roi_target() function assumes target height is relative to home
-                 Location target_loc_demand = camera_mount.get_roi_target();
-                 target_loc_demand.lat = guided_WP_loc.lat;
-                 target_loc_demand.lng = guided_WP_loc.lng;
-                 target_loc_demand.alt += 100.0f * time_delta * climb_rate_ms;
-                 float terrain_difference_m = 0.0f;
-#if AP_TERRAIN_AVAILABLE
-                if (terrain.status() == AP_Terrain::TerrainStatusOK) {
-                    terrain.height_terrain_difference_home(terrain_difference_m, false);
-                }
-#endif
-                camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
+                // Set mount target location to guided waypoint
+                Location target_loc_demand = camera_mount.get_roi_target();
+                target_loc_demand.lat = guided_WP_loc.lat;
+                target_loc_demand.lng = guided_WP_loc.lng;
 
+                // Adjust ROI height using climb/descent buttons
+                // Note: initial height is set in Plane::set_mode function
+                const float dz_frac = 0.1f;
+                float dz_up = dz_frac * (control_max - control_mid);
+                float dz_down = dz_frac * (control_mid - control_min);
+                if (control_in <= (control_mid - dz_down)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(-g.flybywire_sink_rate, 0.0f, control_in, control_min, (control_mid - dz_down));
+                } else if (control_in >= (control_mid + dz_up)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(0.0f, g.flybywire_climb_rate, control_in, (control_mid + dz_up), control_max);
+                }
+
+                // Send adjusted ROI target back to mount
+                camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
             }
             update_loiter(radius);
         }
