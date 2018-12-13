@@ -2,6 +2,29 @@
 
 #include "Plane.h"
 
+// This enum maps to the order in which buttons are reported in the MANUAL_CONTROL message
+// and may not map to the order in which buttons are reported directly by the controller.
+// QGroundControl fills the MANUAL_CONTROL message in the order that the controller reports
+// buttons to QGC.
+typedef enum CORVO_X_HHC_ButtonMap {
+    buttonUp    = (1u << 0),
+    buttonDown  = (1u << 1),
+    trigger     = (1u << 2),
+    multi1      = (1u << 3),
+    multi2      = (1u << 4),
+    dpadPress   = (1u << 5)    
+} CORVO_X_HHC_ButtonMap;
+
+typedef enum CORVO_X_HHC_ButtonSpecialFunctionMask {
+    controlSelect = trigger,
+    modeChange    = (buttonUp | buttonDown)
+} CORVO_X_HHC_ButtonSpecialFunctionMask;
+
+typedef enum CORVO_ControllerType {
+    CORVO_ControllerNone = 0,
+    CORVO_ControllerX = 1
+} CORVO_ControllerType;
+
 MAV_TYPE GCS_MAVLINK_Plane::frame_type() const
 {
     return plane.quadplane.get_mav_type();
@@ -599,6 +622,14 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("ADSB",   9, GCS_MAVLINK, streamRates[9],  5),
+
+    // @Param: CORVO_ControllerType
+    // @DisplayName: CORVO Controller Type
+    // @Description: Specify CORVO Controller Type which affects how MANUAL_CONTROL messages are interpreted
+    // @Values: 0: No CORVO Controller, 1: CORVO X Controller
+    // @User: Advanced
+    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 0),
+
     AP_GROUPEND
 };
 
@@ -1182,6 +1213,17 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         RC_Channels::set_override(uint8_t(plane.rcmap.pitch() - 1), pitch, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.throttle() - 1), throttle, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.yaw() - 1), yaw, tnow);
+
+        if(_corvoControllerType.get() == CORVO_ControllerType::CORVO_ControllerX) {
+            // Derive virtual RC channels from manual control button combinations (specific to CORVO X Controller)
+            //RC5 (Control Select)
+            int16_t rc5 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) == CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) ? 2000 : 1000;
+            //RC6 (Change Mode)
+            int16_t rc6 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) == CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) ? 2000 : 1000;
+
+            RC_Channels::set_override(4, rc5, tnow);
+            RC_Channels::set_override(5, rc6, tnow);
+        }
 
         // a manual control message is considered to be a 'heartbeat' from the ground station for failsafe purposes
         plane.failsafe.last_heartbeat_ms = tnow;
