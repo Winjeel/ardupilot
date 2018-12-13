@@ -447,6 +447,14 @@ void FlightAxis::update(const struct sitl_input &input)
     rpm1 = state.m_heliMainRotorRPM;
     rpm2 = state.m_propRPM;
 
+    /*
+      the interlink interface supports 8 input channels
+     */
+    rcin_chan_count = 8;
+    for (uint8_t i=0; i<rcin_chan_count; i++) {
+        rcin[i] = state.rcin[i];
+    }
+
     update_position();
     time_advance();
     uint64_t new_time_us = (state.m_currentPhysicsTime_SEC - initial_time_s)*1.0e6;
