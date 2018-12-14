@@ -119,8 +119,11 @@ void Plane::rudder_arm_disarm_check()
         return;
     }
 
+    // corvo uses the up button to arm and takeoff
+    bool corvo_arm_method = (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides();
+
     // if throttle is not down, then pilot cannot rudder arm/disarm
-    if (get_throttle_input() != 0){
+    if (get_throttle_input() != 0 && !corvo_arm_method){
         rudder_arm_timer = 0;
         return;
     }
@@ -134,25 +137,57 @@ void Plane::rudder_arm_disarm_check()
     }
 
 	if (!arming.is_armed()) {
-		// when not armed, full right rudder starts arming counter
-		if (channel_rudder->get_control_in() > 4000) {
-			uint32_t now = millis();
+        if (corvo_arm_method) {
+            // handle special case where the Corvo hand controller is being used where the up button
+            // is used to arm the vehicle
+            float control_mid = 0.0f;
+            const float control_max = channel_throttle->get_range();
+            const float control_in = channel_throttle->get_control_in_zero_dz();
+            if (channel_throttle->get_type() == RC_Channel::RC_CHANNEL_TYPE_RANGE) {
+                    control_mid = channel_throttle->get_control_mid();
+            }
+            const float dz_frac = 0.5f;
+            float dz_up = dz_frac * (control_max - control_mid);
+            if (control_in >= (control_mid + dz_up)) {
+                // up button pushed
+                uint32_t now = millis();
 
-			if (rudder_arm_timer == 0 ||
-				now - rudder_arm_timer < 3000) {
+                if (rudder_arm_timer == 0 ||
+                    now - rudder_arm_timer < 3000) {
 
-				if (rudder_arm_timer == 0) {
-                    rudder_arm_timer = now;
+                    if (rudder_arm_timer == 0) {
+                        rudder_arm_timer = now;
+                    }
+                } else {
+                    //time to arm!
+                    arm_motors(AP_Arming::RUDDER);
+                    rudder_arm_timer = 0;
                 }
-			} else {
-				//time to arm!
-				arm_motors(AP_Arming::RUDDER);
-				rudder_arm_timer = 0;
-			}
-		} else {
-			// not at full right rudder
-			rudder_arm_timer = 0;
-		}
+            } else {
+                // up button not pushed
+                rudder_arm_timer = 0;
+            }
+        } else {
+            // when not armed, full throttle starts arming counter
+            if (channel_throttle->get_control_in() > 4000) {
+                uint32_t now = millis();
+
+                if (rudder_arm_timer == 0 ||
+                    now - rudder_arm_timer < 3000) {
+
+                    if (rudder_arm_timer == 0) {
+                        rudder_arm_timer = now;
+                    }
+                } else {
+                    //time to arm!
+                    arm_motors(AP_Arming::RUDDER);
+                    rudder_arm_timer = 0;
+                }
+            } else {
+                // not at full right rudder
+                rudder_arm_timer = 0;
+            }
+        }
 	} else if ((arming_rudder == AP_Arming::ARMING_RUDDER_ARMDISARM) && !is_flying()) {
 		// when armed and not flying, full left rudder starts disarming counter
 		if (channel_rudder->get_control_in() < -4000) {
