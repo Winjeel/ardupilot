@@ -58,6 +58,11 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
         ret = false;
     }
 
+    if (plane.quadplane.corvo_takeoff_inhibit()) {
+        check_failed(ARMING_CHECK_NONE, display_failure, "Incorrect mode for takeoff");
+        ret = false;
+    }
+
     if (plane.control_mode == AUTO && plane.mission.num_commands() <= 1) {
         check_failed(ARMING_CHECK_NONE, display_failure, "No mission loaded");
         ret = false;
