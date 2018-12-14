@@ -73,6 +73,10 @@ public:
     bool in_vtol_auto(void) const;
     bool in_vtol_mode(void) const;
 
+    // not in a mode suitable for corvo X to takeoff
+    bool corvo_takeoff_inhibit(void) const;
+
+
     // vtol help for is_flying()
     bool is_flying(void);
 

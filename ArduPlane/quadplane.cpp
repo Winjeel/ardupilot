@@ -2105,6 +2105,25 @@ bool QuadPlane::in_vtol_mode(void) const
             in_vtol_auto());
 }
 
+// not in a mode suitable for corvo X to takeoff
+bool QuadPlane::corvo_takeoff_inhibit(void) const
+{
+    if (tailsitter.input_type != TAILSITTER_CORVOX) {
+        return false;
+    }
+
+    // VTOL functions not enabled
+    if (!enable) {
+        return true;
+    }
+
+    // not in a suitable flight mode
+    if (plane.control_mode != QLOITER && !in_vtol_auto()) {
+        return true;
+    }
+
+    return false;
+}
 
 /*
   main landing controller. Used for landing and RTL.
