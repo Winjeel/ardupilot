@@ -530,6 +530,10 @@ private:
     float _elev_slew_rate_amplitude = 0.0f;     // Amplitude of the elevator channel slew rate produced by the unmodified feedback (deg/sec)
     float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
 
+    // jump takeoff
+    bool _doing_takeoff_jump = false;
+    bool _takeoff_jump_arm_status = false;
+
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
 

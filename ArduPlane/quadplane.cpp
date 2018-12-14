@@ -1334,9 +1334,33 @@ void QuadPlane::control_loiter()
     } else if (plane.control_mode == GUIDED && guided_takeoff) {
         pos_control->set_alt_target_from_climb_rate_ff(0, plane.G_Dt, false);
     } else {
-        // update altitude target and call position controller
-        pos_control->set_alt_target_from_climb_rate_ff(get_pilot_desired_climb_rate_cms(), plane.G_Dt, false);
+        // pilot control of height
+        if ((tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+            // corvo X uses up button press to start a takeoff and automatic climb to height set by Q_RTL_ALT
+            float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+            if ((plane.control_mode == QLOITER) && motors->armed() && !_takeoff_jump_arm_status) {
+                // start the jump to Q_RTL_ALT height
+                set_alt_target_current();
+                _doing_takeoff_jump = true;
+            } else if (_doing_takeoff_jump &&
+                       ((plane.control_mode != QLOITER) || (height_above_ground > (float)qrtl_alt) || (get_pilot_desired_climb_rate_cms() < -50))) {
+                // jump completes whn height is reached, the mode changes or the pilot commands a descent
+                set_alt_target_current();
+                _doing_takeoff_jump = false;
+            }
+        } else {
+            _doing_takeoff_jump = false;
+        }
+        if (_doing_takeoff_jump) {
+            // raise alt target using max allowd pilot demanded climb rate
+            pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
+        } else {
+            // update altitude target using pilot demanded climb rate
+            pos_control->set_alt_target_from_climb_rate_ff(get_pilot_desired_climb_rate_cms(), plane.G_Dt, false);
+        }
     }
+
+    // run height controller calculations
     run_z_controller();
 }
 
@@ -1976,6 +2000,7 @@ void QuadPlane::control_run(void)
     default:
         break;
     }
+    _takeoff_jump_arm_status = motors->armed();
  }
 
 /*
