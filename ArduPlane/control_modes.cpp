@@ -139,8 +139,13 @@ void Plane::read_corvo_control_switch()
         // switch press confirmed
         oldChangeMode = true;
         if (quadplane.in_vtol_mode()) {
-            // in VTOL mode so change to FW CRUISE
-            set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+            if (quadplane.fw_transition_allowed()) {
+                // in VTOL mode so change to FW CRUISE
+                set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+            } else {
+                // not allowed at the moment
+                gcs().send_text(MAV_SEVERITY_WARNING, "FW transition disabled - climb above Q RTL ALT");
+            }
         } else {
             // in FW mode so change to VTOL QLOITER
             set_mode(QLOITER, MODE_REASON_TX_COMMAND);
