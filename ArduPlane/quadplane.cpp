@@ -654,7 +654,7 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @DisplayName: Takeoff jump radius
     // @Description: Controls the radius of the takeoff/landing zone used when flying in QLOITER when Q_TAILSIT_INPUT is set to 2 (using corvo X hand controller). When within this radfius, the vehicle must climb above Q_RTL_ALT before a forward flight transition is allowed and when descending will automatically reduced sink rate when close to the pre-takeoff recorded altitude to prevent hard landings.
     // @Units: m
-    // @Range: 5 100
+    // @Range: 0 127
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("TVBS_JMP_RAD", 45, QuadPlane, tailsitter.tvbs_jmp_radius, 50),
@@ -1352,7 +1352,7 @@ void QuadPlane::control_loiter()
         pos_control->set_alt_target_from_climb_rate_ff(0, plane.G_Dt, false);
     } else {
         if (_doing_takeoff_jump) {
-            // raise alt target using max allowd pilot demanded climb rate
+            // during takeoff jump, climb at max climb rate allowed during pilot controlled operation
             pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
         } else {
             // update altitude target using pilot demanded climb rate
@@ -1414,7 +1414,8 @@ float QuadPlane::get_pilot_desired_climb_rate_cms(void) const
     uint16_t dead_zone = plane.channel_throttle->get_dead_zone();
     uint16_t trim = (plane.channel_throttle->get_radio_max() + plane.channel_throttle->get_radio_min())/2;
     float climb_rate_cms = pilot_velocity_z_max * plane.channel_throttle->pwm_to_angle_dz_trim(dead_zone, trim) / 100.0f;
-    climb_rate_cms = MAX(climb_rate_cms, -_down_button_sink_rate_cms);
+    // enable limiting of sink rate close to ground
+    climb_rate_cms = MAX(climb_rate_cms, -_pilot_sink_rate_limit_cms);
     return climb_rate_cms;
 }
 
@@ -1986,6 +1987,7 @@ void QuadPlane::control_run(void)
     // height above ground is required in many places
     _height_above_ground_m = plane.relative_ground_altitude(plane.g.rangefinder_landing);
 
+    // run logic used to determine limits based on positon and height relative to home location
     launch_recovery_zone_logic();
 
     switch (plane.control_mode) {
@@ -2013,7 +2015,7 @@ void QuadPlane::control_run(void)
  run corvo launch and recovery zone logic
  */
 void QuadPlane::launch_recovery_zone_logic(void) {
-    // Addtional protections are required to enable one hand operation
+    // Addtional protections required to enable one hand operation
     if ((tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
         if (!motors->armed()) {
             // reset flags when disarmed
@@ -2021,8 +2023,8 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             _reached_rtl_alt = false;
             _outside_takeoff_zone = false;
         } else {
-            // corvo X uses up button press to start a takeoff and automatic climb to height set by Q_TVBS_JMP_ALT
-            if ((plane.control_mode == QLOITER) && motors->armed() && !_takeoff_jump_arm_status) {
+            // corvo X uses up button press to arm and start a takeoff, followed by automatic climb to height set by Q_TVBS_JMP_ALT
+            if ((plane.control_mode == QLOITER) && motors->armed() && !_prev_arm_status) {
                 // start the jump to Q_RTL_ALT height
                 set_alt_target_current();
                 _doing_takeoff_jump = true;
@@ -2030,12 +2032,12 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                        ((plane.control_mode != QLOITER)
                         || (plane.relative_altitude > (float)tailsitter.tvbs_jmp_alt)
                         || (get_pilot_desired_climb_rate_cms() < -50))) {
-                // jump completes when height is reached, the mode changes or the pilot commands a descent
+                // jump stops when height is reached, the mode changes or the pilot commands a descent
                 set_alt_target_current();
                 _doing_takeoff_jump = false;
             }
 
-            // check takeoff height clearance
+            // check takeoff height clearance - used to prevent early transition into FW flight modes
             if (!_reached_rtl_alt && (_height_above_ground_m > (float)qrtl_alt)) {
                 _reached_rtl_alt = true;
             }
@@ -2053,26 +2055,28 @@ void QuadPlane::launch_recovery_zone_logic(void) {
 
             // generate descent rate to be used when descend button is pressed
             if (_outside_takeoff_zone) {
-                _down_button_sink_rate_cms = pilot_velocity_z_max;
+                _pilot_sink_rate_limit_cms = pilot_velocity_z_max;
             } else if (_height_above_ground_m > land_final_alt) {
-                _down_button_sink_rate_cms = linear_interpolate(land_speed_cms, pilot_velocity_z_max,
+                _pilot_sink_rate_limit_cms = linear_interpolate(land_speed_cms, pilot_velocity_z_max,
                                                                plane.relative_altitude,
                                                                land_final_alt, land_final_alt+6);
             } else {
-                _down_button_sink_rate_cms = linear_interpolate((0.7f * land_speed_cms), land_speed_cms,
+                _pilot_sink_rate_limit_cms = linear_interpolate((0.7f * land_speed_cms), land_speed_cms,
                                                                plane.relative_altitude,
                                                                MIN(2.0f,(land_final_alt-1.0f)), land_final_alt);
             }
 
         }
     } else {
-        // defaults when operating with normal RC handset which will remove restrictions and disable takeoff jump
+        // defaults when operating with normal RC handset removes restrictions and disables takeoff jump
         _doing_takeoff_jump = false;
         _reached_rtl_alt = true;
         _outside_takeoff_zone = true;
-        _down_button_sink_rate_cms = pilot_velocity_z_max;
+        _pilot_sink_rate_limit_cms = pilot_velocity_z_max;
     }
-    _takeoff_jump_arm_status = motors->armed();
+
+    // record value for next frame
+    _prev_arm_status = motors->armed();
 }
 
 /*

@@ -143,8 +143,8 @@ void Plane::read_corvo_control_switch()
                 // in VTOL mode so change to FW CRUISE
                 set_mode(CRUISE, MODE_REASON_TX_COMMAND);
             } else {
-                // not allowed at the moment
-                gcs().send_text(MAV_SEVERITY_WARNING, "FW transition disabled - climb above Q RTL ALT");
+                // not allowed - send message to console
+                gcs().send_text(MAV_SEVERITY_WARNING, "Forward Flight disabled - climb above Q RTL ALT");
             }
         } else {
             // in FW mode so change to VTOL QLOITER

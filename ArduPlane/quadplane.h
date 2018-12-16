@@ -497,8 +497,8 @@ private:
         AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
         AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
         AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
-        AP_Float tvbs_jmp_alt;              // Takeoff tump altitude used by corvo X in QLOITER mode
-        AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone
+        AP_Float tvbs_jmp_alt;              // Takeoff jump altitude used by Corvo X in QLOITER mode (m)
+        AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone (m)
 
     } tailsitter;
 
@@ -538,12 +538,12 @@ private:
     float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
 
     // corvo launch/recovery
-    bool _doing_takeoff_jump = false;
-    bool _takeoff_jump_arm_status = false;
-    bool _reached_rtl_alt = false;
-    bool _outside_takeoff_zone = false;
-    float _down_button_sink_rate_cms = 0.0f;
-    float _height_above_ground_m = 0.0f;
+    bool _doing_takeoff_jump = false;           // True when the vehicle is doing a max climb rate takeoff to Q_JMP_ALT
+    bool _prev_arm_status = false;              // Value of motors->armed() from previous frame. Used to detect change in arm status.
+    bool _reached_rtl_alt = false;              // Latches to true when the vehicle climbs past Q_RTL_ALT for the first time. Set to false when motors->armed() is false.
+    bool _outside_takeoff_zone = false;         // True when the horizontal distance to the home location is greater than Q_TVBS_JMP_RAD plus allowance for GPS uncertainty.
+    float _pilot_sink_rate_limit_cms = 0.0f;    // Sink rate limit applied to pilot stick inputs (cm/s). Used to prevent hard landings when using a down button for descent.
+    float _height_above_ground_m = 0.0f;        // Common height above ground used by multiple functions (m). Will use terrain data or range finder if available.
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
