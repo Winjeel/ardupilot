@@ -641,6 +641,15 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_LAT_GMAX", 43, QuadPlane, tailsitter.tvbs_lat_gmax, 0.2f),
 
+    // @Param: TVBS_JMP_ALT
+    // @DisplayName: Takeoff jump altitude
+    // @Description: Sets the altitude that the vheicle will jump to when taking off in QLOITER mode if Q_TAILSIT_INPUT si set to 2 (using corvo X hand controller).
+    // @Units: m
+    // @Range: 1.0 5.0
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("TVBS_JMP_ALT", 44, QuadPlane, tailsitter.tvbs_jmp_alt, 2.5),
+
     AP_GROUPEND
 };
 
@@ -1336,14 +1345,14 @@ void QuadPlane::control_loiter()
     } else {
         // pilot control of height
         if ((tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
-            // corvo X uses up button press to start a takeoff and automatic climb to height set by Q_RTL_ALT
+            // corvo X uses up button press to start a takeoff and automatic climb to height set by Q_TVBS_JMP_ALT
             float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
             if ((plane.control_mode == QLOITER) && motors->armed() && !_takeoff_jump_arm_status) {
                 // start the jump to Q_RTL_ALT height
                 set_alt_target_current();
                 _doing_takeoff_jump = true;
             } else if (_doing_takeoff_jump &&
-                       ((plane.control_mode != QLOITER) || (height_above_ground > (float)qrtl_alt) || (get_pilot_desired_climb_rate_cms() < -50))) {
+                       ((plane.control_mode != QLOITER) || (height_above_ground > (float)tailsitter.tvbs_jmp_alt) || (get_pilot_desired_climb_rate_cms() < -50))) {
                 // jump completes whn height is reached, the mode changes or the pilot commands a descent
                 set_alt_target_current();
                 _doing_takeoff_jump = false;

@@ -492,6 +492,7 @@ private:
         AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
         AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
         AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
+        AP_Float tvbs_jmp_alt;              // Takeoff tump altitude used by corvo X in QLOITER mode
 
     } tailsitter;
 
