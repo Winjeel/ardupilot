@@ -76,6 +76,8 @@ public:
     // not in a mode suitable for corvo X to takeoff
     bool corvo_takeoff_inhibit(void) const;
 
+    // transition to a forward flight mode is allowed
+    bool fw_transition_allowed(void) { return _reached_rtl_alt; }
 
     // vtol help for is_flying()
     bool is_flying(void);
@@ -256,6 +258,9 @@ private:
 
     // calculate a stopping distance for fixed-wing to vtol transitions
     float stopping_distance(void);
+
+    //  run corvo launch and recovery zone logic
+    void launch_recovery_zone_logic(void);
     
     AP_Int16 transition_time_ms;
 
@@ -493,6 +498,7 @@ private:
         AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
         AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
         AP_Float tvbs_jmp_alt;              // Takeoff tump altitude used by corvo X in QLOITER mode
+        AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone
 
     } tailsitter;
 
@@ -531,9 +537,13 @@ private:
     float _elev_slew_rate_amplitude = 0.0f;     // Amplitude of the elevator channel slew rate produced by the unmodified feedback (deg/sec)
     float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
 
-    // jump takeoff
+    // corvo launch/recovery
     bool _doing_takeoff_jump = false;
     bool _takeoff_jump_arm_status = false;
+    bool _reached_rtl_alt = false;
+    bool _outside_takeoff_zone = false;
+    float _down_button_sink_rate_cms = 0.0f;
+    float _height_above_ground_m = 0.0f;
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
