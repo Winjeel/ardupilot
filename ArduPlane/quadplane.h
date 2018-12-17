@@ -76,8 +76,8 @@ public:
     // not in a mode suitable for corvo X to takeoff
     bool corvo_takeoff_inhibit(void) const;
 
-    // transition to a forward flight mode is allowed
-    bool fw_transition_allowed(void) { return _reached_rtl_alt; }
+    // return true if transition to a forward flight mode is allowed
+    bool fw_transition_allowed(void) const;
 
     // vtol help for is_flying()
     bool is_flying(void);

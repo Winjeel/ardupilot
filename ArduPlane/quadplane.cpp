@@ -2079,6 +2079,18 @@ void QuadPlane::launch_recovery_zone_logic(void) {
     _prev_arm_status = motors->armed();
 }
 
+// return true if transition to a forward flight mode is allowed
+bool QuadPlane::fw_transition_allowed(void) const
+{
+    // Until we have reached the altitude set by Q_RTL_ALT for the first time, no forward trnsitoin is allowed
+    bool ret = false;
+    if (_reached_rtl_alt) {
+        // Once we have passed the height we must be outside the recovery zone set by Q_RTL_ALT and Q_TVBS_JMP_RAD. This allows for hilltop operations.
+        ret = (_outside_takeoff_zone || (_height_above_ground_m > (float)qrtl_alt));
+    }
+    return ret;
+}
+
 /*
   enter a quadplane mode
  */
