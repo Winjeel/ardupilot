@@ -306,6 +306,9 @@ public:
     // write log to dataflash
     void write_log();
 
+    /// returns current value of _is_landed
+    bool get_is_landed() const { return _is_landed; }
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
