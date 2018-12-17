@@ -1294,7 +1294,7 @@ void QuadPlane::control_loiter()
 
     // process pilot's roll and pitch input
     if (plane.vtolCameraControlMode) {
-        // don't move vehicle becasue we are using sticks to control camera
+        // don't move vehicle because we are using sticks to control camera
         loiter_nav->set_pilot_desired_acceleration(0, 0, plane.G_Dt);
     } else {
         loiter_nav->set_pilot_desired_acceleration(plane.channel_roll->get_control_in(),
@@ -1339,7 +1339,6 @@ void QuadPlane::control_loiter()
     if (plane.control_mode == QLAND) {
         if (_height_above_ground_m < land_final_alt && poscontrol.state < QPOS_LAND_FINAL) {
             poscontrol.state = QPOS_LAND_FINAL;
-            descent_delay_time_sec = 0.0f;
             // cut IC engine if enabled
             if (land_icengine_cut != 0) {
                 plane.g2.ice_control.engine_control(0, 0, 0);
@@ -2022,6 +2021,7 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             _doing_takeoff_jump = false;
             _reached_rtl_alt = false;
             _outside_takeoff_zone = false;
+            _land_point_offset_NE.zero();
         } else {
             // corvo X uses up button press to arm and start a takeoff, followed by automatic climb to height set by Q_TVBS_JMP_ALT
             if ((plane.control_mode == QLOITER) && motors->armed() && !_prev_arm_status) {
@@ -2067,10 +2067,10 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
             // toggle auto land arrest using climb/descend buttons
-            if (get_pilot_desired_climb_rate_cms() < 0.5f * pilot_velocity_z_max) {
+            if (plane.channel_throttle->norm_input() < 0.5f) {
                 _climb_start_event_ms = AP_HAL::millis();
             }
-            if (get_pilot_desired_climb_rate_cms() > -0.5f * pilot_velocity_z_max) {
+            if (plane.channel_throttle->norm_input() > -0.5f) {
                 _descend_start_event_ms = AP_HAL::millis();
             }
             if (!_auto_land_arrested && ((AP_HAL::millis() - _climb_start_event_ms) > 1000)) {
@@ -2286,9 +2286,9 @@ void QuadPlane::vtol_position_controller(void)
 
     // determine if inside or outside the landing recovery cone using hysteresis
     float cone_radius = (float)tailsitter.tvbs_land_cone_radius + (_height_above_ground_m / atanf(radians(constrain_float((float)tailsitter.tvbs_land_cone_elev, 0.0f, 80.0f))));
-    if (plane.auto_state.wp_distance < (cone_radius - 0.5f)) {
+    if (poscontrol.radial_error < (cone_radius - 0.5f)) {
         poscontrol.outside_cone = false;
-    } else if (plane.auto_state.wp_distance > (cone_radius + 0.5f)) {
+    } else if (poscontrol.radial_error > (cone_radius + 0.5f)) {
         poscontrol.outside_cone = true;
     }
 
@@ -2453,7 +2453,10 @@ void QuadPlane::vtol_position_controller(void)
     case QPOS_LAND_FINAL:
     {
         // set position controller desired velocity and acceleration to zero
-        pos_control->set_desired_velocity_xy(0.0f,0.0f);
+        if (!_auto_land_arrested) {
+           // handle special case where operator is adjusting the landing waypoint
+            pos_control->set_desired_velocity_xy(0.0f,0.0f);
+        }
         pos_control->set_desired_accel_xy(0.0f,0.0f);
 
         // set position control target and update
@@ -2550,9 +2553,10 @@ void QuadPlane::vtol_position_controller(void)
         if (_auto_land_arrested) {
             // allow pilot to raise alt during repositioning
             pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms()), plane.G_Dt, false);
-        } else if (poscontrol.outside_cone) {
-            // allow descent if inside the landing cone
+        } else if (poscontrol.outside_cone && (descent_delay_time_sec < 30.0f)) {
+            // don't allow descent if outside the landing cone
             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
+            descent_delay_time_sec += dt;
         } else {
             pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(_height_above_ground_m), plane.G_Dt, true);
         }
@@ -2589,33 +2593,59 @@ void QuadPlane::vtol_position_controller(void)
 
 /*
   setup the target position based on plane.next_WP_loc
+  adjust using pilot stick inputs if auto landing has been arrested
  */
 void QuadPlane::setup_target_position(void)
 {
-    const Location &loc = plane.next_WP_loc;
-    Location origin = inertial_nav.get_origin();
-    Vector2f diff2d;
-
     motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
-    diff2d = location_diff(origin, loc);
-    poscontrol.target.x = diff2d.x * 100;
-    poscontrol.target.y = diff2d.y * 100;
+    const uint32_t now = AP_HAL::millis();
+    uint32_t dt_ms = now - last_loiter_ms;
+    last_loiter_ms = now;
+
+    // Get waypoint and compare with internally stored value. If different, then the waypoint has been
+    // modified externally and th epositon controller destination needs to be reset.
+    if (!locations_are_same(plane.next_WP_loc, last_auto_target) ||
+        plane.next_WP_loc.alt != last_auto_target.alt ||
+        dt_ms > 500) {
+        wp_nav->set_wp_destination(poscontrol.target);
+    }
+    last_auto_target = plane.next_WP_loc;
+
+    // During descent and final landing, the pilot can adjust the landibng position using control sticks
+    if (_auto_land_arrested && (dt_ms < 200) && ((poscontrol.state == QPOS_LAND_DESCEND) || (poscontrol.state == QPOS_LAND_FINAL))) {
+        // allow pilot to adjust waypoint at a slow speed - this is only intended for fine adjustment
+        const float stick_to_speed = (2.0f / 4500.0f);
+        float velY = stick_to_speed * plane.channel_roll->get_control_in();
+        float velX = - stick_to_speed * plane.channel_pitch->get_control_in();
+        float vel_N = velX * ahrs_view->cos_yaw() - velY * ahrs_view->sin_yaw();
+        float vel_E = velX * ahrs_view->sin_yaw() + velY * ahrs_view->cos_yaw();
+        pos_control->set_desired_velocity_xy(100.0f * vel_N, 100.0f * vel_E);
+        float dt_sec = 0.001f * (float)dt_ms;
+        _land_point_offset_NE.x += dt_sec * vel_N;
+        _land_point_offset_NE.y += dt_sec * vel_E;
+    } else if ((poscontrol.state != QPOS_LAND_DESCEND) && (poscontrol.state != QPOS_LAND_FINAL)) {
+        _auto_land_arrested = false;
+        _land_point_offset_NE.zero();
+    }
+
+    // Update the position control target including pilot adjustments
+    Location origin = inertial_nav.get_origin();
+    Vector2f WP_pos_adj_NE = location_diff(origin, plane.next_WP_loc);
+    WP_pos_adj_NE += _land_point_offset_NE;
+    poscontrol.target.x = WP_pos_adj_NE.x * 100;
+    poscontrol.target.y = WP_pos_adj_NE.y * 100;
     poscontrol.target.z = plane.next_WP_loc.alt - origin.alt;
 
-    const uint32_t now = AP_HAL::millis();
-    if (!locations_are_same(loc, last_auto_target) ||
-        plane.next_WP_loc.alt != last_auto_target.alt ||
-        now - last_loiter_ms > 500) {
-        wp_nav->set_wp_destination(poscontrol.target);
-        last_auto_target = loc;
-    }
-    last_loiter_ms = now;
+    // calculate radial distance to waypoint
+    Vector2f pos_error_NE = location_diff(origin, plane.current_loc) - WP_pos_adj_NE;
+    poscontrol.radial_error = pos_error_NE.length();
     
     // setup vertical speed and acceleration
     pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
     pos_control->set_max_accel_z(pilot_accel_z);
 }
+
 
 /*
   run takeoff controller to climb vertically
@@ -2684,6 +2714,8 @@ void QuadPlane::takeoff_controller(void)
  */
 void QuadPlane::waypoint_controller(void)
 {
+    _auto_land_arrested = false;
+    _land_point_offset_NE.zero();
     setup_target_position();
 
     check_attitude_relax();
@@ -2954,11 +2986,13 @@ bool QuadPlane::verify_vtol_land(void)
         return true;
     }
     if (poscontrol.state == QPOS_POSITION2 &&
-        plane.auto_state.wp_distance < 2) {
+        !poscontrol.outside_cone) {
         poscontrol.state = QPOS_LAND_DESCEND;
         gcs().send_text(MAV_SEVERITY_INFO,"Land descend started");
         plane.set_next_WP(plane.next_WP_loc);
         _auto_land_arrested = false;
+        _land_point_offset_NE.zero();
+        descent_delay_time_sec = 0.0f;
     }
 
     if (should_relax()) {
@@ -3262,6 +3296,8 @@ void QuadPlane::guided_start(void)
     poscontrol.state = QPOS_POSITION1;
     poscontrol.initialised = false;
     guided_takeoff = false;
+    _auto_land_arrested = false;
+    _land_point_offset_NE.zero();
     setup_target_position();
     poscontrol.slow_descent = (plane.current_loc.alt > plane.next_WP_loc.alt);
 }
