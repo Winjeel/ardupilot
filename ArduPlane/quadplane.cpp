@@ -2066,6 +2066,19 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                                                                MIN(2.0f,(land_final_alt-1.0f)), land_final_alt);
             }
 
+            // toggle auto land arrest using climb/descend buttons
+            if (get_pilot_desired_climb_rate_cms() < 0.5f * pilot_velocity_z_max) {
+                _climb_start_event_ms = AP_HAL::millis();
+            }
+            if (get_pilot_desired_climb_rate_cms() > -0.5f * pilot_velocity_z_max) {
+                _descend_start_event_ms = AP_HAL::millis();
+            }
+            if (!_auto_land_arrested && ((AP_HAL::millis() - _climb_start_event_ms) > 1000)) {
+                _auto_land_arrested = true;
+            } else if (_auto_land_arrested && (((AP_HAL::millis() - _descend_start_event_ms) > 1000) || !motors->armed())) {
+                _auto_land_arrested = false;
+            }
+
         }
     } else {
         // defaults when operating with normal RC handset removes restrictions and disables takeoff jump
@@ -2534,8 +2547,11 @@ void QuadPlane::vtol_position_controller(void)
     }
 
     case QPOS_LAND_DESCEND: {
-        // allow descent if inside the landing cone
-        if (poscontrol.outside_cone) {
+        if (_auto_land_arrested) {
+            // allow pilot to raise alt during repositioning
+            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms()), plane.G_Dt, false);
+        } else if (poscontrol.outside_cone) {
+            // allow descent if inside the landing cone
             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
         } else {
             pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(_height_above_ground_m), plane.G_Dt, true);
@@ -2544,7 +2560,10 @@ void QuadPlane::vtol_position_controller(void)
     }
 
     case QPOS_LAND_FINAL: {
-        if ((!weathervane.tip_warning && !poscontrol.outside_cone) || descent_delay_time_sec > 30.0f) {
+        if (_auto_land_arrested) {
+            // allow pilot to raise alt during repositioning
+            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms()), plane.G_Dt, false);
+        } else if ((!weathervane.tip_warning && !poscontrol.outside_cone) || descent_delay_time_sec > 30.0f) {
             // complete descent if landing conditions are met or we have delayed the descent for more than 30 seconds in total
             // slow further to half the kinetic energy at the expected touchdown point allowing for expected 2m height error
             float kinetic_energy_ratio = linear_interpolate(0.5f, 1.0f,
@@ -2939,6 +2958,7 @@ bool QuadPlane::verify_vtol_land(void)
         poscontrol.state = QPOS_LAND_DESCEND;
         gcs().send_text(MAV_SEVERITY_INFO,"Land descend started");
         plane.set_next_WP(plane.next_WP_loc);
+        _auto_land_arrested = false;
     }
 
     if (should_relax()) {
