@@ -1306,7 +1306,7 @@ void QuadPlane::control_loiter()
     loiter_nav->update();
 
     // nav roll and pitch are controlled by the loiter controller
-    if (!reverse_transition_active) {
+    if (!reverse_transition_active && motors->armed()) {
         plane.nav_roll_cd = loiter_nav->get_roll();
         plane.nav_pitch_cd = loiter_nav->get_pitch();
     } else {
@@ -2022,11 +2022,17 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             _reached_rtl_alt = false;
             _outside_takeoff_zone = false;
             _land_point_offset_NE.zero();
+
+            // ensure in a correct mode
+            if ((plane.control_mode != QLOITER) || !((plane.control_mode == AUTO) && plane.auto_state.vtol_mode)) {
+                plane.control_mode = QLOITER;
+            }
+
         } else {
             // corvo X uses up button press to arm and start a takeoff, followed by automatic climb to height set by Q_TVBS_JMP_ALT
             if ((plane.control_mode == QLOITER) && motors->armed() && !_prev_arm_status) {
                 // start the jump to Q_RTL_ALT height
-                set_alt_target_current();
+                init_loiter();
                 _doing_takeoff_jump = true;
             } else if (_doing_takeoff_jump &&
                        ((plane.control_mode != QLOITER)
@@ -2067,6 +2073,7 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
             // generate descent rate to be used when descend button is pressed
+            bool prepare_for_touchdown = false;
             if (_outside_takeoff_zone) {
                 _pilot_sink_rate_limit_cms = pilot_velocity_z_max;
             } else if (_height_above_ground_m > land_final_alt) {
@@ -2078,18 +2085,31 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 _pilot_sink_rate_limit_cms = linear_interpolate((0.7f * land_speed_cms), land_speed_cms,
                                                                plane.relative_altitude,
                                                                MIN(2.0f,(land_final_alt-1.0f)), land_final_alt);
-                // Let the position controller know to expect touchdown
-                if ((AP_HAL::millis() - _no_descent_demand_ms) > 500) {
-                    pos_control->set_vtol_landing_expected();
-                }
 
-                // check if we are landed using multiple criteria
-                if (fabsf(plane.channel_pitch->norm_input()) > 0.1f) {
-                    _pitch_stick_moved_ms = AP_HAL::millis();
-                }
-                if (!pos_control->get_is_landed()) {
-                    _pos_ctrl_not_is_landed_ms = AP_HAL::millis();
-                }
+                // Prepare for touchdown if descend button is being pressed or we are in final land stage
+                prepare_for_touchdown = ((AP_HAL::millis() - _no_descent_demand_ms) > 500) || (poscontrol.state == QPOS_LAND_FINAL);
+            }
+
+            // record absence of pitch stick movement - used for auto disarm
+            if (fabsf(plane.channel_pitch->norm_input()) > 0.1f) {
+                _pitch_stick_moved_ms = AP_HAL::millis();
+            }
+
+            // record absence of positon controller land detection - used for auto disarm
+            if (!pos_control->get_is_landed()) {
+                _pos_ctrl_not_is_landed_ms = AP_HAL::millis();
+            }
+
+            if (prepare_for_touchdown) {
+                // Let position controller know to look for touchdown and activate protection against blade strike
+                pos_control->set_vtol_landing_expected();
+
+                /*
+                 Check if we are landed and auto disarm using multiple criteria.
+                 NOTE - When descending with poscontrol.state == QPOS_LAND_FINAL, landing and disarm can also be performed by
+                 checks in QuadPlane::check_land_complete() which may not trigger with a TVBS type vehicle due to the altitude
+                 variation check which can fail due to landing shock, accel bias and static pressure errors.
+                */
                 uint8_t land_criteria_count = 0;
                 if ((AP_HAL::millis() - _pos_ctrl_not_is_landed_ms) > 4000) {
                     // position controller has detected a touchdown condition
@@ -2105,8 +2125,10 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 }
                 if (land_criteria_count == 3) {
                     plane.disarm_motors();
-                    poscontrol.state = QPOS_LAND_COMPLETE;
-                    gcs().send_text(MAV_SEVERITY_INFO,"Land complete");
+                    if (poscontrol.state == QPOS_LAND_FINAL) {
+                        poscontrol.state = QPOS_LAND_COMPLETE;
+                        gcs().send_text(MAV_SEVERITY_INFO,"Land complete");
+                    }
                 }
             }
         }
@@ -2967,6 +2989,13 @@ bool QuadPlane::verify_vtol_takeoff(const AP_Mission::Mission_Command &cmd)
  */
 void QuadPlane::check_land_complete(void)
 {
+    /*
+      NOTE - there is a land detect and disarm implemented in QuadPlane::launch_recovery_zone_logic() which operates
+      when the corvo controller is used. This is less prone to false negatives with TVBS airframe types than the check
+      in QuadPlane::check_land_complete() due to the altitude variation check which can fail due to landing shock,
+      accel bias and static pressure errors.
+    */
+
     if (poscontrol.state != QPOS_LAND_FINAL) {
         // only apply to final landing phase
         return;
