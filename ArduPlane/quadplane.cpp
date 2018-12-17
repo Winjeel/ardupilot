@@ -2042,6 +2042,19 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 _reached_rtl_alt = true;
             }
 
+            // toggle auto land arrest using climb/descend buttons
+            if (plane.channel_throttle->norm_input() < 0.5f) {
+                _no_climb_demand_ms = AP_HAL::millis();
+            }
+            if (plane.channel_throttle->norm_input() > -0.5f) {
+                _no_descent_demand_ms = AP_HAL::millis();
+            }
+            if (!_auto_land_arrested && ((AP_HAL::millis() - _no_climb_demand_ms) > 1000)) {
+                _auto_land_arrested = true;
+            } else if (_auto_land_arrested && (((AP_HAL::millis() - _no_descent_demand_ms) > 1000) || !motors->armed())) {
+                _auto_land_arrested = false;
+            }
+
             // check outside zone using hysteresis set to typical GPS drift value to avoid rapid switching
             Vector2f posNE_rel_to_home;
             if (ahrs.get_relative_position_NE_home(posNE_rel_to_home)){
@@ -2061,24 +2074,41 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                                                                plane.relative_altitude,
                                                                land_final_alt, land_final_alt+6);
             } else {
+                // halve the kinetic energy by touchdown allowing for 2m of height uncertainty
                 _pilot_sink_rate_limit_cms = linear_interpolate((0.7f * land_speed_cms), land_speed_cms,
                                                                plane.relative_altitude,
                                                                MIN(2.0f,(land_final_alt-1.0f)), land_final_alt);
-            }
+                // Let the position controller know to expect touchdown
+                if ((AP_HAL::millis() - _no_descent_demand_ms) > 500) {
+                    pos_control->set_vtol_landing_expected();
+                }
 
-            // toggle auto land arrest using climb/descend buttons
-            if (plane.channel_throttle->norm_input() < 0.5f) {
-                _climb_start_event_ms = AP_HAL::millis();
+                // check if we are landed using multiple criteria
+                if (fabsf(plane.channel_pitch->norm_input()) > 0.1f) {
+                    _pitch_stick_moved_ms = AP_HAL::millis();
+                }
+                if (!pos_control->get_is_landed()) {
+                    _pos_ctrl_not_is_landed_ms = AP_HAL::millis();
+                }
+                uint8_t land_criteria_count = 0;
+                if ((AP_HAL::millis() - _pos_ctrl_not_is_landed_ms) > 4000) {
+                    // position controller has detected a touchdown condition
+                    land_criteria_count++;
+                }
+                if ((AP_HAL::millis() - _no_descent_demand_ms) > 4000) {
+                    // descend button held for more than than 3 seconds
+                    land_criteria_count++;
+                }
+                if ((AP_HAL::millis() - _pitch_stick_moved_ms) > 4000) {
+                    // no pilot stick input
+                    land_criteria_count++;
+                }
+                if (land_criteria_count == 3) {
+                    plane.disarm_motors();
+                    poscontrol.state = QPOS_LAND_COMPLETE;
+                    gcs().send_text(MAV_SEVERITY_INFO,"Land complete");
+                }
             }
-            if (plane.channel_throttle->norm_input() > -0.5f) {
-                _descend_start_event_ms = AP_HAL::millis();
-            }
-            if (!_auto_land_arrested && ((AP_HAL::millis() - _climb_start_event_ms) > 1000)) {
-                _auto_land_arrested = true;
-            } else if (_auto_land_arrested && (((AP_HAL::millis() - _descend_start_event_ms) > 1000) || !motors->armed())) {
-                _auto_land_arrested = false;
-            }
-
         }
     } else {
         // defaults when operating with normal RC handset removes restrictions and disables takeoff jump

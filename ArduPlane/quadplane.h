@@ -546,9 +546,11 @@ private:
     float _pilot_sink_rate_limit_cms = 0.0f;    // Sink rate limit applied to pilot stick inputs (cm/s). Used to prevent hard landings when using a down button for descent.
     float _height_above_ground_m = 0.0f;        // Common height above ground used by multiple functions (m). Will use terrain data or range finder if available.
     bool _auto_land_arrested = false;           // True when the auto landing has been temporarily arrested to enable user to gain height and adjust landing position.
-    uint32_t _climb_start_event_ms = 0;         // Last time in msec that pilot climb demand was not received.
-    uint32_t _descend_start_event_ms = 0;       // Last time in msec that a pilot descend demand was not received.
+    uint32_t _no_climb_demand_ms = 0;           // Last time in msec that a pilot climb demand was not received.
+    uint32_t _no_descent_demand_ms = 0;         // Last time in msec that a pilot descend demand was not received.
     Vector2f _land_point_offset_NE = {};        // NE offset of the landing waypoint as last adjusted by the pilot stick inputs
+    uint32_t _pitch_stick_moved_ms = 0;         // Last time in msec that the pitch axis stick was moved.
+    uint32_t _pos_ctrl_not_is_landed_ms = 0;    // Last time in msec the position controller _is_landed flag was false
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
