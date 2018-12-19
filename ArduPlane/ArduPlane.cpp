@@ -780,7 +780,8 @@ void Plane::update_navigation()
     case AVOID_ADSB:
     case GUIDED:
         {
-            // TODO only enable this when payload handset control is active
+            // Special case using corvo hand controller where 2-axis stick is used to move ROI NE position and up/down
+            // buttons adjust ROI height.
             if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
                 // When in guided mode, allow stick inputs to move point
                 const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
