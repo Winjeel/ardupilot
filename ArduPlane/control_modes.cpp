@@ -135,25 +135,52 @@ void Plane::read_corvo_control_switch()
         changeModeCount--;
     }
 
+    bool resetVtolCameraControl = false;
     if (changeModeCount == 5 && !oldChangeMode) {
         // switch press confirmed
         oldChangeMode = true;
-        if (quadplane.in_vtol_mode()) {
-            if (quadplane.fw_transition_allowed()) {
-                // in VTOL mode so change to FW CRUISE
-                set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+
+        // determine if we are in a FW flight mode that doesn't give the pilot direct control over trajectory
+        bool in_fw_auto = ((control_mode == AUTO) && !plane.auto_state.vtol_mode)
+                || (control_mode == RTL)
+                || (control_mode == LOITER)
+                || (((plane.control_mode == GUIDED) || (plane.control_mode == AVOID_ADSB)) && plane.auto_state.vtol_loiter);
+        if ((control_mode == QLOITER) || in_fw_auto) {
+            if (quadplane.fw_transition_allowed() || in_fw_auto) {
+                // don't allow transiton from QLOITER to forward flight inside the launch and recovery zone
+                if ((control_mode == QLOITER) && vtolCameraControlMode ) {
+                    // Switch to the default FW camera control mode
+                    set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+                } else {
+                    // Switch to the default operator controlled FW trajectory control mode
+                    set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+
+                    // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
+                    camera_mount.set_elev_park(true);
+                    camera_mount.reset_elev();
+                }
             } else {
-                // not allowed - send message to console
+                // not allowed - send message  to console
                 gcs().send_text(MAV_SEVERITY_WARNING, "Forward Flight disabled - climb above Q RTL ALT");
             }
+        } else if ((control_mode == MANUAL)
+                   || (control_mode == CIRCLE)
+                   || (control_mode == STABILIZE)
+                   || (control_mode == ACRO)
+                   || (control_mode == FLY_BY_WIRE_A)
+                   || (control_mode == FLY_BY_WIRE_B)
+                   || (control_mode == AUTOTUNE)) {
+            // If in any other FW stick control mode, switch to CRUISE
+            set_mode(CRUISE, MODE_REASON_TX_COMMAND);
         } else {
-            // in FW mode so change to VTOL QLOITER
+            // All VTOL modes other than QLOITER end up here
+            bool was_in_camera_mode = (control_mode == GUIDED);
             set_mode(QLOITER, MODE_REASON_TX_COMMAND);
+            if (was_in_camera_mode) {
+                vtolCameraControlMode = true;
+                resetVtolCameraControl = true;
+            }
         }
-        // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
-        vtolCameraControlMode = false;
-        camera_mount.set_elev_park(true);
-        camera_mount.reset_elev();
     } else if (changeModeCount == 0 && oldChangeMode) {
         // switch release confirmed
         oldChangeMode = false;
@@ -171,7 +198,6 @@ void Plane::read_corvo_control_switch()
     }
 
     bool toggle_fw_flight_mode = false;
-    bool resetVtolCameraControl = false;
     if (controlSelectCount == 5 && !oldControlSelect) {
         // switch press confirmed
         oldControlSelect = true;
