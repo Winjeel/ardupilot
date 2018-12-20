@@ -151,6 +151,7 @@ void Plane::read_corvo_control_switch()
                 if ((control_mode == QLOITER) && vtolCameraControlMode ) {
                     // Switch to the default FW camera control mode
                     set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+                    camera_mount.set_elev_park(false);
                 } else {
                     // Switch to the default operator controlled FW trajectory control mode
                     set_mode(CRUISE, MODE_REASON_TX_COMMAND);
