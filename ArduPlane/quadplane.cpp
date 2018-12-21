@@ -1985,7 +1985,7 @@ void QuadPlane::control_run(void)
  }
 
 /*
- run corvo launch and recovery zone logic
+ run corvo launch and recovery zone logic including automatic disarm
  */
 void QuadPlane::launch_recovery_zone_logic(void) {
     // Addtional protections required to enable one hand operation

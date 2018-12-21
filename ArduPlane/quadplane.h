@@ -259,7 +259,7 @@ private:
     // calculate a stopping distance for fixed-wing to vtol transitions
     float stopping_distance(void);
 
-    //  run corvo launch and recovery zone logic
+    //  run corvo launch and recovery zone logic incuding automatic disarm
     void launch_recovery_zone_logic(void);
     
     AP_Int16 transition_time_ms;

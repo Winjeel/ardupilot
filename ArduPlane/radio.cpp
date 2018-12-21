@@ -119,7 +119,9 @@ void Plane::rudder_arm_disarm_check()
         return;
     }
 
-    // corvo uses the up button to arm and takeoff
+    // Corvo uses the up button to arm and takeoff but has no rudder input so RC cannot be used to disarm
+    // Corvo automatic disarm via down button cannot be done here because is_flying() check is not reliable enough
+    //and is instead handled by the QuadPlane::launch_recovery_zone_logic function
     bool corvo_arm_method = (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides();
 
     // if throttle is not down, then pilot cannot rudder arm/disarm
@@ -188,7 +190,7 @@ void Plane::rudder_arm_disarm_check()
                 rudder_arm_timer = 0;
             }
         }
-	} else if ((arming_rudder == AP_Arming::ARMING_RUDDER_ARMDISARM) && !is_flying()) {
+    } else if (!corvo_arm_method && (arming_rudder == AP_Arming::ARMING_RUDDER_ARMDISARM) && !is_flying()) {
 		// when armed and not flying, full left rudder starts disarming counter
 		if (channel_rudder->get_control_in() < -4000) {
 			uint32_t now = millis();
@@ -238,7 +240,7 @@ void Plane::read_radio()
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, get_throttle_input());
 
     // corvo cotroller can't nudge using throttle stick
-    if ((quadplane.tailsitter.input_type != 2)
+    if ((quadplane.tailsitter.input_type != quadplane.TAILSITTER_CORVOX)
             && g.throttle_nudge
             && SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) > 50
             && geofence_stickmixing()) {
