@@ -113,9 +113,11 @@ void AP_Mount_Backend::rate_input_rad(float &out, const RC_Channel *chan, int16_
         return;
     }
     out += chan->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
-    if (min != 0 && max != 0) {
+    if (min != 0 || max != 0) {
+        // a non zero angular limit indicates that the output should be constrained
         out = constrain_float(out, radians((float)min*0.01f), radians((float)max*0.01f));
     } else {
+        // if both angular limits are zero, then wrap the angle to allow continuous rotation
         out = wrap_PI(out);
     }
 }
@@ -129,7 +131,8 @@ void AP_Mount_Backend::update_targets_from_rc()
 
     // if joystick_speed is defined then pilot input defines a rate of change of the angle
     if (_frontend._joystick_speed) {
-        // allow pilot position input to come directly from an RC_Channel
+        // Allow pilot rate input to come directly from an RC_Channel
+        // Roll and pitch is constrained, yaw is allowed to wrap
         rate_input_rad(_angle_ef_target_rad.x,
                        roll_ch,
                        _state._roll_angle_min,

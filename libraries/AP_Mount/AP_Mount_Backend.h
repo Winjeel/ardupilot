@@ -97,9 +97,6 @@ public:
 
 protected:
 
-    // the attitude view of the VTOL attitude controller which is aligned with the rotors
-    AP_AHRS_View *ahrs_view;
-
     // update_targets_from_rc - updates angle targets (i.e. _angle_ef_target_rad) using input from receiver
     void update_targets_from_rc();
 
@@ -121,5 +118,5 @@ protected:
 
 private:
 
-    void rate_input_rad(float &out, const RC_Channel *ch, int16_t min, int16_t max) const;
+    void rate_input_rad(float &out, const RC_Channel *ch, int16_t min = 0, int16_t max = 0) const;
 };
