@@ -1207,7 +1207,13 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         int16_t roll = (packet.y == INT16_MAX) ? 0 : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + 1000) / 2000.0f;
         int16_t pitch = (packet.x == INT16_MAX) ? 0 : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + 1000) / 2000.0f;
         int16_t throttle = (packet.z == INT16_MAX) ? 0 : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
-        int16_t yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+        int16_t yaw;
+        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+            // set to zero to prevent inadvertent operation
+            yaw = 0;
+        } else {
+            yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+        }
 
         RC_Channels::set_override(uint8_t(plane.rcmap.roll() - 1), roll, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.pitch() - 1), pitch, tnow);
@@ -1616,6 +1622,13 @@ bool GCS_MAVLINK_Plane::set_mode(const uint8_t mode)
     case ACRO:
     case FLY_BY_WIRE_A:
     case AUTOTUNE:
+    {
+        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+            // these modes can't be used when we have a corvo controller
+            return false;
+        }
+    }
+        FALLTHROUGH;
     case FLY_BY_WIRE_B:
     case CRUISE:
     case AVOID_ADSB:

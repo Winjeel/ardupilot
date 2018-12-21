@@ -73,6 +73,12 @@ public:
     bool in_vtol_auto(void) const;
     bool in_vtol_mode(void) const;
 
+    // not in a mode suitable for corvo X to takeoff
+    bool corvo_takeoff_inhibit(void) const;
+
+    // return true if transition to a forward flight mode is allowed
+    bool fw_transition_allowed(void) const;
+
     // vtol help for is_flying()
     bool is_flying(void);
 
@@ -82,7 +88,10 @@ public:
     }
 
     // return desired forward throttle percentage
-    int8_t forward_throttle_pct(void);        
+    int8_t forward_throttle_pct(void);
+
+    // return yaw rate demand in centi-degrees/sec required to yaw the vehicle into the wind
+    // if operating in a payload control mode return the yaw rate required to zero the payload body frame yaw angle
     float get_weathervane_yaw_rate_cds(void);
 
     // see if we are flying from vtol point of view
@@ -249,6 +258,9 @@ private:
 
     // calculate a stopping distance for fixed-wing to vtol transitions
     float stopping_distance(void);
+
+    //  run corvo launch and recovery zone logic incuding automatic disarm
+    void launch_recovery_zone_logic(void);
     
     AP_Int16 transition_time_ms;
 
@@ -324,6 +336,7 @@ private:
         bool moving_backwards; // true when moving backwards rel to ground
         uint32_t last_move_back_ms; // last system time in msec that we were moving backwards rel to ground
         bool tip_warning; // true when tilted backwards and there is a tipover risk
+        bool payload_yaw_lockout; // true when a payload pointing demanded yaw is being ignored due to conditions being outside limits
 
     } weathervane;
 
@@ -397,6 +410,7 @@ private:
         bool slow_descent:1;
         uint32_t time_ms;
         bool outside_cone:1;
+        float radial_error;
     } poscontrol;
 
     struct {
@@ -482,6 +496,10 @@ private:
         AP_Float tvbs_wpe_gain;             // gain from wing pitch error to elevator
         AP_Int8 tvbs_land_cone_elev;        // Elevation of the landing cone in degrees
         AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
+        AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
+        AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
+        AP_Float tvbs_jmp_alt;              // Takeoff jump altitude used by Corvo X in QLOITER mode (m)
+        AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone (m)
 
     } tailsitter;
 
@@ -519,6 +537,20 @@ private:
     LowPassFilterFloat _elev_slew_rate_filter;  // LPF used by elevator channel slew rate calculation
     float _elev_slew_rate_amplitude = 0.0f;     // Amplitude of the elevator channel slew rate produced by the unmodified feedback (deg/sec)
     float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
+
+    // corvo launch/recovery
+    bool _doing_takeoff_jump = false;           // True when the vehicle is doing a max climb rate takeoff to Q_JMP_ALT
+    bool _prev_arm_status = false;              // Value of motors->armed() from previous frame. Used to detect change in arm status.
+    bool _reached_rtl_alt = false;              // Latches to true when the vehicle climbs past Q_RTL_ALT for the first time. Set to false when motors->armed() is false.
+    bool _outside_takeoff_zone = false;         // True when the horizontal distance to the home location is greater than Q_TVBS_JMP_RAD plus allowance for GPS uncertainty.
+    float _pilot_sink_rate_limit_cms = 0.0f;    // Sink rate limit applied to pilot stick inputs (cm/s). Used to prevent hard landings when using a down button for descent.
+    float _height_above_ground_m = 0.0f;        // Common height above ground used by multiple functions (m). Will use terrain data or range finder if available.
+    bool _auto_land_arrested = false;           // True when the auto landing has been temporarily arrested to enable user to gain height and adjust landing position.
+    uint32_t _no_climb_demand_ms = 0;           // Last time in msec that a pilot climb demand was not received.
+    uint32_t _no_descent_demand_ms = 0;         // Last time in msec that a pilot descend demand was not received.
+    Vector2f _land_point_offset_NE = {};        // NE offset of the landing waypoint as last adjusted by the pilot stick inputs
+    uint32_t _pitch_stick_moved_ms = 0;         // Last time in msec that the pitch axis stick was moved.
+    uint32_t _pos_ctrl_not_is_landed_ms = 0;    // Last time in msec the position controller _is_landed flag was false
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;

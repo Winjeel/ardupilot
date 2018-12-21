@@ -467,16 +467,32 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
 
     case AVOID_ADSB:
     case GUIDED:
-        throttle_allows_nudging = true;
-        auto_throttle_mode = true;
-        auto_navigation_mode = true;
-        guided_throttle_passthru = false;
-        /*
-          when entering guided mode we set the target as the current
-          location. This matches the behaviour of the copter code
-        */
-        guided_WP_loc = current_loc;
-        set_guided_WP();
+        {
+            throttle_allows_nudging = true;
+            auto_throttle_mode = true;
+            auto_navigation_mode = true;
+            guided_throttle_passthru = false;
+            /*
+              when entering guided mode we set the target as the current
+              location. This matches the behaviour of the copter code
+            */
+            guided_WP_loc = current_loc;
+            set_guided_WP();
+
+            // also set the camera ROI to current location at terrain level
+            // use height above home if terrain height unavailable
+            Location target_loc_demand = current_loc;
+            float hagl_cm = 0.0f;
+           if (terrain.status() == AP_Terrain::TerrainStatusOK) {
+               terrain.height_above_terrain(hagl_cm, false);
+               hagl_cm *= 100.0f;
+           } else {
+               hagl_cm = current_loc.alt - home.alt;
+           }
+           target_loc_demand.alt = current_loc.alt - hagl_cm;
+           camera_mount.set_mode(MAV_MOUNT_MODE_GPS_POINT);
+           camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
+        }
         break;
 
     case QSTABILIZE:

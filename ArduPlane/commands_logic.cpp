@@ -993,9 +993,7 @@ bool Plane::verify_landing_vtol_approach(const AP_Mission::Mission_Command &cmd)
         case WAIT_FOR_BREAKOUT:
             {
                 const float breakout_direction_rad = radians(wrap_180(vtol_approach_s.approach_direction_deg + 270));
-                Vector2f velNE;
-                velNE.zero();
-                nav_controller->update_loiter(cmd.content.location, aparm.loiter_radius, cmd.content.location.flags.loiter_ccw ? -1 : 1, velNE);
+                nav_controller->update_loiter(cmd.content.location, aparm.loiter_radius, cmd.content.location.flags.loiter_ccw ? -1 : 1);
 
                 // breakout when within 5 degrees of the opposite direction
                 if (fabsf(ahrs.yaw - breakout_direction_rad) < radians(5.0f)) {

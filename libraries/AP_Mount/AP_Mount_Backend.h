@@ -21,6 +21,7 @@
 
 #include <AP_Common/AP_Common.h>
 #include "AP_Mount.h"
+#include <AP_AHRS/AP_AHRS_View.h>
 
 class AP_Mount_Backend
 {
@@ -47,14 +48,31 @@ public:
     // has_pan_control - returns true if this mount can control it's pan (required for multicopters)
     virtual bool has_pan_control() const = 0;
 
+    // return the earth frame yaw of the payload in radians
+    virtual float get_ef_yaw();
+
     // set_mode - sets mount's mode
     virtual void set_mode(enum MAV_MOUNT_MODE mode) = 0;
 
     // set_angle_targets - sets angle targets in degrees
     virtual void set_angle_targets(float roll, float tilt, float pan);
 
+    // set yaw target in degrees
+    virtual void set_yaw_target(float pan);
+
+    // specialised mode that uses RC targeting
+    // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+    // when called with park = false, causes the mount to revert to normal RC targeting operation
+    virtual void set_elev_park(bool park);
+
+    // reset the mount LOS elevation angle to the parameter defined value
+    virtual void reset_elev();
+
     // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
     virtual void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE);
+
+    // get_roi_target - gets target location that mount should attempt to point towards
+    virtual Location get_roi_target();
 
     // control - control the mount
     virtual void control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, MAV_MOUNT_MODE mount_mode);
@@ -96,8 +114,9 @@ protected:
     AP_Mount::mount_state &_state;    // references to the parameters and state for this backend
     uint8_t     _instance;  // this instance's number
     Vector3f    _angle_ef_target_rad;   // desired earth-frame roll, tilt and vehicle-relative pan angles in radians
+    bool _slave_yaw_roll = false; // when set to true the earth frame yaw angle aligns with vehicle yaw and roll is set to zero
 
 private:
 
-    void rate_input_rad(float &out, const RC_Channel *ch, float min, float max) const;
+    void rate_input_rad(float &out, const RC_Channel *ch, int16_t min = 0, int16_t max = 0) const;
 };

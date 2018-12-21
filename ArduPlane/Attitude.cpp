@@ -50,7 +50,8 @@ bool Plane::stick_mixing_enabled(void)
 {
     if (auto_throttle_mode && auto_navigation_mode) {
         // we're in an auto mode. Check the stick mixing flag
-        if (g.stick_mixing != STICK_MIXING_DISABLED &&
+        if (control_mode != GUIDED &&
+            g.stick_mixing != STICK_MIXING_DISABLED &&
             geofence_stickmixing() &&
             failsafe.state == FAILSAFE_NONE &&
             !rc_failsafe_active()) {
@@ -158,13 +159,23 @@ void Plane::stabilize_stick_mixing_direct()
         control_mode == TRAINING) {
         return;
     }
-    int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
-    stick_mix_channel(channel_roll, aileron);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
 
-    int16_t elevator = SRV_Channels::get_output_scaled(SRV_Channel::k_elevator);
-    stick_mix_channel(channel_pitch, elevator);
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+        // When using the corvo hand controller allow x stick axis to roll only becasue y stick axis  stick is not associated with pitch/height
+        int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
+        stick_mix_channel(channel_roll, aileron);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
+
+        // y-axis / pitch stick is used to adjust speed - see calc_airspeed_errors() function for how this is achieved
+    } else {
+        int16_t aileron = SRV_Channels::get_output_scaled(SRV_Channel::k_aileron);
+        stick_mix_channel(channel_roll, aileron);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, aileron);
+
+        int16_t elevator = SRV_Channels::get_output_scaled(SRV_Channel::k_elevator);
+        stick_mix_channel(channel_pitch, elevator);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, elevator);
+    }
 }
 
 /*
@@ -174,6 +185,7 @@ void Plane::stabilize_stick_mixing_direct()
 void Plane::stabilize_stick_mixing_fbw()
 {
     if (!stick_mixing_enabled() ||
+        ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && (control_mode == GUIDED) && RC_Channels::has_active_overrides()) ||
         control_mode == ACRO ||
         control_mode == FLY_BY_WIRE_A ||
         control_mode == AUTOTUNE ||
@@ -203,21 +215,24 @@ void Plane::stabilize_stick_mixing_fbw()
     nav_roll_cd += roll_input * roll_limit_cd;
     nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
     
-    float pitch_input = channel_pitch->norm_input();
-    if (pitch_input > 0.5f) {
-        pitch_input = (3*pitch_input - 1);
-    } else if (pitch_input < -0.5f) {
-        pitch_input = (3*pitch_input + 1);
+    // don't modify pitch input when using a corvo hand controller
+    if ((quadplane.tailsitter.input_type != quadplane.TAILSITTER_CORVOX)) {
+        float pitch_input = channel_pitch->norm_input();
+        if (pitch_input > 0.5f) {
+            pitch_input = (3*pitch_input - 1);
+        } else if (pitch_input < -0.5f) {
+            pitch_input = (3*pitch_input + 1);
+        }
+        if (fly_inverted()) {
+            pitch_input = -pitch_input;
+        }
+        if (pitch_input > 0) {
+            nav_pitch_cd += pitch_input * aparm.pitch_limit_max_cd;
+        } else {
+            nav_pitch_cd += -(pitch_input * pitch_limit_min_cd);
+        }
+        nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
     }
-    if (fly_inverted()) {
-        pitch_input = -pitch_input;
-    }
-    if (pitch_input > 0) {
-        nav_pitch_cd += pitch_input * aparm.pitch_limit_max_cd;
-    } else {
-        nav_pitch_cd += -(pitch_input * pitch_limit_min_cd);
-    }
-    nav_pitch_cd = constrain_int32(nav_pitch_cd, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
 }
 
 

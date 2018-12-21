@@ -67,7 +67,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(rpm_update,             10,    100),
     SCHED_TASK(airspeed_ratio_update,   1,    100),
 #if MOUNT == ENABLED
-    SCHED_TASK_CLASS(AP_Mount, &plane.camera_mount, update, 50, 100),
+    SCHED_TASK_CLASS(AP_Mount, &plane.camera_mount, update, 400, 100),
 #endif // MOUNT == ENABLED
 #if CAMERA == ENABLED
     SCHED_TASK_CLASS(AP_Camera, &plane.camera, update_trigger, 50, 100),
@@ -779,7 +779,59 @@ void Plane::update_navigation()
     case LOITER:
     case AVOID_ADSB:
     case GUIDED:
-        update_loiter(radius);
+        {
+            // Special case using corvo hand controller where 2-axis stick is used to move ROI NE position and up/down
+            // buttons adjust ROI height.
+            if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+                // When in guided mode, allow stick inputs to move point
+                const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
+                plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
+                plane.loiter.velNE.y = scaler * channel_roll->get_control_in();
+
+                // Move target waypoint at constant velocity
+                float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
+                location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
+
+                // The up/down buttons are mapped to throttle channel and used to make the target location move up or down
+                float control_min = 0.0f;
+                float control_mid = 0.0f;
+                const float control_max = channel_throttle->get_range();
+                const float control_in = get_throttle_input();
+                switch (channel_throttle->get_type()) {
+                    case RC_Channel::RC_CHANNEL_TYPE_ANGLE:
+                        control_min = -control_max;
+                        break;
+                    case RC_Channel::RC_CHANNEL_TYPE_RANGE:
+                        control_mid = channel_throttle->get_control_mid();
+                        break;
+                }
+
+                loiter.last_update_ms = millis();
+                guided_WP_loc = next_WP_loc;
+
+                // Set mount target location to guided waypoint
+                Location target_loc_demand = camera_mount.get_roi_target();
+                target_loc_demand.lat = guided_WP_loc.lat;
+                target_loc_demand.lng = guided_WP_loc.lng;
+
+                // Adjust ROI height using climb/descent buttons
+                // Note: initial height is set in Plane::set_mode function
+                const float dz_frac = 0.1f;
+                float dz_up = dz_frac * (control_max - control_mid);
+                float dz_down = dz_frac * (control_mid - control_min);
+                if (control_in <= (control_mid - dz_down)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(-g.flybywire_sink_rate, 0.0f, control_in, control_min, (control_mid - dz_down));
+                } else if (control_in >= (control_mid + dz_up)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(0.0f, g.flybywire_climb_rate, control_in, (control_mid + dz_up), control_max);
+                }
+
+                // Send adjusted ROI target back to mount
+                camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
+            }
+            update_loiter(radius);
+        }
         break;
 
     case CRUISE:

@@ -107,14 +107,17 @@ void Plane::calc_airspeed_errors()
     // may be using synthetic airspeed
     ahrs.airspeed_estimate(&airspeed_measured);
 
-    // FBW_B/cruise airspeed target
-    if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
-        if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
-            // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
-            const float control_in = get_throttle_input();
-            target_airspeed_cm += 10.0f * control_in;
-            target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
-        } else if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
+    // airspeed target
+    if (!failsafe.rc_failsafe
+            && (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()
+            && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
+        // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
+        // allow the operator to adjust speed in all auto-throttle modes
+        const float control_in = get_throttle_input();
+        target_airspeed_cm += 10.0f * control_in;
+        target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
+    } else if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
+        if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {
             float control_min = 0.0f;
             float control_mid = 0.0f;
             const float control_max = channel_throttle->get_range();
@@ -236,9 +239,9 @@ void Plane::update_loiter(uint16_t radius)
           that is going to be switching to QRTL when it gets within
           RTL_RADIUS
         */
-        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc);
+        nav_controller->update_waypoint(prev_WP_loc, next_WP_loc, 0.0f, radius, (control_mode == GUIDED), loiter.direction);
     } else {
-        nav_controller->update_loiter(next_WP_loc, radius, loiter.direction, loiter.velNE);
+        nav_controller->update_loiter(next_WP_loc, radius, loiter.direction, loiter.velNE, (control_mode == GUIDED));
     }
 
     if (loiter.start_time_ms == 0) {
@@ -309,7 +312,7 @@ void Plane::update_fbwb_speed_height(void)
         target_altitude.last_elev_check_us = now;
         
         float elevator_input;
-        if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+        if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
             // handle special case where the Corvo hand controller is being used where the up/down buttons
             // mapped to throttle channel are used to make the vehicle climb or descend
             float control_min = 0.0f;
@@ -324,14 +327,19 @@ void Plane::update_fbwb_speed_height(void)
                     control_mid = channel_throttle->get_control_mid();
                     break;
             }
-            if (control_in <= control_mid) {
+            const float dz_frac = 0.1f;
+            float dz_up = dz_frac * (control_max - control_mid);
+            float dz_down = dz_frac * (control_mid - control_min);
+            if (control_in <= (control_mid - dz_down)) {
                 elevator_input = linear_interpolate(-1.0f, 0.0f,
                                                     control_in,
-                                                    control_min, control_mid);
-            } else {
+                                                    control_min, (control_mid - dz_down));
+            } else if (control_in >= (control_mid + dz_up)) {
                 elevator_input = linear_interpolate(0.0f, 1.0f,
                                                     control_in,
-                                                    control_mid, control_max);
+                                                    (control_mid + dz_up), control_max);
+            } else {
+                elevator_input = 0.0f;
             }
         } else {
             elevator_input = channel_pitch->get_control_in() / 4500.0f;

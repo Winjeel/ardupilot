@@ -73,14 +73,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: enable roll stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 0),
+    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 1),
 
     // @Param: _STAB_TILT
     // @DisplayName: Stabilize mount's pitch/tilt angle
     // @Description: enable tilt/pitch stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  0),
+    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  1),
 
     // @Param: _STAB_PAN
     // @DisplayName: Stabilize mount pan/yaw angle
@@ -119,7 +119,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control tilt (pitch) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    0),
+    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    2),
 
     // @Param: _ANGMIN_TIL
     // @DisplayName: Minimum tilt angle
@@ -144,7 +144,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control pan (yaw) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       0),
+    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       1),
 
     // @Param: _ANGMIN_PAN
     // @DisplayName: Minimum pan angle
@@ -170,7 +170,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 0),
+    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 50),
 
     // @Param: _LEAD_RLL
     // @DisplayName: Roll stabilization lead time
@@ -198,7 +198,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_TYPE", 19, AP_Mount, state[0]._type, 0),
 
-    // 20 formerly _OFF_JNT
+    // @Param: _INIT_ELEV
+    // @DisplayName: Initial elevation angle
+    // @Description: When entering AHRS stabilised pointing modes, the target elevation angle will be set to this value
+    // @Units: deg
+    // @Range: -90 0
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("_INIT_ELEV", 20, AP_Mount, _ef_elev_deg, -15),
 
     // 21 formerly _OFF_ACC
 
@@ -529,6 +536,17 @@ MAV_MOUNT_MODE AP_Mount::get_mode(uint8_t instance) const
     return state[instance]._mode;
 }
 
+// return the earth frame yaw of the payload in radians
+float AP_Mount::get_ef_yaw(uint8_t instance) const
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return 0.0f;
+    }
+
+    // get value from backend
+    return _backends[instance]->get_ef_yaw();
+}
+
 // set_mode_to_default - restores the mode to it's default mode held in the MNT_MODE parameter
 //      this operation requires 60us on a Pixhawk/PX4
 void AP_Mount::set_mode_to_default(uint8_t instance)
@@ -557,6 +575,41 @@ void AP_Mount::set_angle_targets(uint8_t instance, float roll, float tilt, float
 
     // send command to backend
     _backends[instance]->set_angle_targets(roll, tilt, pan);
+}
+
+// set yaw target in degrees
+void AP_Mount::set_yaw_target(uint8_t instance, float pan)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->set_yaw_target(pan);
+}
+
+// specialised mode that uses RC targeting
+// when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+// when called with park = false, causes the mount to revert to normal RC targeting operation
+void AP_Mount::set_elev_park(uint8_t instance, bool park)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->set_elev_park(park);
+}
+
+// reset the mount LOS elevation angle to the parameter defined value
+void AP_Mount::reset_elev(uint8_t instance)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->reset_elev();
 }
 
 MAV_RESULT AP_Mount::handle_command_do_mount_configure(const mavlink_command_long_t &packet)
@@ -642,6 +695,18 @@ void AP_Mount::set_roi_target(uint8_t instance, const struct Location &target_lo
     // call instance's set_roi_cmd
     if (instance < AP_MOUNT_MAX_INSTANCES && _backends[instance] != nullptr) {
         _backends[instance]->set_roi_target(target_loc, roi_velNE);
+    }
+}
+
+// get_roi_target - gets target location that mount is attempting to point towards
+Location AP_Mount::get_roi_target(uint8_t instance)
+{
+    // call instance's set_roi_cmd
+    if (instance < AP_MOUNT_MAX_INSTANCES && _backends[instance] != nullptr) {
+        return _backends[instance]->get_roi_target();
+    } else {
+        Location ret = {};
+        return ret;
     }
 }
 

@@ -267,7 +267,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
         FALLTHROUGH;
     case VTOL_STAGE_HEIGHT_CAPTURE:
         {
-            landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1, Vector2f(0.0f,0.0f));
+            landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1);
             _timeout_count = 0;
             if (!landing.nav_controller->reached_loiter_target() || ((height - _approach_alt_offset) > VTOL_LOITER_ALT_TOLERANCE)) {
                 // wait until the altitude is correct before considering a breakout
@@ -280,7 +280,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
         FALLTHROUGH;
     case VTOL_STAGE_WAIT_FOR_BREAKOUT:
         {
-            landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1, Vector2f(0.0f,0.0f));
+            landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1);
             _timeout_count = 0;
             // Ensure we have done a half circle before landing to give a reliable approach angle.
             if ((_loiter_sum_cd < 18000) && !_low_wind_overshoot) {
@@ -344,7 +344,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
             _timeout_count += 1;
             if (_timeout_count > 10) {
 
-                landing.nav_controller->update_loiter(_landing_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1, Vector2f(0.0f,0.0f));
+                landing.nav_controller->update_loiter(_landing_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1);
             }
 
             return true;
@@ -359,7 +359,7 @@ bool AP_Landing_VTOL::verify_land(const Location &prev_WP_loc, Location &next_WP
                 _stage = VTOL_STAGE_WAIT_FOR_BREAKOUT;
                 _low_wind_overshoot = true;
                 _loiter_sum_cd = 0;
-                landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1, Vector2f(0.0f,0.0f));
+                landing.nav_controller->update_loiter(_loiter_point, _loiter_radius, _loiter_point.flags.loiter_ccw ? -1 : 1);
             }
 
             return false;

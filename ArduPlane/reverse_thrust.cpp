@@ -107,7 +107,8 @@ bool Plane::have_reverse_thrust(void) const
 int16_t Plane::get_throttle_input(bool no_deadzone) const
 {
     int16_t ret;
-    if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
+    if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX && RC_Channels::has_active_overrides()
+            && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
         // handle special case where corvo hand controller is being used where the pitch stick is used to accel/decel the vehicle
         // forward/down stick is positive/faster
         ret = -channel_pitch->get_control_in_zero_dz();

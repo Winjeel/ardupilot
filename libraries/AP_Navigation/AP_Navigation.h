@@ -67,7 +67,7 @@ public:
     // main flight code will call an output function (such as
     // nav_roll_cd()) after this function to ask for the new required
     // navigation attitude/steering.
-    virtual void update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min = 0.0f) = 0;
+    virtual void update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min = 0.0f, float radius = 0.0f, bool wind_comp = false, int8_t loiter_direction = 1) = 0;
 
     // update the internal state of the navigation controller for when
     // the vehicle has been commanded to circle about a point.  This
@@ -76,7 +76,7 @@ public:
     // main flight code will call an output function (such as
     // nav_roll_cd()) after this function to ask for the new required
     // navigation attitude/steering.
-    virtual void update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction, Vector2f center_velNE) = 0;
+    virtual void update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction, Vector2f center_velNE = {}, bool wind_comp = false) = 0;
 
     // update the internal state of the navigation controller, given a
     // fixed heading. This is the step function for navigation control
