@@ -455,8 +455,9 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
                     has_mission = true;
                 }
 
-                // Command #2 : loiter at min of ATL_HOLD_RTL and Q_RTL_ALT
-                cmd.id = MAV_CMD_NAV_LOITER_UNLIM;
+                // Command #2 : loiter at min of ATL_HOLD_RTL and Q_RTL_ALT for 10 minutes
+                cmd.id = MAV_CMD_NAV_LOITER_TIME;
+                cmd.p1 = 600;
                 cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, (int32_t)plane.g.RTL_altitude_cm);
                 if (plane.mission.add_cmd(cmd)) {
                     has_mission = true;
