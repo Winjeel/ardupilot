@@ -436,7 +436,12 @@ void Plane::handle_auto_mode(void)
     if (mission.state() != AP_Mission::MISSION_RUNNING) {
         // this could happen if AP_Landing::restart_landing_sequence() returns false which would only happen if:
         // restart_landing_sequence() is called when not executing a NAV_LAND or there is no previous nav point
-        set_mode(RTL, MODE_REASON_MISSION_END);
+        if (arming.is_armed()) {
+            set_mode(RTL, MODE_REASON_MISSION_END);
+        } else if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) {
+            // When using a Corvo controller we default to QLOITER if unable to takeoff in auto
+            set_mode(QLOITER, MODE_REASON_MISSION_END);
+        }
         gcs().send_text(MAV_SEVERITY_INFO, "Aircraft in auto without a running mission");
         return;
     }

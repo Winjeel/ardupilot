@@ -424,6 +424,54 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         break;
 
     case AUTO:
+        // Ensure we have a basic mission plan when selecting AUTO before flight
+        if ((quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS)
+                && !arming.is_armed()) {
+            // Basic check that the first waypoint is a VTOL takeoff and there is more than one waypoint
+            bool has_mission = false;
+            AP_Mission::Mission_Command cmd = {};
+            if (plane.mission.get_next_nav_cmd(1, cmd)) {
+                has_mission = (cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF) && (plane.mission.num_commands() > 1);
+            }
+
+            if (!has_mission && ahrs.home_is_set()) {
+                // clear mission
+                plane.mission.clear();
+
+                // Command #0 : home
+                cmd = {};
+                cmd.id = MAV_CMD_NAV_WAYPOINT;
+                cmd.content.location.alt = plane.home.alt;
+                cmd.content.location.lat = plane.home.lat;
+                cmd.content.location.lng = plane.home.lng;
+                if (plane.mission.add_cmd(cmd)) {
+                    has_mission = true;
+                }
+
+                // Command #1 : VTOL take-off to Q_RTL_ALT
+                cmd.id = MAV_CMD_NAV_VTOL_TAKEOFF;
+                cmd.content.location.alt = (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
+                if (plane.mission.add_cmd(cmd)) {
+                    has_mission = true;
+                }
+
+                // Command #2 : loiter at min of ATL_HOLD_RTL and Q_RTL_ALT
+                cmd.id = MAV_CMD_NAV_LOITER_UNLIM;
+                cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, (int32_t)plane.g.RTL_altitude_cm);
+                if (plane.mission.add_cmd(cmd)) {
+                    has_mission = true;
+                }
+
+                if (has_mission) {
+                    // reset index to start
+                    plane.mission.reset();
+                } else {
+                    // can't use auto mode so switch to pilot controlled mode
+                    control_mode = QLOITER;
+                }
+            }
+        }
+
         throttle_allows_nudging = true;
         auto_throttle_mode = true;
         auto_navigation_mode = true;

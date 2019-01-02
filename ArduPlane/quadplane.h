@@ -162,6 +162,8 @@ public:
 
     void Log_Write_MotBatt();
 
+    float rtl_alt_m() { return (float)qrtl_alt; }
+
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
