@@ -717,6 +717,19 @@ private:
 
     } loiter;
 
+    /*
+      Used by Corvo X shake to start auto mission functonality
+    */
+    struct {
+        uint8_t up_shake_count = 0; // number of up shake events
+        uint8_t down_shake_count = 0; // number of down shake events
+        uint32_t up_shake_time_ms = 0; // last time an up shake event was detected (msec)
+        uint32_t down_shake_time_ms = 0; // last time a down shake event was detected (msec)
+        uint32_t first_shake_time_ms = 0; // time the first shake event, either up or down, was detected (msec)
+        uint32_t shake_pass_time_ms = 0; // time the shake test passed (msec)
+        float accel_up_filt = 0.0f; // state for LPF noise filter applied to vertical acceleration
+
+    } shake_to_fly;
 
     // Conditional command
     // A value used in condition commands (eg delay, change alt, etc.)

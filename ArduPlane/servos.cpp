@@ -730,6 +730,88 @@ void Plane::set_servos(void)
 
     // run output mixer and send values to the hal for output
     servos_output();
+
+    /*
+     Special case handling of Corvo X - shake up and down TKOFF_ACCEL_CNT times to place into AUTO mode and arm
+    */
+    if ((quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && !arming.is_armed()) {
+        // require each consecutive up/down shake event to be no more than this time apart
+        const uint32_t shake_interval_ms = 500;
+
+        // reset the detector if the vehicle is not pointing up
+        if (shake_to_fly.first_shake_time_ms != 0) {
+            // This ahrs_view is for a frame of reference that moves with the net motor tilt so a smaller pitch tolerance
+            // is used because rotors will auto level in pitch
+            bool is_tilted = (fabsf(quadplane.ahrs_view->roll) > degrees(30.0f)) || (fabsf(quadplane.ahrs_view->pitch) > degrees(10.0f));
+            if (is_tilted) {
+                shake_to_fly = {};
+            }
+        }
+
+        // calculate the vertical g after removing gravity and applying some noise filtering (positive is up)
+        Vector3f accel_ef = ahrs.get_accel_ef_blended();
+        shake_to_fly.accel_up_filt = 0.9f * shake_to_fly.accel_up_filt - 0.1f * (GRAVITY_MSS + accel_ef.z);
+
+        // detect up movement
+        if ((shake_to_fly.accel_up_filt > g.takeoff_throttle_min_accel) &&
+                ((shake_to_fly.up_shake_count == 0) || ((millis() - shake_to_fly.up_shake_time_ms) < shake_interval_ms))) {
+            if (shake_to_fly.up_shake_count == 0 && shake_to_fly.down_shake_count == 0) {
+                // start of shake sequence
+                shake_to_fly.first_shake_time_ms = millis();
+            }
+            if (shake_to_fly.up_shake_count <= shake_to_fly.down_shake_count) {
+                shake_to_fly.up_shake_count++;
+                shake_to_fly.up_shake_time_ms = millis();
+            }
+         }
+
+        // detect down movement
+        if ((shake_to_fly.accel_up_filt < -g.takeoff_throttle_min_accel) &&
+                ((shake_to_fly.down_shake_count == 0) || ((millis() - shake_to_fly.down_shake_time_ms) < shake_interval_ms))) {
+            if ((shake_to_fly.up_shake_count == 0) && (shake_to_fly.down_shake_count == 0)) {
+                // start of shake sequence
+                shake_to_fly.first_shake_time_ms = millis();
+            }
+            if (shake_to_fly.down_shake_count <= shake_to_fly.up_shake_count) {
+                shake_to_fly.down_shake_count++;
+                shake_to_fly.down_shake_time_ms = millis();
+            }
+        }
+
+        uint32_t max_check_duration_ms = (uint32_t)g2.takeoff_throttle_accel_count * shake_interval_ms;
+        if (((millis() - shake_to_fly.first_shake_time_ms) > max_check_duration_ms)
+                && (shake_to_fly.first_shake_time_ms != 0)) {
+            // reset counters if motion not completed within required time
+            shake_to_fly = {};
+        } else if ((shake_to_fly.shake_pass_time_ms == 0)
+                   && (shake_to_fly.up_shake_count >= g2.takeoff_throttle_accel_count)
+                   && (shake_to_fly.down_shake_count >= g2.takeoff_throttle_accel_count)) {
+            // if completed enough shakes, then record test completion time and place vehicle into AUTO mode
+            shake_to_fly.shake_pass_time_ms = millis();
+            set_mode(AUTO, MODE_REASON_SHAKE_TO_LAUNCH);
+         }
+
+        // wait before arming - gives operator time to adjust grip and level rotors before motors start
+        // also allows time for flight mode change initialisation functions to complete
+        // controlled by TKOFF_THR_DELAY parameter
+        bool is_level = (fabsf(quadplane.ahrs_view->roll) < degrees(10.0f)) && (fabsf(quadplane.ahrs_view->pitch) < degrees(10.0f));
+        if ((shake_to_fly.shake_pass_time_ms != 0)
+                && (control_mode == AUTO) && ((millis() - shake_to_fly.shake_pass_time_ms) > 100 * (uint32_t)g.takeoff_throttle_delay)
+                && is_level) {
+            // final sanity check that we will do a VTOL takeoff
+            bool has_valid_mission = false;
+            AP_Mission::Mission_Command cmd = {};
+            if (plane.mission.get_next_nav_cmd(1, cmd)) {
+                has_valid_mission = (cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF);
+            }
+            if (has_valid_mission) {
+                arm_motors(AP_Arming::ArmingMethod::SHAKE, true);
+            }
+            shake_to_fly = {};        }
+    } else if (shake_to_fly.shake_pass_time_ms != 0) {
+        // ensure that all test variables are reset when not in use
+        shake_to_fly = {};
+    }
 }
 
 
