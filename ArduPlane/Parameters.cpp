@@ -763,6 +763,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     ASCALAR(min_gndspeed_cm,      "MIN_GNDSPD_CM",  MIN_GNDSPEED_CM),
 
+    // @Param: VTO_LOIT_ALT_M
+    // @DisplayName: Post launch loiter altitude
+    // @Description: This is the relative altitude the plane will aim for and loiter at after performing a VTOL takeoff with the internally generated mission plan. If lower than Q_RTL_ALT, then Q_RTL_ALT will be used instead.
+    // @Units: m
+    // @User: Advanced
+    GSCALAR(vto_loiter_alt_m,        "VTO_LOIT_ALT_M",  50),
+
     // @Param: TRIM_PITCH_CD
     // @DisplayName: Pitch angle offset
     // @Description: offset to add to pitch - used for in-flight pitch trimming. It is recommended that instead of using this parameter you level your plane correctly on the ground for good flight attitude.
@@ -1245,7 +1252,6 @@ ParametersG2::ParametersG2(void) :
   old object. This should be zero for top level parameters.
  */
 const AP_Param::ConversionInfo conversion_table[] = {
-    { Parameters::k_param_log_bitmask_old,    0,      AP_PARAM_INT16, "LOG_BITMASK" },
     { Parameters::k_param_rally_limit_km_old, 0,      AP_PARAM_FLOAT, "RALLY_LIMIT_KM" },
     { Parameters::k_param_rally_total_old,    0,      AP_PARAM_INT8, "RALLY_TOTAL" },
     { Parameters::k_param_serial0_baud,       0,      AP_PARAM_INT16, "SERIAL0_BAUD" },

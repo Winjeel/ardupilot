@@ -52,7 +52,7 @@ public:
         // Misc
         //
         k_param_auto_trim      = 10,
-        k_param_log_bitmask_old,  // unused
+        k_param_vto_loiter_alt_m,
         k_param_pitch_trim_cd,
         k_param_mix_mode,
         k_param_reverse_elevons, // unused
@@ -456,6 +456,7 @@ public:
     AP_Int8 reset_switch_chan;
     AP_Int8 reset_mission_chan;
     AP_Int32 RTL_altitude_cm;
+    AP_Int16 vto_loiter_alt_m;
     AP_Int16 pitch_trim_cd;
     AP_Int16 FBWB_min_altitude_cm;
     AP_Int8  hil_servos;

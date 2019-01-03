@@ -455,17 +455,18 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
                     has_mission = true;
                 }
 
-                // Command #2 : loiter at min of ATL_HOLD_RTL and Q_RTL_ALT for 10 minutes
+                // Command #2 : loiter at max of VTO_LOIT_ALT_M and Q_RTL_ALT for 10 minutes above home location
                 cmd.id = MAV_CMD_NAV_LOITER_TIME;
                 cmd.p1 = 600;
-                cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, (int32_t)plane.g.RTL_altitude_cm);
+                cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, 100 * (int32_t)plane.g.vto_loiter_alt_m);
                 if (plane.mission.add_cmd(cmd)) {
                     has_mission = true;
                 }
 
-                // Command #3 land at takeoff location
+                // Command #3 perform an into wind transition and VTOL landing at home location
                 cmd.id = MAV_CMD_NAV_LAND;
-                cmd.content.location.alt = (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
+                cmd.p1 = 0;
+                cmd.content.location.alt = plane.home.alt + (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
                 if (plane.mission.add_cmd(cmd)) {
                     has_mission = true;
                 }
