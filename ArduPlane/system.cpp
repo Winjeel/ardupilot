@@ -463,6 +463,13 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
                     has_mission = true;
                 }
 
+                // Command #3 land at takeoff location
+                cmd.id = MAV_CMD_NAV_LAND;
+                cmd.content.location.alt = (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
+                if (plane.mission.add_cmd(cmd)) {
+                    has_mission = true;
+                }
+
                 if (has_mission) {
                     // reset index to start
                     plane.mission.reset();
