@@ -738,14 +738,12 @@ void Plane::set_servos(void)
         // require each consecutive up/down shake event to be no more than this time apart
         const uint32_t shake_interval_ms = 500;
 
-        // reset the detector if the vehicle is not pointing up
-        if (shake_to_fly.first_shake_time_ms != 0) {
-            // This ahrs_view is for a frame of reference that moves with the net motor tilt so a smaller pitch tolerance
-            // is used because rotors will auto level in pitch
-            bool is_tilted = (fabsf(quadplane.ahrs_view->roll) > degrees(30.0f)) || (fabsf(quadplane.ahrs_view->pitch) > degrees(10.0f));
-            if (is_tilted) {
-                shake_to_fly = {};
-            }
+        // reset the detector if the rotors are not pointing up or the wing chord line is too far from vertical
+        bool oriented_for_flight = (fabsf(quadplane.ahrs_view->roll) <= degrees(15.0f)) // vehicle is not excessively rolled
+                && (fabsf(quadplane.ahrs_view->get_pitch_312_rotor()) <= degrees(10.0f)) // rotors are not excessively pitched
+                && fabsf(quadplane.ahrs_view->get_pitch_312_wing()) < radians (10.0f); // wing chord line is close to vertical
+        if ((shake_to_fly.first_shake_time_ms != 0) && !oriented_for_flight) {
+            shake_to_fly = {};
         }
 
         // calculate the vertical g after removing gravity and applying some noise filtering (positive is up)
@@ -794,10 +792,9 @@ void Plane::set_servos(void)
         // wait before arming - gives operator time to adjust grip and level rotors before motors start
         // also allows time for flight mode change initialisation functions to complete
         // controlled by TKOFF_THR_DELAY parameter
-        bool is_level = (fabsf(quadplane.ahrs_view->roll) < degrees(10.0f)) && (fabsf(quadplane.ahrs_view->pitch) < degrees(10.0f));
         if ((shake_to_fly.shake_pass_time_ms != 0)
                 && (control_mode == AUTO) && ((millis() - shake_to_fly.shake_pass_time_ms) > 100 * (uint32_t)g.takeoff_throttle_delay)
-                && is_level) {
+                && oriented_for_flight) {
             // final sanity check that we will do a VTOL takeoff
             bool has_valid_mission = false;
             AP_Mission::Mission_Command cmd = {};
