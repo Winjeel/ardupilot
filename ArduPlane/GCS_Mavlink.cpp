@@ -628,7 +628,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Description: Specify CORVO Controller Type which affects how MANUAL_CONTROL messages are interpreted
     // @Values: 0: No CORVO Controller, 1: CORVO X Controller
     // @User: Advanced
-    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 0),
+    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 1),
 
     AP_GROUPEND
 };
