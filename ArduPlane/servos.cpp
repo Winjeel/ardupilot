@@ -796,6 +796,13 @@ void Plane::set_servos(void)
         float lpf_coef = dt / lpf_tconst;
         shake_to_fly.accel_up_filt = (1.0f - lpf_coef) * shake_to_fly.accel_up_filt - lpf_coef * (GRAVITY_MSS + accel_ef.z);
 
+        // record peak values for diagnostics
+        if (shake_to_fly.accel_up_filt > shake_to_fly.accel_up_peak) {
+            shake_to_fly.accel_up_peak = shake_to_fly.accel_up_filt;
+        } else if (-shake_to_fly.accel_up_filt > shake_to_fly.accel_down_peak) {
+            shake_to_fly.accel_down_peak = -shake_to_fly.accel_up_filt;
+        }
+
         // detect up movement - require yaw rotation sequence to be completed recently for first shake to register
         bool yaw_rotation_is_recent = ((millis() - shake_to_fly.ang_x_rh_time_ms) < 5000) && ((millis() - shake_to_fly.ang_x_lh_time_ms) < 5000);
         if ((shake_to_fly.accel_up_filt > g.takeoff_throttle_min_accel) &&
@@ -835,6 +842,7 @@ void Plane::set_servos(void)
             // if completed enough shakes, then record test completion time and place vehicle into AUTO mode
             shake_to_fly.shake_pass_time_ms = now_ms;
             set_mode(AUTO, MODE_REASON_SHAKE_TO_LAUNCH);
+            hal.console-printf("Shake To Fly: peak accel = %5.2f up,  %5.2f down\n", shake_to_fly.accel_up_peak, shake_to_fly.accel_down_peak);
         }
 
         // wait before arming - gives operator time to adjust grip and level vehicle before motors start

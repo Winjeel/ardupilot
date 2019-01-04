@@ -734,6 +734,8 @@ private:
         uint32_t first_shake_time_ms = 0; // time the first shake event, either up or down, was detected (msec)
         uint32_t shake_pass_time_ms = 0; // time the shake test passed (msec)
         float accel_up_filt = 0.0f; // state for LPF noise filter applied to vertical acceleration
+        float accel_up_peak = 0.0f; // peak up acceleration recorded since check started running
+        float accel_down_peak = 0.0f; // peak down acceleration recorded since check started running
 
     } shake_to_fly;
 
