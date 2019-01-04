@@ -133,7 +133,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Range: 0 30
     // @Increment: 0.1
     // @User: User
-    GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  10.0f),
+    GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  7.0f),
 
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay

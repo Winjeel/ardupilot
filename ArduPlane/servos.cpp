@@ -735,6 +735,41 @@ void Plane::set_servos(void)
      Special case handling of Corvo X - shake up and down TKOFF_ACCEL_CNT times to place into AUTO mode and arm
     */
     if ((quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && !arming.is_armed()) {
+        /*
+        This section of code enables the vehicle to be placed into AUTO, armed and flow with a default mission plan without
+        requiring any operator interaction with the hand controller or GCS. To do this the operator needs to follow a sequence:
+        1) Wait for arming checks to pass which will be indicated by the servos becoming active and the motors pointing up.
+        2) Hold the vehicle nose up and rotate approximately +-90 degrees around the X axis within a 3 second period. This
+           helps to prevent false triggering of the shake to launch function and also improves likelihood that a bad magnetomer
+           will be detected prior to arming.
+        3) Within 5 seconds of starting 2), shake the vehicle up and down TKOFF_ACCEL_CNT times at faster than 2 shakes per second
+        The vehicle will then immediately enter AUTO with atime delay set by TKOFF_THR_DELAY before arming and starting motors. A
+        mission plan will be automatically generated if not already loaded. If motors cannot be armed then the vehicle will remain
+        in AUTO.
+        */
+
+        uint32_t now_ms = millis();
+
+        // calculate a delta time
+        float dt = 0.001f * (float)(now_ms - shake_to_fly.last_time_ms);
+        shake_to_fly.last_time_ms = now_ms;
+        dt = constrain_float(dt, 0.0f, 0.02f);
+
+        // integrate the X gyro and washout resulting angle to that it decays to zero over a 1 second time constant
+        Vector3f gyro_rate = ahrs.get_gyro();
+        shake_to_fly.ang_rot_x_hpf += gyro_rate.x * dt;
+        shake_to_fly.ang_rot_x_hpf = constrain_float(shake_to_fly.ang_rot_x_hpf, -1.5f, 1.5f);
+        const float hpf_tconst = 1.0f;
+        float hpf_coef = 1.0f - (dt / hpf_tconst);
+        shake_to_fly.ang_rot_x_hpf *= hpf_coef;
+
+        // Record RH and LH rotaton events
+        if (shake_to_fly.ang_rot_x_hpf > 1.0f) {
+            shake_to_fly.ang_x_rh_time_ms = now_ms;
+        } else if (shake_to_fly.ang_rot_x_hpf < -1.0f) {
+            shake_to_fly.ang_x_lh_time_ms = now_ms;
+        }
+
         // require each consecutive up/down shake event to be no more than this time apart
         const uint32_t shake_interval_ms = 500;
 
@@ -742,42 +777,47 @@ void Plane::set_servos(void)
         bool oriented_for_flight = (fabsf(quadplane.ahrs_view->roll) <= degrees(15.0f)) // vehicle is not excessively rolled
                 && (fabsf(quadplane.ahrs_view->get_pitch_312_rotor()) <= degrees(10.0f)) // rotors are not excessively pitched
                 && fabsf(quadplane.ahrs_view->get_pitch_312_wing()) < radians (10.0f); // wing chord line is close to vertical
+        bool yaw_rotation_is_recent = ((millis() - shake_to_fly.ang_x_rh_time_ms) < 5000) && ((millis() - shake_to_fly.ang_x_lh_time_ms) < 5000);
         if ((shake_to_fly.first_shake_time_ms != 0) && !oriented_for_flight) {
             shake_to_fly = {};
         }
 
         // calculate the vertical g after removing gravity and applying some noise filtering (positive is up)
+        // set up the LPF so that there are 10 time constants for each shake up/down event
         Vector3f accel_ef = ahrs.get_accel_ef_blended();
-        shake_to_fly.accel_up_filt = 0.9f * shake_to_fly.accel_up_filt - 0.1f * (GRAVITY_MSS + accel_ef.z);
+        float lpf_tconst = (0.1f * 0.001f) * (float)shake_interval_ms;
+        lpf_tconst = MAX(lpf_tconst, dt);
+        float lpf_coef = dt / lpf_tconst;
+        shake_to_fly.accel_up_filt = (1.0f - lpf_coef) * shake_to_fly.accel_up_filt - lpf_coef * (GRAVITY_MSS + accel_ef.z);
 
-        // detect up movement
+        // detect up movement - require yaw rotation sequence to be completed recently for first shake to register first shake
         if ((shake_to_fly.accel_up_filt > g.takeoff_throttle_min_accel) &&
-                ((shake_to_fly.up_shake_count == 0) || ((millis() - shake_to_fly.up_shake_time_ms) < shake_interval_ms))) {
+                (((shake_to_fly.up_shake_count == 0) && yaw_rotation_is_recent) || ((now_ms - shake_to_fly.up_shake_time_ms) < shake_interval_ms))) {
             if (shake_to_fly.up_shake_count == 0 && shake_to_fly.down_shake_count == 0) {
-                // start of shake sequence
-                shake_to_fly.first_shake_time_ms = millis();
+                // record start of shake sequence
+                shake_to_fly.first_shake_time_ms = now_ms;
             }
             if (shake_to_fly.up_shake_count <= shake_to_fly.down_shake_count) {
                 shake_to_fly.up_shake_count++;
-                shake_to_fly.up_shake_time_ms = millis();
+                shake_to_fly.up_shake_time_ms = now_ms;
             }
          }
 
-        // detect down movement
+        // detect down movement - require yaw rotation sequence to be completed recently for first shake to register first shake
         if ((shake_to_fly.accel_up_filt < -g.takeoff_throttle_min_accel) &&
-                ((shake_to_fly.down_shake_count == 0) || ((millis() - shake_to_fly.down_shake_time_ms) < shake_interval_ms))) {
+                (((shake_to_fly.down_shake_count == 0) && yaw_rotation_is_recent) || ((now_ms - shake_to_fly.down_shake_time_ms) < shake_interval_ms))) {
             if ((shake_to_fly.up_shake_count == 0) && (shake_to_fly.down_shake_count == 0)) {
                 // start of shake sequence
-                shake_to_fly.first_shake_time_ms = millis();
+                shake_to_fly.first_shake_time_ms = now_ms;
             }
             if (shake_to_fly.down_shake_count <= shake_to_fly.up_shake_count) {
                 shake_to_fly.down_shake_count++;
-                shake_to_fly.down_shake_time_ms = millis();
+                shake_to_fly.down_shake_time_ms = now_ms;
             }
         }
 
         uint32_t max_check_duration_ms = (uint32_t)g2.takeoff_throttle_accel_count * shake_interval_ms;
-        if (((millis() - shake_to_fly.first_shake_time_ms) > max_check_duration_ms)
+        if (((now_ms - shake_to_fly.first_shake_time_ms) > max_check_duration_ms)
                 && (shake_to_fly.first_shake_time_ms != 0)) {
             // reset counters if motion not completed within required time
             shake_to_fly = {};
@@ -785,15 +825,15 @@ void Plane::set_servos(void)
                    && (shake_to_fly.up_shake_count >= g2.takeoff_throttle_accel_count)
                    && (shake_to_fly.down_shake_count >= g2.takeoff_throttle_accel_count)) {
             // if completed enough shakes, then record test completion time and place vehicle into AUTO mode
-            shake_to_fly.shake_pass_time_ms = millis();
+            shake_to_fly.shake_pass_time_ms = now_ms;
             set_mode(AUTO, MODE_REASON_SHAKE_TO_LAUNCH);
-         }
+        }
 
         // wait before arming - gives operator time to adjust grip and level rotors before motors start
         // also allows time for flight mode change initialisation functions to complete
         // controlled by TKOFF_THR_DELAY parameter
         if ((shake_to_fly.shake_pass_time_ms != 0)
-                && (control_mode == AUTO) && ((millis() - shake_to_fly.shake_pass_time_ms) > 100 * (uint32_t)g.takeoff_throttle_delay)
+                && (control_mode == AUTO) && ((now_ms - shake_to_fly.shake_pass_time_ms) > 100 * (uint32_t)g.takeoff_throttle_delay)
                 && oriented_for_flight) {
             // final sanity check that we will do a VTOL takeoff
             bool has_valid_mission = false;

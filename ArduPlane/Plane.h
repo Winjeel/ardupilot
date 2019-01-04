@@ -721,6 +721,12 @@ private:
       Used by Corvo X shake to start auto mission functonality
     */
     struct {
+        uint32_t last_time_ms = 0; // last time the calculation was performed (msec)
+
+        float ang_rot_x_hpf = 0.0f; // rotation about the X body axis after application of a high pass filter (rad)
+        uint32_t ang_x_rh_time_ms = 0; // time a RH rotation was detected (msec)
+        uint32_t ang_x_lh_time_ms = 0; // time a LH rotation was detected (msec)
+
         uint8_t up_shake_count = 0; // number of up shake events
         uint8_t down_shake_count = 0; // number of down shake events
         uint32_t up_shake_time_ms = 0; // last time an up shake event was detected (msec)
