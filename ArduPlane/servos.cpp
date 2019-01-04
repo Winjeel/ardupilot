@@ -748,6 +748,12 @@ void Plane::set_servos(void)
         in AUTO.
         */
 
+        // This function requires that the vehicle be in a VTOL mode
+        // If not then place in QLOITER
+        if (!(quadplane.in_vtol_auto() || quadplane.in_vtol_mode())) {
+            set_mode(QLOITER, MODE_REASON_SHAKE_TO_LAUNCH);
+        }
+
         uint32_t now_ms = millis();
 
         // calculate a delta time
