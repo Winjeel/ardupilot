@@ -146,18 +146,25 @@ void Plane::read_corvo_control_switch()
                 || (control_mode == LOITER)
                 || (((plane.control_mode == GUIDED) || (plane.control_mode == AVOID_ADSB)) && plane.auto_state.vtol_loiter);
         if ((control_mode == QLOITER) || in_fw_auto) {
+            // in QLOITER so determine if we should switch to the default FW vehicle control mode CRUISE
+            // or the default camera control mode GUIDED
             if (quadplane.fw_transition_allowed() || in_fw_auto) {
                 // don't allow transiton from QLOITER to forward flight inside the launch and recovery zone
                 if ((control_mode == QLOITER) && vtolCameraControlMode ) {
-                    // Switch to the default FW camera control mode
+                    // We are in VTOL camera control mode so switch to the default FW camera control mode
                     set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+
+                    // resets the mount EF roll demand to zero and reverts the mount to default targeting mode
                     camera_mount.set_elev_park(false);
                 } else {
-                    // Switch to the default operator controlled FW trajectory control mode
+                    // We are in VTOL vehicle ocntrol mode so switch to the default FW vehicle control mode
                     set_mode(CRUISE, MODE_REASON_TX_COMMAND);
 
-                    // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
+                    // Mount is placed into a mode where gimbal is held at last demanded earth frame elevation angle,
+                    // roll is held to zero and yaw moves with vehicle yaw
                     camera_mount.set_elev_park(true);
+
+                    // reset the earth frame elevation demand to MNT_INIT_ELEV
                     camera_mount.reset_elev();
                 }
             } else {
@@ -238,7 +245,7 @@ void Plane::read_corvo_control_switch()
         }
     }
 
-    // switch camera mount mode control
+    // set camera mount mode control when entering QLOITER or switching between vehicle and camera control whilst in QLOITER
     if (resetVtolCameraControl) {
         if (vtolCameraControlMode) {
             // camera yaw/elevation pointing is controlled by the roll/pitch stick and vehicle holds at previous horizontal position
