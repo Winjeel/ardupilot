@@ -1195,6 +1195,11 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
             break; // only accept control from our gcs
         }
 
+        // Corvo flight test safety customisation - ignore mavlink overide if RC handset Ch 7 is high
+        if ((_corvoControllerType.get() == CORVO_ControllerType::CORVO_ControllerX) && (RC_Channels::get_radio_in(6) >= 1500)) {
+            break;
+        }
+
         mavlink_manual_control_t packet;
         mavlink_msg_manual_control_decode(msg, &packet);
 
