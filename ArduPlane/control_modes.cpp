@@ -209,8 +209,13 @@ void Plane::read_corvo_control_switch()
             // in QLOITER we transfer operator control between positon to camera
             vtolCameraControlMode = !vtolCameraControlMode;
             resetVtolCameraControl = true;
+        } else if (plane.auto_state.vtol_mode) {
+            // in a VTOL auto modes we switch to QLOITER and enable camera control
+            set_mode(QLOITER, MODE_REASON_TX_COMMAND);
+            vtolCameraControlMode = true;
+            resetVtolCameraControl = true;
         } else {
-            // we don't do camera control in other VTOL modes
+            // we don't do camera control camera control in  modes
             vtolCameraControlMode = false;
             resetVtolCameraControl = true;
         }
