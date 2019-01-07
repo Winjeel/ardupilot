@@ -1204,15 +1204,15 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
 
         uint32_t tnow = AP_HAL::millis();
 
-        int16_t roll = (packet.y == INT16_MAX) ? 0 : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + 1000) / 2000.0f;
-        int16_t pitch = (packet.x == INT16_MAX) ? 0 : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + 1000) / 2000.0f;
-        int16_t throttle = (packet.z == INT16_MAX) ? 0 : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
+        int16_t roll = (packet.y == INT16_MAX) ? plane.channel_roll->get_radio_trim() : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + 1000) / 2000.0f;
+        int16_t pitch = (packet.x == INT16_MAX) ? plane.channel_pitch->get_radio_trim() : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + 1000) / 2000.0f;
+        int16_t throttle = (packet.z == INT16_MAX) ? plane.channel_throttle->get_radio_min() : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
         int16_t yaw;
-        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
-            // set to zero to prevent inadvertent operation
-            yaw = 0;
+        if (_corvoControllerType.get() == CORVO_ControllerType::CORVO_ControllerX) {
+            // set to trim value to prevent inadvertent operation - corvo controller does not have yaw
+            yaw = plane.channel_rudder->get_radio_trim();
         } else {
-            yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+            yaw = (packet.r == INT16_MAX) ? plane.channel_rudder->get_radio_trim() : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
         }
 
         RC_Channels::set_override(uint8_t(plane.rcmap.roll() - 1), roll, tnow);
