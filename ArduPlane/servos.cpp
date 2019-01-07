@@ -858,12 +858,26 @@ void Plane::set_servos(void)
                 has_valid_mission = (cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF);
             }
             if (has_valid_mission) {
-                arm_motors(AP_Arming::ArmingMethod::SHAKE, true);
+                if(arm_motors(AP_Arming::ArmingMethod::SHAKE, true)) {
+                    shake_arm_time_ms = now_ms;
+                }
             }
             shake_to_fly = {};        }
     } else if (shake_to_fly.shake_pass_time_ms != 0) {
         // ensure that all test variables are reset when not in use
         shake_to_fly = {};
+    }
+
+    // The operator has within 5 seconds of arming to cancel by tilting in roll past 60 degrees
+    if (arming.is_armed() && quadplane.in_vtol_auto() && ((millis() - shake_arm_time_ms) < 5000)) {
+        const Matrix3f &rotMat = ahrs.get_rotation_body_to_ned();
+        // Check the magnitude of the DCM matrix that rotates the Y body axis component into the Z earth frame.
+        // If this is large then the vehicle is rolled
+        const float sin_60 = sinf(radians(60.0f));
+        if (fabsf(rotMat.c.y) > sin_60) {
+            disarm_motors();
+            shake_arm_time_ms = 0;
+        }
     }
 }
 

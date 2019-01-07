@@ -738,6 +738,7 @@ private:
         float accel_down_peak = 0.0f; // peak down acceleration recorded since check started running
 
     } shake_to_fly;
+    uint32_t shake_arm_time_ms = 0; // time the vehicle was armed using  the 'shake to fly' method (msec)
 
     // Conditional command
     // A value used in condition commands (eg delay, change alt, etc.)
