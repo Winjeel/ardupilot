@@ -2264,7 +2264,7 @@ bool QuadPlane::in_vtol_mode(void) const
 // not in a mode suitable for corvo X to takeoff
 bool QuadPlane::corvo_takeoff_inhibit(void) const
 {
-    if (tailsitter.input_type != TAILSITTER_CORVOX) {
+    if ((tailsitter.input_type != TAILSITTER_CORVOX) || !RC_Channels::has_active_overrides()) {
         return false;
     }
 
