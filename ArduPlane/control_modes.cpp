@@ -135,7 +135,9 @@ void Plane::read_corvo_control_switch()
         changeModeCount--;
     }
 
-    bool resetVtolCameraControl = false;
+    bool resetVtolCameraControl = false; // determines how the camera mount should be configured when entering a VTOL mode
+
+    // Perform change mode select actions
     if (changeModeCount == 5 && !oldChangeMode) {
         // switch press confirmed
         oldChangeMode = true;
@@ -206,10 +208,23 @@ void Plane::read_corvo_control_switch()
     }
 
     bool toggle_fw_flight_mode = false;
+    bool toggle_flight_mode = false;
     if (controlSelectCount == 5 && !oldControlSelect) {
         // switch press confirmed
         oldControlSelect = true;
         controlSelectTime_ms = millis();
+        toggle_flight_mode = true;
+    } else if (controlSelectCount == 0 && oldControlSelect) {
+        // switch release confirmed
+        oldControlSelect = false;
+        // handle case where the operator has released the 'Control Select' button before the 1 second latch timeout
+        if ((millis() - controlSelectTime_ms) < 1000) {
+            toggle_flight_mode = true;
+        }
+    }
+
+    // action flight mode change for both switch press and release within 1 second
+    if (toggle_flight_mode) {
         if (!quadplane.in_vtol_mode()) {
             toggle_fw_flight_mode = true;
         } else if (control_mode == QLOITER) {
@@ -225,23 +240,6 @@ void Plane::read_corvo_control_switch()
             // we don't do camera control camera control in  modes
             vtolCameraControlMode = false;
             resetVtolCameraControl = true;
-        }
-    } else if (controlSelectCount == 0 && oldControlSelect) {
-        // switch release confirmed
-        oldControlSelect = false;
-        // handle case where the operator has released the 'Control Select' button before the 1 second latch timeout
-        if ((millis() - controlSelectTime_ms) < 1000) {
-            if (!quadplane.in_vtol_mode()) {
-                toggle_fw_flight_mode = true;
-            } else if (control_mode == QLOITER) {
-                // in QLOITER we transfer operator control between positon to camera
-                vtolCameraControlMode = !vtolCameraControlMode;
-                resetVtolCameraControl = true;
-            } else {
-                // we don't do camera control in other VTOL modes
-                vtolCameraControlMode = false;
-                resetVtolCameraControl = true;
-            }
         }
     }
 
