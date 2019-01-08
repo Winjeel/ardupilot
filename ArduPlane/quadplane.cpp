@@ -1368,10 +1368,14 @@ float QuadPlane::get_desired_yaw_rate_cds(void)
         // the user may be trying to disarm
         return 0;
     }
-    // add in pilot input
-    yaw_cds += get_pilot_input_yaw_rate_cds();
+    // add in pilot input to yaw the vehicle unless doing camera control
+    if (!plane.vtolCameraControlMode) {
+        yaw_cds += get_pilot_input_yaw_rate_cds();
+    } else {
+        yaw_cds = 0;
+    }
 
-    // add in weathervaning
+    // add in weathervaning and camera yaw follow
     yaw_cds += get_weathervane_yaw_rate_cds();
     
     return yaw_cds;
@@ -3309,11 +3313,11 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
     if (plane.vtolCameraControlMode
             && (tailsitter.tvbs_yaw_gain > 0.1f)
             && !weathervane.payload_yaw_lockout) {
-        // when flying in a VTOL mode where the operator is panning the payload mount, yaw the vehicle to drive vehicle relative yaw to zero
-        // enables yaw pointing of payloads with limited angular motion, eg roll tilt gimbals
+        // When flying in a VTOL mode where the operator is panning the payload mount, yaw the vehicle to driv misalignment between
+        // payload and vehicle to zero which enables yaw pointing of payloads with limited angular motion, eg roll tilt gimbals
         yaw_rate_dem_cd = 100.0f * constrain_float(tailsitter.tvbs_yaw_gain * degrees(wrap_PI(plane.camera_mount.get_ef_yaw() - ahrs_view->yaw)), -yaw_rate_max, yaw_rate_max);
     } else {
-        // do normal weather vaning over half of yaw_rate_max. This gives the pilot twice the
+        // Do normal weather vaning over half of yaw_rate_max. This gives the pilot twice the
         // authority of the weathervane controller
         yaw_rate_dem_cd = weathervane.gain_modifier * weathervane.last_output * (yaw_rate_max/2) * 100;
     }

@@ -135,25 +135,62 @@ void Plane::read_corvo_control_switch()
         changeModeCount--;
     }
 
+    bool resetVtolCameraControl = false; // determines how the camera mount should be configured when entering a VTOL mode
+
+    // Perform change mode select actions
     if (changeModeCount == 5 && !oldChangeMode) {
         // switch press confirmed
         oldChangeMode = true;
-        if (quadplane.in_vtol_mode()) {
-            if (quadplane.fw_transition_allowed()) {
-                // in VTOL mode so change to FW CRUISE
-                set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+
+        // determine if we are in a FW flight mode that doesn't give the pilot direct control over trajectory
+        bool in_fw_auto = ((control_mode == AUTO) && !plane.auto_state.vtol_mode)
+                || (control_mode == RTL)
+                || (control_mode == LOITER)
+                || (((plane.control_mode == GUIDED) || (plane.control_mode == AVOID_ADSB)) && plane.auto_state.vtol_loiter);
+        if ((control_mode == QLOITER) || in_fw_auto) {
+            // in QLOITER so determine if we should switch to the default FW vehicle control mode CRUISE
+            // or the default camera control mode GUIDED
+            if (quadplane.fw_transition_allowed() || in_fw_auto) {
+                // don't allow transiton from QLOITER to forward flight inside the launch and recovery zone
+                if ((control_mode == QLOITER) && vtolCameraControlMode ) {
+                    // We are in VTOL camera control mode so switch to the default FW camera control mode
+                    set_mode(GUIDED, MODE_REASON_TX_COMMAND);
+
+                    // resets the mount EF roll demand to zero and reverts the mount to default targeting mode
+                    camera_mount.set_elev_park(false);
+                } else {
+                    // We are in VTOL vehicle ocntrol mode so switch to the default FW vehicle control mode
+                    set_mode(CRUISE, MODE_REASON_TX_COMMAND);
+
+                    // Mount is placed into a mode where gimbal is held at last demanded earth frame elevation angle,
+                    // roll is held to zero and yaw moves with vehicle yaw
+                    camera_mount.set_elev_park(true);
+
+                    // reset the earth frame elevation demand to MNT_INIT_ELEV
+                    camera_mount.reset_elev();
+                }
             } else {
-                // not allowed - send message to console
+                // not allowed - send message  to console
                 gcs().send_text(MAV_SEVERITY_WARNING, "Forward Flight disabled - climb above Q RTL ALT");
             }
+        } else if ((control_mode == MANUAL)
+                   || (control_mode == CIRCLE)
+                   || (control_mode == STABILIZE)
+                   || (control_mode == ACRO)
+                   || (control_mode == FLY_BY_WIRE_A)
+                   || (control_mode == FLY_BY_WIRE_B)
+                   || (control_mode == AUTOTUNE)) {
+            // If in any other FW stick control mode, switch to CRUISE
+            set_mode(CRUISE, MODE_REASON_TX_COMMAND);
         } else {
-            // in FW mode so change to VTOL QLOITER
+            // All VTOL modes other than QLOITER end up here
+            bool was_in_camera_mode = (control_mode == GUIDED);
             set_mode(QLOITER, MODE_REASON_TX_COMMAND);
+            if (was_in_camera_mode) {
+                vtolCameraControlMode = true;
+                resetVtolCameraControl = true;
+            }
         }
-        // disable stick control of the payload mount and reset the LOS elevation to MNT_INIT_ELEV
-        vtolCameraControlMode = false;
-        camera_mount.set_elev_park(true);
-        camera_mount.reset_elev();
     } else if (changeModeCount == 0 && oldChangeMode) {
         // switch release confirmed
         oldChangeMode = false;
@@ -171,42 +208,42 @@ void Plane::read_corvo_control_switch()
     }
 
     bool toggle_fw_flight_mode = false;
-    bool resetVtolCameraControl = false;
+    bool toggle_flight_mode = false;
     if (controlSelectCount == 5 && !oldControlSelect) {
         // switch press confirmed
         oldControlSelect = true;
         controlSelectTime_ms = millis();
+        toggle_flight_mode = true;
+    } else if (controlSelectCount == 0 && oldControlSelect) {
+        // switch release confirmed
+        oldControlSelect = false;
+        // handle case where the operator has released the 'Control Select' button before the 1 second latch timeout
+        if ((millis() - controlSelectTime_ms) < 1000) {
+            toggle_flight_mode = true;
+        }
+    }
+
+    // action flight mode change for both switch press and release within 1 second
+    if (toggle_flight_mode) {
         if (!quadplane.in_vtol_mode()) {
             toggle_fw_flight_mode = true;
         } else if (control_mode == QLOITER) {
             // in QLOITER we transfer operator control between positon to camera
             vtolCameraControlMode = !vtolCameraControlMode;
             resetVtolCameraControl = true;
+        } else if (plane.auto_state.vtol_mode) {
+            // in a VTOL auto modes we switch to QLOITER and enable camera control
+            set_mode(QLOITER, MODE_REASON_TX_COMMAND);
+            vtolCameraControlMode = true;
+            resetVtolCameraControl = true;
         } else {
-            // we don't do camera control in other VTOL modes
+            // we don't do camera control camera control in  modes
             vtolCameraControlMode = false;
             resetVtolCameraControl = true;
         }
-    } else if (controlSelectCount == 0 && oldControlSelect) {
-        // switch release confirmed
-        oldControlSelect = false;
-        // handle case where the operator has released the 'Control Select' button before the 1 second latch timeout
-        if ((millis() - controlSelectTime_ms) < 1000) {
-            if (!quadplane.in_vtol_mode()) {
-                toggle_fw_flight_mode = true;
-            } else if (control_mode == QLOITER) {
-                // in QLOITER we transfer operator control between positon to camera
-                vtolCameraControlMode = !vtolCameraControlMode;
-                resetVtolCameraControl = true;
-            } else {
-                // we don't do camera control in other VTOL modes
-                vtolCameraControlMode = false;
-                resetVtolCameraControl = true;
-            }
-        }
     }
 
-    // switch camera mount mode control
+    // set camera mount mode control when entering QLOITER or switching between vehicle and camera control whilst in QLOITER
     if (resetVtolCameraControl) {
         if (vtolCameraControlMode) {
             // camera yaw/elevation pointing is controlled by the roll/pitch stick and vehicle holds at previous horizontal position

@@ -316,14 +316,14 @@ private:
     uint8_t oldSwitchPosition = 254;
 
     // Used to monitor the corvo controller 'control select' switch
-    bool oldControlSelect = false;
-    int8_t controlSelectCount = 0;
-    uint32_t controlSelectTime_ms = 0;
-    bool vtolCameraControlMode = false;
+    bool oldControlSelect = false; // true on the frame that the button press event was confirmed
+    int8_t controlSelectCount = 0; // counter used to debounce switch presses
+    uint32_t controlSelectTime_ms = 0; // time that the button press event was confirmed (msec)
+    bool vtolCameraControlMode = false; // true when operator is controlling camera pointing in QLOITER rather than vehicle trajectory
 
     // Used to monitor the corvo controller 'change mode select' switch
-    bool oldChangeMode = false;
-    int8_t changeModeCount = 0;
+    bool oldChangeMode = false; // true on the frame that the button press event was confirmed
+    int8_t changeModeCount = 0; // counter used to debounce switch presses
 
     // This is used to enable the inverted flight feature
     bool inverted_flight;
