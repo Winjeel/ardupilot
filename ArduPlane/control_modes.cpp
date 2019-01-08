@@ -3,7 +3,9 @@
 void Plane::read_control_switch()
 {
     // custom handling of switch inputs for corvo controller
-    if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+    if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX)
+            && RC_Channels::has_active_overrides()
+            && (RC_Channels::get_radio_in(6) < 1500)) {
         read_corvo_control_switch();
         return;
     }
@@ -125,6 +127,8 @@ void Plane::read_corvo_control_switch()
         // only use signals that are less than 0.1s old.
         return;
     }
+
+    // Monitor the Ch 7 switch and
 
     // Use the 'Change Mode Select' button to toggle between QLOITER and CRUISE control modes
 
