@@ -2015,7 +2015,7 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             } else if (_doing_takeoff_jump &&
                        ((plane.control_mode != QLOITER)
                         || (plane.relative_altitude > (float)tailsitter.tvbs_jmp_alt)
-                        || (get_pilot_desired_climb_rate_cms() < -50))) {
+                        || (plane.channel_throttle->norm_input() < -0.5f))) {
                 // jump stops when height is reached, the mode changes or the pilot commands a descent
                 set_alt_target_current();
                 _doing_takeoff_jump = false;
