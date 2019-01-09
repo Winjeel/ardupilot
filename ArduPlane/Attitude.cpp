@@ -216,7 +216,7 @@ void Plane::stabilize_stick_mixing_fbw()
     nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit_cd, roll_limit_cd);
     
     // don't modify pitch input when using a corvo hand controller
-    if ((quadplane.tailsitter.input_type != quadplane.TAILSITTER_CORVOX)) {
+    if ((quadplane.tailsitter.input_type != quadplane.TAILSITTER_CORVOX) || !RC_Channels::has_active_overrides()) {
         float pitch_input = channel_pitch->norm_input();
         if (pitch_input > 0.5f) {
             pitch_input = (3*pitch_input - 1);
