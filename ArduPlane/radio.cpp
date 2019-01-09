@@ -239,7 +239,7 @@ void Plane::read_radio()
 
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, get_throttle_input());
 
-    // corvo cotroller can't nudge using throttle stick
+    // corvo controller can't nudge using throttle stick
     if ((quadplane.tailsitter.input_type != quadplane.TAILSITTER_CORVOX)
             && g.throttle_nudge
             && SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) > 50

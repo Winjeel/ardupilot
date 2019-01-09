@@ -734,7 +734,7 @@ void Plane::set_servos(void)
     /*
      Special case handling of Corvo X - shake up and down TKOFF_ACCEL_CNT times to place into AUTO mode and arm
     */
-    if ((quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && !arming.is_armed()) {
+    if ((quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides() && !arming.is_armed()) {
         /*
         This section of code enables the vehicle to be placed into AUTO, armed and flow with a default mission plan without
         requiring any operator interaction with the hand controller or GCS. To do this the operator needs to follow a sequence:
