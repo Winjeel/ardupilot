@@ -177,9 +177,6 @@ protected:
 
     // scaling for booster motor throttle
     AP_Float            _boost_scale;
-
-    // gain used to reduce ESC demands for overpowered setups
-    AP_Float            _esc_thr_gain;
     
     // motor output variables
     bool                motor_enabled[AP_MOTORS_MAX_NUM_MOTORS];    // true if motor is enabled

@@ -183,14 +183,6 @@ const AP_Param::GroupInfo AP_MotorsMulticopter::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("BAT_IDX",  39, AP_MotorsMulticopter,  _batt_idx, 0),
 
-    // @Param: ESC_THR_GAIN
-    // @DisplayName: Gain applied to all ESC demands
-    // @Description: Set to a value less than 1.0 when maximum ESC power should be used (eg high cell count)
-    // @Range: 0.5 1.0
-    // @Increment: 0.05
-    // @User: Advanced
-    AP_GROUPINFO("ESC_THR_GAIN",  40, AP_MotorsMulticopter,  _esc_thr_gain, 0.75f),
-
     AP_GROUPEND
 };
 
@@ -398,7 +390,6 @@ float AP_MotorsMulticopter::calc_fwd_compensation_gain()
 int16_t AP_MotorsMulticopter::calc_thrust_to_pwm(float thrust_in) const
 {
     thrust_in = constrain_float(thrust_in, 0.0f, 1.0f);
-    thrust_in *= _esc_thr_gain;
     return get_pwm_output_min() + (get_pwm_output_max()-get_pwm_output_min()) * (_spin_min + (_spin_max-_spin_min)*apply_thrust_curve_and_volt_scaling(thrust_in));
 }
 
