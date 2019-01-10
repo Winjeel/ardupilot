@@ -75,8 +75,8 @@ void AP_MotorsTailsitter::output_to_motors()
         case THROTTLE_UNLIMITED:
         case SPOOL_DOWN: {
             throttle = _spin_min + throttle * (1 - _spin_min);
-            throttle_left  = constrain_float(throttle + _rudder*0.5, _spin_min, 1);
-            throttle_right = constrain_float(throttle - _rudder*0.5, _spin_min, 1);
+            throttle_left  = constrain_float(throttle + _rudder*0.5, _spin_min, 1) * _esc_thr_gain;
+            throttle_right = constrain_float(throttle - _rudder*0.5, _spin_min, 1) * _esc_thr_gain;
             // initialize limits flags
             limit.roll_pitch = false;
             limit.yaw = false;
