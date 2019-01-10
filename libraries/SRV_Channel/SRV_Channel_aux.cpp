@@ -175,15 +175,20 @@ void SRV_Channels::enable_aux_servos()
           ensure consistency we force the MIN/MAX/TRIM to be consistent
           across all digital channels. We use a MIN/MAX of 1000/2000, and
           set TRIM to either 1000 or 1500 depending on whether the channel
-          is reversible
+          is reversible. For non reversible channels, eg ESC's, we allow a
+          PWM max value less than 2000 which may be required to limit ESC
+          output for setups where supply voltage exceeds motor limits.
         */
         if (digital_mask & (1U<<i)) {
             c.servo_min.set(1000);
-            c.servo_max.set(2000);
             if (reversible_mask & (1U<<i)) {
+                c.servo_max.set(2000);
                 c.servo_trim.set(1500);
             } else {
                 c.servo_trim.set(1000);
+                if (c.servo_max.get() > 2000) {
+                    c.servo_max.set(2000);
+                }
             }
         }
     }
