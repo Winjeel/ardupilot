@@ -2007,6 +2007,17 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
         } else {
+            //detect up or down button press
+            uint16_t up_threshold = (3*plane.channel_throttle->get_radio_max() + plane.channel_throttle->get_radio_min())/4;
+            uint16_t down_threshold = (plane.channel_throttle->get_radio_max() + 3*plane.channel_throttle->get_radio_min())/4;
+            bool up_cmd = false;
+            bool down_cmd = false;
+            if (plane.channel_throttle->get_radio_in() < down_threshold) {
+                down_cmd = true;
+            } else if (plane.channel_throttle->get_radio_in() > up_threshold) {
+                up_cmd = true;
+            }
+
             // corvo X uses up button press to arm and start a takeoff, followed by automatic climb to height set by Q_TVBS_JMP_ALT
             if ((plane.control_mode == QLOITER) && motors->armed() && !_prev_arm_status) {
                 // start the jump to Q_RTL_ALT height
@@ -2015,7 +2026,7 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             } else if (_doing_takeoff_jump &&
                        ((plane.control_mode != QLOITER)
                         || (plane.relative_altitude > (float)tailsitter.tvbs_jmp_alt)
-                        || (plane.channel_throttle->norm_input() < -0.5f))) {
+                        || down_cmd)) {
                 // jump stops when height is reached, the mode changes or the pilot commands a descent
                 set_alt_target_current();
                 _doing_takeoff_jump = false;
@@ -2027,10 +2038,10 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
             // toggle auto land arrest using climb/descend buttons
-            if (plane.channel_throttle->norm_input() < 0.5f) {
+            if (!up_cmd) {
                 _no_climb_demand_ms = AP_HAL::millis();
             }
-            if (plane.channel_throttle->norm_input() > -0.5f) {
+            if (!down_cmd) {
                 _no_descent_demand_ms = AP_HAL::millis();
             }
             if (!_auto_land_arrested && ((AP_HAL::millis() - _no_climb_demand_ms) > 1000)) {
