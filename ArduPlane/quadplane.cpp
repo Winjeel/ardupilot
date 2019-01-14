@@ -658,6 +658,16 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("TVBS_JMP_RAD", 45, QuadPlane, tailsitter.tvbs_jmp_radius, 50),
+
+    // @Param: TVBS_JMP_SPD
+    // @DisplayName: Takeoff jump climb rate
+    // @Description: Sets the climb rate that the vehicle will use initially at when taking off in QLOITER when Q_TAILSIT_INPUT is set to 2 (using corvo X hand controller).
+    // @Units: m/s
+    // @Range: 0.5 3.0
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("TVBS_JMP_SPD", 46, QuadPlane, tailsitter.tvbs_jmp_spd, 1.5),
+
     AP_GROUPEND
 };
 
@@ -1325,8 +1335,8 @@ void QuadPlane::control_loiter()
         pos_control->set_alt_target_from_climb_rate_ff(0, plane.G_Dt, false);
     } else {
         if (_doing_takeoff_jump) {
-            // during takeoff jump, climb at max climb rate allowed during pilot controlled operation
-            pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
+            // during takeoff jump, climb at specified rate
+            pos_control->add_takeoff_climb_rate(100.0f * tailsitter.tvbs_jmp_spd, plane.G_Dt);
         } else {
             // update altitude target using pilot demanded climb rate
             pos_control->set_alt_target_from_climb_rate_ff(get_pilot_desired_climb_rate_cms(), plane.G_Dt, false);
@@ -2023,13 +2033,18 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 // start the jump to Q_RTL_ALT height
                 init_loiter();
                 _doing_takeoff_jump = true;
-            } else if (_doing_takeoff_jump &&
-                       ((plane.control_mode != QLOITER)
-                        || (plane.relative_altitude > (float)tailsitter.tvbs_jmp_alt)
-                        || down_cmd)) {
-                // jump stops when height is reached, the mode changes or the pilot commands a descent
-                set_alt_target_current();
-                _doing_takeoff_jump = false;
+            } else if (_doing_takeoff_jump) {
+                // Allow for delay in height loop response
+                bool reached_alt = plane.relative_altitude > ((float)tailsitter.tvbs_jmp_alt + 0.01f * inertial_nav.get_velocity_z());
+                if ((plane.control_mode != QLOITER) || reached_alt || down_cmd) {
+                    // jump stops when height is reached, the mode changes or the pilot commands a descent
+                    if (reached_alt) {
+                        pos_control->set_alt_target(100.0f * tailsitter.tvbs_jmp_alt);
+                    } else {
+                        set_alt_target_current();
+                    }
+                    _doing_takeoff_jump = false;
+                }
             }
 
             // check takeoff height clearance - used to prevent early transition into FW flight modes

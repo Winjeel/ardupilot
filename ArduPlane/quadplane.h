@@ -502,6 +502,7 @@ private:
         AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
         AP_Float tvbs_jmp_alt;              // Takeoff jump altitude used by Corvo X in QLOITER mode (m)
         AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone (m)
+        AP_Float tvbs_jmp_spd;              // Takeoff jump climb rate used by Corvo X in QLOITER mode (m/s)
 
     } tailsitter;
 
