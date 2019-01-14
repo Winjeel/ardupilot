@@ -534,6 +534,7 @@ private:
     float takeoff_alt_cm;
     Vector3f takeoff_pos_cm;
     bool init_takeoff_this_frame = false;
+    uint32_t _do_vtol_takeoff_ms = 0; // last time the do_vtol_takeoff() functionality was active (msec)
 
     // elevator channel gain limit cycle control
     float _last_elev_feedback = 0.0f;           // value of the filtered elevator channel feedback from the previous time step (deg)

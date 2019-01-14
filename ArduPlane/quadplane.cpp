@@ -648,7 +648,7 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Range: 1.0 5.0
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("TVBS_JMP_ALT", 44, QuadPlane, tailsitter.tvbs_jmp_alt, 2.5),
+    AP_GROUPINFO("TVBS_JMP_ALT", 44, QuadPlane, tailsitter.tvbs_jmp_alt, 4.5),
 
     // @Param: TVBS_JMP_RAD
     // @DisplayName: Takeoff jump radius
@@ -2136,6 +2136,13 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 }
             }
 
+            // Prepare the EKF for ground effect if either takeoff or touchdown is expected.
+            bool starting_vtol_auto_takeoff = motors->armed()
+                    && (plane.relative_altitude < 2.0f)
+                    && ((AP_HAL::millis() - _do_vtol_takeoff_ms) < 100);
+            ahrs.setTakeoffExpected(_doing_takeoff_jump || starting_vtol_auto_takeoff);
+            ahrs.setTouchdownExpected(prepare_for_touchdown);
+
             // Logging for debug and tuning of land detection and disarm logic
             static uint32_t _last_log_time_ms = 0;
             if (AP_HAL::millis() - _last_log_time_ms >= 50) {
@@ -2946,6 +2953,9 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
 
     // tell position controller to prepare for takeoff
     pos_control->init_takeoff();
+
+    // let other functions know how long since we were doing a takeoff
+    _do_vtol_takeoff_ms = AP_HAL::millis();
 
     // also update nav_controller for status output
     plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);
