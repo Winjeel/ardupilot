@@ -2120,6 +2120,22 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                     }
                 }
             }
+
+            // Logging for debug and tuning of land detection and disarm logic
+            static uint32_t _last_log_time_ms = 0;
+            if (AP_HAL::millis() - _last_log_time_ms >= 50) {
+                _last_log_time_ms = AP_HAL::millis();
+
+                DataFlash_Class::instance()->Log_Write("TVB3", "TimeUS,UP,DOWN,OTZ,PFT,PCNL,NDD,PSM", "QbbbbIII",
+                                                       AP_HAL::micros64(),
+                                                       (bool)up_cmd,
+                                                       (bool)down_cmd,
+                                                       (bool)_outside_takeoff_zone,
+                                                       (bool)prepare_for_touchdown,
+                                                       (uint32_t)_pos_ctrl_not_is_landed_ms,
+                                                       (uint32_t)_no_descent_demand_ms,
+                                                       (uint32_t)_pitch_stick_moved_ms);
+            }
         }
     } else {
         // defaults when operating with normal RC handset removes restrictions and disables takeoff jump
