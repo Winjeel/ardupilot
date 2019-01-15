@@ -267,6 +267,15 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_FWD_DB_THR",  23, AC_PosControl, _drag_brake_g_thrhld, 0.15f),
 
+    // @Param: _VELZ_FF
+    // @DisplayName: Gain from climb rate demand to throttle.
+    // @Description: A gain of 0.1 gives a throttle increment of 0.1 or 10% for every m/s of demanded climb rate. Increase until the PIQA.I term doesn't change from its steady state value in a sustained climb.
+    // @Units: 1/(m/s)
+    // @Range: 0.0 0.1
+    // @Increment: 0.01
+    // @User: Advanced
+    AP_GROUPINFO("_VELZ_FF",  24, AC_PosControl, _vz_to_thr_gain, 0.0f),
+
 
     AP_GROUPEND
 };
@@ -737,7 +746,8 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
     // calculate the lift g demand scaled as an equivalent throttle
     float az_pd_gain = constrain_float(1.0f - _fwd_az_gf * _ahrs_wing.cos_pitch(), 0.1f, 1.0f);
-    float lift_g_pid = (az_pd_gain * p + i + az_pd_gain * d) * 0.001f;
+    float climb_comp_mmss =  constrain_float(-_vz_to_thr_gain * 10.0f * _vel_target.z, 0.0f, 500.0f);
+    float lift_g_pid = (az_pd_gain * (p + d + climb_comp_mmss) + i) * 0.001f;
     float lift_g_demand = (1.0f + lift_g_pid);
 
     if (_taking_off) {
@@ -885,6 +895,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
         // calculate throttle required to generate thrust
         // rough correction for prop inflow is included - needs refinement
+        // rough correction for steady state throttle change required to climb - descent variation is less predictable due to localised propeller blade stall
         float vel_inflow = MAX(- _vel_forward_filt * sinf(pitch_target_rad), 0.0f);
         float thrust_g_inflow = _fwd_inflow_thrust_factor * vel_inflow;
         throttle_demand = constrain_float((thrust_g_demand + thrust_g_inflow) * _motors.get_throttle_hover(), 0.0f, 1.0f);
