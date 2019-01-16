@@ -746,7 +746,7 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
     // calculate the lift g demand scaled as an equivalent throttle
     float az_pd_gain = constrain_float(1.0f - _fwd_az_gf * _ahrs_wing.cos_pitch(), 0.1f, 1.0f);
-    float climb_comp_mmss =  constrain_float(-_vz_to_thr_gain * 10.0f * _vel_target.z, 0.0f, 500.0f);
+    float climb_comp_mmss =  constrain_float(_vz_to_thr_gain * 10.0f * _vel_target.z, 0.0f, 500.0f);
     float lift_g_pid = (az_pd_gain * (p + d + climb_comp_mmss) + i) * 0.001f;
     float lift_g_demand = (1.0f + lift_g_pid);
 
