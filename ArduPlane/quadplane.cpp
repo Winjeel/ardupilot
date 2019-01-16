@@ -2034,8 +2034,8 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                 init_loiter();
                 _doing_takeoff_jump = true;
             } else if (_doing_takeoff_jump) {
-                // Allow for delay in height loop response
-                bool reached_alt = plane.relative_altitude > ((float)tailsitter.tvbs_jmp_alt + 0.01f * inertial_nav.get_velocity_z());
+                // Allow for delay in height loop response - note inertial_nav.get_velocity_z() returns a climb rate in cm/s that is positive up
+                bool reached_alt = plane.relative_altitude > ((float)tailsitter.tvbs_jmp_alt - 0.01f * inertial_nav.get_velocity_z());
                 if ((plane.control_mode != QLOITER) || reached_alt || down_cmd) {
                     // jump stops when height is reached, the mode changes or the pilot commands a descent
                     if (reached_alt) {
