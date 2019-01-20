@@ -111,7 +111,7 @@ int16_t Plane::get_throttle_input(bool no_deadzone) const
             && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
         // handle special case where corvo hand controller is being used where the pitch stick is used to accel/decel the vehicle
         // forward/down stick is positive/faster
-        ret = -channel_pitch->get_control_in_zero_dz();
+        ret = (int16_t)(-100.0f * (float)channel_pitch->norm_input_dz());
     } else {
         if (no_deadzone) {
             ret = channel_throttle->get_control_in_zero_dz();

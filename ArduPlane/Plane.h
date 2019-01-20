@@ -395,6 +395,9 @@ private:
     // Also used for flap deployment criteria.  Centimeters per second.
     float target_airspeed_cm;
 
+    // last time target_airspeed_cm was set (msec)
+    uint32_t time_aspd_tgt_set_ms = 0;
+
     // The difference between current and desired airspeed.  Used in the pitch controller.  Meters per second.
     float airspeed_error;
 
