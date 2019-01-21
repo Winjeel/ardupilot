@@ -797,6 +797,12 @@ void AC_PosControl::calc_roll_pitch_throttle()
         float alpha_coef = constrain_float(_dt / MAX(_trim_tau,0.1f),0.0f,1.0f);
         _vel_forward_filt = alpha_coef * vel_forward + (1.0f - alpha_coef) * _vel_forward_filt;
 
+        // fade the lateral integrated error because_vel_forward_filt derived from it is only used to adjust pitch angle
+        // therefore the lateral component can build up and cause problems with wind or yaw angle changes
+        float lat_vel_integ_adj = - alpha_coef * (- _vel_xy_error_integ.x * _ahrs.sin_yaw() + _vel_xy_error_integ.y * _ahrs.cos_yaw());
+        _vel_xy_error_integ.x -= lat_vel_integ_adj * _ahrs.cos_yaw();
+        _vel_xy_error_integ.y -= lat_vel_integ_adj * _ahrs.sin_yaw();
+
         // use forward velocity to calculate a profile drag that needs to be overcome by the rotors
         float rho = 1.225f / sqrtf(_ahrs.get_EAS2TAS());
         float fwd_g_trim = (rho / (2.0f * MAX(_fwd_bcoef, 1.0f))) * (_vel_forward_filt * _vel_forward_filt) / GRAVITY_MSS;
