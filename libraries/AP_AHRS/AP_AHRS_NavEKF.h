@@ -157,7 +157,7 @@ public:
     bool get_vert_pos_rate(float &velocity) const;
 
     // write optical flow measurements to EKF
-    void writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset);
+    void writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset);
 
     // write body odometry measurements to the EKF
     void writeBodyFrameOdom(float quality, const Vector3f &delPos, const Vector3f &delAng, float delTime, uint32_t timeStamp_ms, const Vector3f &posOffset);
@@ -254,6 +254,15 @@ public:
 
     // get the index of the current primary gyro sensor
     uint8_t get_primary_gyro_index(void) const override;
+
+    // sets the default value of EAS to be assumed when there is no direct measurement
+    // only supported by EKF3
+    void set_default_airspeed(float spd) {
+        if (active_EKF_type() == EKF_TYPE3) {
+            EKF3.set_default_airspeed(spd);
+        }
+    }
+
 
 private:
     enum EKF_TYPE {EKF_TYPE_NONE=0,

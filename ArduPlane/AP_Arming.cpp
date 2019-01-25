@@ -8,12 +8,7 @@ const AP_Param::GroupInfo AP_Arming_Plane::var_info[] = {
     // variables from parent vehicle
     AP_NESTEDGROUPINFO(AP_Arming, 0),
 
-    // @Param: RUDDER
-    // @DisplayName: Rudder Arming
-    // @Description: Control arm/disarm by rudder input. When enabled arming is done with right rudder, disarming with left rudder. Rudder arming only works in manual throttle modes with throttle at zero +- deadzone (RCx_DZ)
-    // @Values: 0:Disabled,1:ArmingOnly,2:ArmOrDisarm
-    // @User: Advanced
-    AP_GROUPINFO("RUDDER",       3,     AP_Arming_Plane,  rudder_arming_value,     ARMING_RUDDER_ARMONLY),
+    // index 3 was RUDDER and should not be used
 
     AP_GROUPEND
 };
@@ -60,6 +55,11 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
 
     if (plane.quadplane.available() && plane.scheduler.get_loop_rate_hz() < 100) {
         check_failed(ARMING_CHECK_NONE, display_failure, "quadplane needs SCHED_LOOP_RATE >= 100");
+        ret = false;
+    }
+
+    if (plane.quadplane.corvo_takeoff_inhibit()) {
+        check_failed(ARMING_CHECK_NONE, display_failure, "Incorrect mode for takeoff");
         ret = false;
     }
 

@@ -236,15 +236,15 @@
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
-// winch support - enabled only on larger firmwares
+// winch support
 #ifndef WINCH_ENABLED
-# define WINCH_ENABLED !HAL_MINIMIZE_FEATURES
+# define WINCH_ENABLED DISABLED
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
 // rotations per minute sensor support
 #ifndef RPM_ENABLED
-# define RPM_ENABLED ENABLED
+ # define RPM_ENABLED !HAL_MINIMIZE_FEATURES
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -310,7 +310,7 @@
 //////////////////////////////////////////////////////////////////////////////
 // GuidedNoGPS mode - control vehicle's angles from GCS
 #ifndef MODE_GUIDED_NOGPS_ENABLED
-# define MODE_GUIDED_NOGPS_ENABLED ENABLED
+# define MODE_GUIDED_NOGPS_ENABLED !HAL_MINIMIZE_FEATURES
 #endif
 
 //////////////////////////////////////////////////////////////////////////////
@@ -347,6 +347,12 @@
 // Throw - fly vehicle after throwing it in the air
 #ifndef MODE_THROW_ENABLED
 # define MODE_THROW_ENABLED ENABLED
+#endif
+
+//////////////////////////////////////////////////////////////////////////////
+// ZigZag - allow vehicle to fly in a zigzag manner with predefined point A B
+#ifndef MODE_ZIGZAG_ENABLED
+# define MODE_ZIGZAG_ENABLED !HAL_MINIMIZE_FEATURES
 #endif
 
 //////////////////////////////////////////////////////////////////////////////

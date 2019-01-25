@@ -1,5 +1,5 @@
 # hw definition file for processing by chibios_hwdef.py
-# for FMUv3 hardware (ie. for CUAV-PixHack-v5 and Pixhawk4)
+# for FMUv5 hardware (ie. for CUAV-PixHack-v5 and Pixhawk4)
 
 # MCU class and specific type. It is a F765, which is the same as F767
 # but without the TFT interface
@@ -245,9 +245,13 @@ PD2 SDMMC_CMD SDMMC1
 define HAL_STORAGE_SIZE 16384
 define HAL_WITH_RAMTRON 1
 
+# allow to have have a dedicated safety switch pin
+define HAL_HAVE_SAFETY_SWITCH 1
+
 define HAL_BARO_DEFAULT HAL_BARO_MS5611_SPI
 
 define HAL_COMPASS_DEFAULT HAL_COMPASS_NONE
+define HAL_COMPASS_AUTO_ROT_DEFAULT 2
 
 DMA_PRIORITY SDMMC* UART8* ADC* SPI* TIM*
 

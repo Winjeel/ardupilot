@@ -18,8 +18,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 #include "AP_HAL_ChibiOS_Namespace.h"
-#include "Semaphores.h"
-#include "ToneAlarm.h"
+#include "AP_HAL_ChibiOS.h"
 
 class ChibiOS::Util : public AP_HAL::Util {
 public:
@@ -28,7 +27,6 @@ public:
     }
 
     bool run_debug_shell(AP_HAL::BetterStream *stream) override { return false; }
-    AP_HAL::Semaphore *new_semaphore(void) override { return new ChibiOS::Semaphore; }
     uint32_t available_memory() override;
 
     // Special Allocation Routines
@@ -49,16 +47,18 @@ public:
     
 #ifdef HAL_PWM_ALARM
     bool toneAlarm_init() override;
-    void toneAlarm_set_tune(uint8_t tone) override;
-    void toneAlarm_set_tune_string(const char *str) override;
-    void _toneAlarm_timer_tick() override;
-
-    static ToneAlarm& get_ToneAlarm() { return _toneAlarm; }
+    void toneAlarm_set_buzzer_tone(float frequency, float volume, uint32_t duration_ms) override;
 #endif
 
 private:
 #ifdef HAL_PWM_ALARM
-    static ToneAlarm _toneAlarm;
+    struct ToneAlarmPwmGroup {
+        pwmchannel_t chan;
+        PWMConfig pwm_cfg;
+        PWMDriver* pwm_drv;
+    };
+
+    static ToneAlarmPwmGroup _toneAlarm_pwm_group;
 #endif
     void* try_alloc_from_ccm_ram(size_t size);
     uint32_t available_memory_in_ccm_ram(void);
@@ -82,6 +82,7 @@ private:
       get system clock in UTC microseconds
      */
     uint64_t get_hw_rtc() const override;
-
+#ifndef HAL_NO_FLASH_SUPPORT
     bool flash_bootloader() override;
+#endif
 };

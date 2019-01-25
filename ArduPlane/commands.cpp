@@ -66,6 +66,9 @@ void Plane::set_next_WP(const struct Location &loc)
     setup_turn_angle();
 
     loiter_angle_reset();
+
+    // zero the velocity of the loiter waypoint
+    loiter.velNE.zero();
 }
 
 void Plane::set_guided_WP(void)
@@ -101,6 +104,10 @@ void Plane::set_guided_WP(void)
     auto_state.vtol_loiter = false;
     
     loiter_angle_reset();
+
+    // record update time
+    loiter.last_update_ms = millis();
+
 }
 
 /*
@@ -139,6 +146,4 @@ void Plane::set_home_persistently(const Location &loc)
 void Plane::set_home(const Location &loc)
 {
     ahrs.set_home(loc);
-    ahrs.Log_Write_Home_And_Origin();
-    gcs().send_home();
 }

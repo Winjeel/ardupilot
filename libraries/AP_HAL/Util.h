@@ -72,9 +72,7 @@ public:
         ToneAlarm Driver
     */
     virtual bool toneAlarm_init() { return false;}
-    virtual void toneAlarm_set_tune(uint8_t tune) {}
-    virtual void toneAlarm_set_tune_string(const char *str) {}
-    virtual void _toneAlarm_timer_tick() {}
+    virtual void toneAlarm_set_buzzer_tone(float frequency, float volume, uint32_t duration_ms) {}
 
     /*
       return a stream for access to a system shell, if available
@@ -100,9 +98,6 @@ public:
     virtual void perf_begin(perf_counter_t h) {}
     virtual void perf_end(perf_counter_t h) {}
     virtual void perf_count(perf_counter_t h) {}
-
-    // create a new semaphore
-    virtual Semaphore *new_semaphore(void) { return nullptr; }
 
     // allocate and free DMA-capable memory if possible. Otherwise return normal memory
     enum Memory_Type {

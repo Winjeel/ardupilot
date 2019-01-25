@@ -14,8 +14,30 @@ void AP_Mount_Backend::set_angle_targets(float roll, float tilt, float pan)
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_MAVLINK_TARGETING);
 }
 
+// set yaw target in degrees
+void AP_Mount_Backend::set_yaw_target(float pan)
+{
+    _angle_ef_target_rad.z = radians(pan);
+}
+
+// specialised mode that uses RC targeting
+// when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+// when called with park = false, causes the mount to revert to normal RC targeting operation
+void AP_Mount_Backend::set_elev_park(bool park)
+{
+    set_mode(MAV_MOUNT_MODE_RC_TARGETING);
+    _slave_yaw_roll = park;
+    _angle_ef_target_rad.x = 0.0f;
+}
+
+// reset the mount LOS elevation angle to the parameter defined value
+void AP_Mount_Backend::reset_elev()
+{
+    _angle_ef_target_rad.y = radians(_frontend._ef_elev_deg);
+}
+
 // set_roi_target - sets target location that mount should attempt to point towards
-void AP_Mount_Backend::set_roi_target(const struct Location &target_loc)
+void AP_Mount_Backend::set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE)
 {
     // set the target gps location
     _state._roi_target = target_loc;
@@ -24,21 +46,24 @@ void AP_Mount_Backend::set_roi_target(const struct Location &target_loc)
     _frontend.set_mode(_instance, MAV_MOUNT_MODE_GPS_POINT);
 }
 
-// configure_msg - process MOUNT_CONFIGURE messages received from GCS.  deprecated.
-void AP_Mount_Backend::configure_msg(mavlink_message_t* msg)
+// get_roi_target - gets target location that mount is attempting to point towards
+Location AP_Mount_Backend::get_roi_target()
 {
-    __mavlink_mount_configure_t packet;
-    mavlink_msg_mount_configure_decode(msg, &packet);
-
-    set_mode((MAV_MOUNT_MODE)packet.mount_mode);
+    return _state._roi_target;
 }
 
-// control_msg - process MOUNT_CONTROL messages received from GCS. deprecated.
-void AP_Mount_Backend::control_msg(mavlink_message_t *msg)
+// process MOUNT_CONFIGURE messages received from GCS.  deprecated.
+void AP_Mount_Backend::handle_mount_configure(const mavlink_mount_configure_t &packet)
 {
-    __mavlink_mount_control_t packet;
-    mavlink_msg_mount_control_decode(msg, &packet);
+    set_mode((MAV_MOUNT_MODE)packet.mount_mode);
+    _state._stab_roll = packet.stab_roll;
+    _state._stab_tilt = packet.stab_pitch;
+    _state._stab_pan = packet.stab_yaw;
+}
 
+// process MOUNT_CONTROL messages received from GCS. deprecated.
+void AP_Mount_Backend::handle_mount_control(const mavlink_mount_control_t &packet)
+{
     control((int32_t)packet.input_a, (int32_t)packet.input_b, (int32_t)packet.input_c, _state._mode);
 }
 
@@ -64,14 +89,16 @@ void AP_Mount_Backend::control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_
             break;
 
         // set lat, lon, alt position targets from mavlink message
-        case MAV_MOUNT_MODE_GPS_POINT:
-            Location target_location;
-            memset(&target_location, 0, sizeof(target_location));
-            target_location.lat = pitch_or_lat;
-            target_location.lng = roll_or_lon;
-            target_location.alt = yaw_or_alt;
-            target_location.flags.relative_alt = true;
-            set_roi_target(target_location);
+        case MAV_MOUNT_MODE_GPS_POINT: {
+                Location target_location;
+                memset(&target_location, 0, sizeof(target_location));
+                target_location.lat = pitch_or_lat;
+                target_location.lng = roll_or_lon;
+                target_location.alt = yaw_or_alt;
+                target_location.flags.relative_alt = true;
+                Vector2f roi_velNE = {};
+                set_roi_target(target_location, roi_velNE);
+            }
             break;
 
         default:
@@ -80,53 +107,67 @@ void AP_Mount_Backend::control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_
     }
 }
 
+void AP_Mount_Backend::rate_input_rad(float &out, const RC_Channel *chan, int16_t min, int16_t max) const
+{
+    if (chan == nullptr) {
+        return;
+    }
+    out += chan->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
+    if (min != 0 || max != 0) {
+        // a non zero angular limit indicates that the output should be constrained
+        out = constrain_float(out, radians((float)min*0.01f), radians((float)max*0.01f));
+    } else {
+        // if both angular limits are zero, then wrap the angle to allow continuous rotation
+        out = wrap_PI(out);
+    }
+}
+
 // update_targets_from_rc - updates angle targets using input from receiver
 void AP_Mount_Backend::update_targets_from_rc()
 {
-#define rc_ch(i) RC_Channels::rc_channel(i-1)
-
-    uint8_t roll_rc_in = _state._roll_rc_in;
-    uint8_t tilt_rc_in = _state._tilt_rc_in;
-    uint8_t pan_rc_in = _state._pan_rc_in;
+    const RC_Channel *roll_ch = rc().channel(_state._roll_rc_in - 1);
+    const RC_Channel *tilt_ch = rc().channel(_state._tilt_rc_in - 1);
+    const RC_Channel *pan_ch = rc().channel(_state._pan_rc_in - 1);
 
     // if joystick_speed is defined then pilot input defines a rate of change of the angle
     if (_frontend._joystick_speed) {
-        // allow pilot speed position input to come directly from an RC_Channel
-        if (roll_rc_in && rc_ch(roll_rc_in)) {
-            _angle_ef_target_rad.x += rc_ch(roll_rc_in)->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
-            _angle_ef_target_rad.x = constrain_float(_angle_ef_target_rad.x, radians(_state._roll_angle_min*0.01f), radians(_state._roll_angle_max*0.01f));
-        }
-        if (tilt_rc_in && (rc_ch(tilt_rc_in))) {
-            _angle_ef_target_rad.y += rc_ch(tilt_rc_in)->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
-            _angle_ef_target_rad.y = constrain_float(_angle_ef_target_rad.y, radians(_state._tilt_angle_min*0.01f), radians(_state._tilt_angle_max*0.01f));
-        }
-        if (pan_rc_in && (rc_ch(pan_rc_in))) {
-            _angle_ef_target_rad.z += rc_ch(pan_rc_in)->norm_input_dz() * 0.0001f * _frontend._joystick_speed;
-            _angle_ef_target_rad.z = constrain_float(_angle_ef_target_rad.z, radians(_state._pan_angle_min*0.01f), radians(_state._pan_angle_max*0.01f));
-        }
+        // Allow pilot rate input to come directly from an RC_Channel
+        // Roll and pitch is constrained, yaw is allowed to wrap
+        rate_input_rad(_angle_ef_target_rad.x,
+                       roll_ch,
+                       _state._roll_angle_min,
+                       _state._roll_angle_max);
+        rate_input_rad(_angle_ef_target_rad.y,
+                       tilt_ch,
+                       _state._tilt_angle_min,
+                       _state._tilt_angle_max);
+        rate_input_rad(_angle_ef_target_rad.z,
+                       pan_ch,
+                       0,
+                       0);
     } else {
-        // allow pilot position input to come directly from an RC_Channel
-        if (roll_rc_in && (rc_ch(roll_rc_in))) {
-            _angle_ef_target_rad.x = angle_input_rad(rc_ch(roll_rc_in), _state._roll_angle_min, _state._roll_angle_max);
+        // allow pilot angle input to come directly from an RC_Channel
+        if (roll_ch) {
+            _angle_ef_target_rad.x = angle_input_rad(roll_ch, _state._roll_angle_min, _state._roll_angle_max);
         }
-        if (tilt_rc_in && (rc_ch(tilt_rc_in))) {
-            _angle_ef_target_rad.y = angle_input_rad(rc_ch(tilt_rc_in), _state._tilt_angle_min, _state._tilt_angle_max);
+        if (tilt_ch) {
+            _angle_ef_target_rad.y = angle_input_rad(tilt_ch, _state._tilt_angle_min, _state._tilt_angle_max);
         }
-        if (pan_rc_in && (rc_ch(pan_rc_in))) {
-            _angle_ef_target_rad.z = angle_input_rad(rc_ch(pan_rc_in), _state._pan_angle_min, _state._pan_angle_max);
+        if (pan_ch) {
+            _angle_ef_target_rad.z = angle_input_rad(pan_ch, _state._pan_angle_min, _state._pan_angle_max);
         }
     }
 }
 
 // returns the angle (degrees*100) that the RC_Channel input is receiving
-int32_t AP_Mount_Backend::angle_input(RC_Channel* rc, int16_t angle_min, int16_t angle_max)
+int32_t AP_Mount_Backend::angle_input(const RC_Channel* rc, int16_t angle_min, int16_t angle_max)
 {
     return (rc->get_reverse() ? -1 : 1) * (rc->get_radio_in() - rc->get_radio_min()) 
       * (int32_t)(angle_max - angle_min) / (rc->get_radio_max() - rc->get_radio_min()) + (rc->get_reverse() ? angle_max : angle_min);
 }
 
 // returns the angle (radians) that the RC_Channel input is receiving
-float AP_Mount_Backend::angle_input_rad(RC_Channel* rc, int16_t angle_min, int16_t angle_max)
+float AP_Mount_Backend::angle_input_rad(const RC_Channel* rc, int16_t angle_min, int16_t angle_max)
 {
     return radians(angle_input(rc, angle_min, angle_max)*0.01f);
 }
@@ -149,10 +190,16 @@ void AP_Mount_Backend::calc_angle_to_location(const struct Location &target, Vec
 
     // pan calcs
     if (calc_pan) {
-        // calc absolute heading and then onvert to vehicle relative yaw
+        // calc absolute heading and then convert to vehicle relative yaw
         angles_to_target_rad.z = atan2f(GPS_vector_x, GPS_vector_y);
         if (relative_pan) {
-            angles_to_target_rad.z = wrap_PI(angles_to_target_rad.z - _frontend._ahrs.yaw);
+            angles_to_target_rad.z = wrap_PI(angles_to_target_rad.z - AP::ahrs().yaw);
         }
     }
+}
+
+// return the earth frame yaw of the payload in radians
+float AP_Mount_Backend::get_ef_yaw()
+{
+    return _angle_ef_target_rad.z;
 }

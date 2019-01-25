@@ -59,39 +59,6 @@ void Copter::ModeAutoTune::Log_Write_AutoTuneDetails(float angle_cd, float rate_
 }
 #endif
 
-struct PACKED log_Optflow {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t surface_quality;
-    float flow_x;
-    float flow_y;
-    float body_x;
-    float body_y;
-};
-
-// Write an optical flow packet
-void Copter::Log_Write_Optflow()
-{
- #if OPTFLOW == ENABLED
-    // exit immediately if not enabled
-    if (!optflow.enabled()) {
-        return;
-    }
-    const Vector2f &flowRate = optflow.flowRate();
-    const Vector2f &bodyRate = optflow.bodyRate();
-    struct log_Optflow pkt = {
-        LOG_PACKET_HEADER_INIT(LOG_OPTFLOW_MSG),
-        time_us         : AP_HAL::micros64(),
-        surface_quality : optflow.quality(),
-        flow_x          : flowRate.x,
-        flow_y          : flowRate.y,
-        body_x          : bodyRate.x,
-        body_y          : bodyRate.y
-    };
-    DataFlash.WriteBlock(&pkt, sizeof(pkt));
- #endif     // OPTFLOW == ENABLED
-}
-
 struct PACKED log_Control_Tuning {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -176,7 +143,7 @@ struct PACKED log_MotBatt {
     uint64_t time_us;
     float   lift_max;
     float   bat_volt;
-    float   bat_res;
+    float   fw_th_gain;
     float   th_limit;
 };
 
@@ -189,7 +156,7 @@ void Copter::Log_Write_MotBatt()
         time_us         : AP_HAL::micros64(),
         lift_max        : (float)(motors->get_lift_max()),
         bat_volt        : (float)(motors->get_batt_voltage_filt()),
-        bat_res         : (float)(battery.get_resistance()),
+        fw_th_gain      : 1.0f,
         th_limit        : (float)(motors->get_throttle_limit())
     };
     DataFlash.WriteBlock(&pkt_mot, sizeof(pkt_mot));
@@ -420,9 +387,15 @@ struct PACKED log_Precland {
     float pos_y;
     float vel_x;
     float vel_y;
+    float meas_x;
+    float meas_y;
+    float meas_z;
+    uint32_t last_meas;
+    uint32_t ekf_outcount;
+    uint8_t estimator;
 };
 
-// Write an optical flow packet
+// Write a precision landing entry
 void Copter::Log_Write_Precland()
 {
  #if PRECISION_LANDING == ENABLED
@@ -431,10 +404,12 @@ void Copter::Log_Write_Precland()
         return;
     }
 
+    Vector3f target_pos_meas = Vector3f(0.0f,0.0f,0.0f);
     Vector2f target_pos_rel = Vector2f(0.0f,0.0f);
     Vector2f target_vel_rel = Vector2f(0.0f,0.0f);
     precland.get_target_position_relative_cm(target_pos_rel);
     precland.get_target_velocity_relative_cms(target_vel_rel);
+    precland.get_target_position_measurement_cm(target_pos_meas);
 
     struct log_Precland pkt = {
         LOG_PACKET_HEADER_INIT(LOG_PRECLAND_MSG),
@@ -444,13 +419,19 @@ void Copter::Log_Write_Precland()
         pos_x           : target_pos_rel.x,
         pos_y           : target_pos_rel.y,
         vel_x           : target_vel_rel.x,
-        vel_y           : target_vel_rel.y
+        vel_y           : target_vel_rel.y,
+        meas_x          : target_pos_meas.x,
+        meas_y          : target_pos_meas.y,
+        meas_z          : target_pos_meas.z,
+        last_meas       : precland.last_backend_los_meas_ms(),
+        ekf_outcount    : precland.ekf_outlier_count(),
+        estimator       : precland.estimator_type()
     };
     DataFlash.WriteBlock(&pkt, sizeof(pkt));
  #endif     // PRECISION_LANDING == ENABLED
 }
 
-// precision landing logging
+// guided target logging
 struct PACKED log_GuidedTarget {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -493,14 +474,10 @@ const struct LogStructure Copter::log_structure[] = {
 #endif
     { LOG_PARAMTUNE_MSG, sizeof(log_ParameterTuning),
       "PTUN", "QBfHHH",          "TimeUS,Param,TunVal,CtrlIn,TunLo,TunHi", "s-----", "F-----" },
-#if OPTFLOW == ENABLED
-    { LOG_OPTFLOW_MSG, sizeof(log_Optflow),
-      "OF",   "QBffff",   "TimeUS,Qual,flowX,flowY,bodyX,bodyY", "s-EEEE", "F-0000" },
-#endif
     { LOG_CONTROL_TUNING_MSG, sizeof(log_Control_Tuning),
       "CTUN", "Qffffffefcfhh", "TimeUS,ThI,ABst,ThO,ThH,DAlt,Alt,BAlt,DSAlt,SAlt,TAlt,DCRt,CRt", "s----mmmmmmnn", "F----00B0BBBB" },
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt),
-      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,BatRes,ThLimit", "s-vw-", "F-00-" },
+      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,ThGainFW,ThLimit", "s-vw-", "F-00-" },
     { LOG_EVENT_MSG, sizeof(log_Event),         
       "EV",   "QB",           "TimeUS,Id", "s-", "F-" },
     { LOG_DATA_INT16_MSG, sizeof(log_Data_Int16t),         
@@ -521,7 +498,7 @@ const struct LogStructure Copter::log_structure[] = {
 #endif
 #if PRECISION_LANDING == ENABLED
     { LOG_PRECLAND_MSG, sizeof(log_Precland),
-      "PL",    "QBBffff",    "TimeUS,Heal,TAcq,pX,pY,vX,vY", "s--ddmm","F--00BB" },
+      "PL",    "QBBfffffffIIB",    "TimeUS,Heal,TAcq,pX,pY,vX,vY,mX,mY,mZ,LastMeasUS,EKFOutl,Est", "s--ddmmddms--","F--00BB00BC--" },
 #endif
     { LOG_GUIDEDTARGET_MSG, sizeof(log_GuidedTarget),
       "GUID",  "QBffffff",    "TimeUS,Type,pX,pY,pZ,vX,vY,vZ", "s-mmmnnn", "F-000000" },
@@ -567,10 +544,6 @@ void Copter::Log_Write_Vehicle_Startup_Messages() {}
 
 #if FRAME_CONFIG == HELI_FRAME
 void Copter::Log_Write_Heli() {}
-#endif
-
-#if OPTFLOW == ENABLED
-void Copter::Log_Write_Optflow() {}
 #endif
 
 void Copter::log_init(void) {}

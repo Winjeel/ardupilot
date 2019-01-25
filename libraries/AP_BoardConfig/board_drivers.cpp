@@ -22,12 +22,12 @@
 
 extern const AP_HAL::HAL& hal;
 
-#if AP_FEATURE_SAFETY_BUTTON
 /*
   init safety state
  */
 void AP_BoardConfig::board_init_safety()
 {
+#if HAL_HAVE_SAFETY_SWITCH
     if (state.safety_enable.get() == 0) {
         hal.rcout->force_safety_off();
         hal.rcout->force_safety_no_wait();
@@ -37,8 +37,8 @@ void AP_BoardConfig::board_init_safety()
             hal.scheduler->delay(20);
         }
     }
-}
 #endif
+}
 
 
 #if AP_FEATURE_BOARD_DETECT
@@ -241,7 +241,7 @@ void AP_BoardConfig::board_autodetect(void)
     // only one choice
     state.board_type.set_and_notify(PX4_BOARD_MINDPXV2);
     hal.console->printf("Detected MindPX-V2\n");
-#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO)
+#elif defined(CONFIG_ARCH_BOARD_PX4FMU_V4PRO) || defined(HAL_CHIBIOS_ARCH_FMUV4PRO)
     // only one choice
     state.board_type.set_and_notify(PX4_BOARD_PIXHAWK_PRO);
     hal.console->printf("Detected Pixhawk Pro\n");	

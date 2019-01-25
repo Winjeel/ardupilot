@@ -21,23 +21,26 @@
 #include "AP_AHRS_View.h"
 #include <stdio.h>
 
-AP_AHRS_View::AP_AHRS_View(AP_AHRS &_ahrs, enum Rotation _rotation) :
+AP_AHRS_View::AP_AHRS_View(AP_AHRS &_ahrs, enum Rotation _rotation, float pitch_trim_deg) :
     rotation(_rotation),
     ahrs(_ahrs)
 {
     switch (rotation) {
     case ROTATION_NONE:
-        rot_view.identity();
+        y_angle = 0;
         break;
     case ROTATION_PITCH_90:
-        rot_view.from_euler(0, radians(90), 0);
+        y_angle = 90;
         break;
     case ROTATION_PITCH_270:
-        rot_view.from_euler(0, radians(270), 0);
+        y_angle = 270;
         break;
     default:
         AP_HAL::panic("Unsupported AHRS view %u\n", (unsigned)rotation);
     }
+
+    // Add pitch trim
+    y_angle = wrap_360(y_angle + pitch_trim_deg);
 
     // setup initial state
     update();
@@ -46,18 +49,29 @@ AP_AHRS_View::AP_AHRS_View(AP_AHRS &_ahrs, enum Rotation _rotation) :
 // update state
 void AP_AHRS_View::update(bool skip_ins_update)
 {
-    rot_body_to_ned = ahrs.get_rotation_body_to_ned();
+    // calculate rotations for rotor and wing
+    rot_view_rotor.from_euler(0, radians(y_angle + pitch_offset_deg), 0);
+    rot_view_wing.from_euler(0, radians(y_angle), 0);
+
+    rot_rotor_to_ned = ahrs.get_rotation_body_to_ned();
+    rot_wing_to_ned = ahrs.get_rotation_body_to_ned();
     gyro = ahrs.get_gyro();
 
-    if (rotation != ROTATION_NONE) {
-        Matrix3f &r = rot_body_to_ned;
-        r.transpose();
-        r = rot_view * r;
-        r.transpose();
+    if (!is_zero(y_angle)) {
+        Matrix3f &r1 = rot_rotor_to_ned;
+        r1.transpose();
+        r1 = rot_view_rotor * r1;
+        r1.transpose();
         gyro.rotate(rotation);
+
+        Matrix3f &r2 = rot_wing_to_ned;
+        r2.transpose();
+        r2 = rot_view_wing * r2;
+        r2.transpose();
+
     }
 
-    rot_body_to_ned.to_euler(&roll, &pitch, &yaw);
+    rot_rotor_to_ned.to_euler(&roll, &pitch, &yaw);
 
     roll_sensor  = degrees(roll) * 100;
     pitch_sensor = degrees(pitch) * 100;
@@ -66,7 +80,7 @@ void AP_AHRS_View::update(bool skip_ins_update)
         yaw_sensor += 36000;
     }
 
-    ahrs.calc_trig(rot_body_to_ned,
+    ahrs.calc_trig(rot_rotor_to_ned,
                    trig.cos_roll, trig.cos_pitch, trig.cos_yaw,
                    trig.sin_roll, trig.sin_pitch, trig.sin_yaw);
 }

@@ -131,7 +131,8 @@ public:
 
     // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
     // An out of range instance (eg -1) returns data for the the primary instance
-    void getWind(int8_t instance, Vector3f &wind) const;
+    // returns true if wind state estimation is active
+    bool getWind(int8_t instance, Vector3f &wind) const;
 
     // return earth magnetic field estimates in measurement units / 1000 for the specified instance
     // An out of range instance (eg -1) returns data for the the primary instance
@@ -206,7 +207,7 @@ public:
     // The sign convention is that a RH physical rotation of the sensor about an axis produces both a positive flow and gyro rate
     // msecFlowMeas is the scheduler time in msec when the optical flow data was received from the sensor.
     // posOffset is the XYZ flow sensor position in the body frame in m
-    void writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset);
+    void writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset);
 
     /*
      * Write body frame linear and angular displacement measurements from a visual odometry sensor
@@ -354,6 +355,9 @@ public:
     // get timing statistics structure
     void getTimingStatistics(int8_t instance, struct ekf_timing &timing) const;
 
+    // set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+    void set_default_airspeed(float spd);
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -416,7 +420,7 @@ private:
     AP_Float _visOdmVelErrMax;      // Observation 1-STD velocity error assumed for visual odometry sensor at lowest reported quality (m/s)
     AP_Float _visOdmVelErrMin;      // Observation 1-STD velocity error assumed for visual odometry sensor at highest reported quality (m/s)
     AP_Float _wencOdmVelErr;        // Observation 1-STD velocity error assumed for wheel odometry sensor (m/s)
-
+    AP_Float _easDefault;           // Default cruise equivalent airspeed (m/s)
 
     // Tuning parameters
     const float gpsNEVelVarAccScale = 0.05f;       // Scale factor applied to NE velocity measurement variance due to manoeuvre acceleration

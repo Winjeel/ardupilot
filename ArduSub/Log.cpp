@@ -5,46 +5,6 @@
 // Code to Write and Read packets from DataFlash log memory
 // Code to interact with the user to dump or erase logs
 
-void Sub::do_erase_logs()
-{
-    gcs().send_text(MAV_SEVERITY_INFO, "Erasing logs");
-    DataFlash.EraseAll();
-    gcs().send_text(MAV_SEVERITY_INFO, "Log erase complete");
-}
-
-struct PACKED log_Optflow {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t surface_quality;
-    float flow_x;
-    float flow_y;
-    float body_x;
-    float body_y;
-};
-
-// Write an optical flow packet
-void Sub::Log_Write_Optflow()
-{
-#if OPTFLOW == ENABLED
-    // exit immediately if not enabled
-    if (!optflow.enabled()) {
-        return;
-    }
-    const Vector2f &flowRate = optflow.flowRate();
-    const Vector2f &bodyRate = optflow.bodyRate();
-    struct log_Optflow pkt = {
-        LOG_PACKET_HEADER_INIT(LOG_OPTFLOW_MSG),
-        time_us         : AP_HAL::micros64(),
-        surface_quality : optflow.quality(),
-        flow_x          : flowRate.x,
-        flow_y          : flowRate.y,
-        body_x          : bodyRate.x,
-        body_y          : bodyRate.y
-    };
-    DataFlash.WriteBlock(&pkt, sizeof(pkt));
-#endif     // OPTFLOW == ENABLED
-}
-
 struct PACKED log_Control_Tuning {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -110,7 +70,7 @@ struct PACKED log_MotBatt {
     uint64_t time_us;
     float   lift_max;
     float   bat_volt;
-    float   bat_res;
+    float   fw_th_gain;
     float   th_limit;
 };
 
@@ -122,7 +82,7 @@ void Sub::Log_Write_MotBatt()
         time_us         : AP_HAL::micros64(),
         lift_max        : (float)(motors.get_lift_max()),
         bat_volt        : (float)(motors.get_batt_voltage_filt()),
-        bat_res         : (float)(battery.get_resistance()),
+        fw_th_gain      : 1.0f,
         th_limit        : (float)(motors.get_throttle_limit())
     };
     DataFlash.WriteBlock(&pkt_mot, sizeof(pkt_mot));
@@ -324,12 +284,10 @@ void Sub::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target
 // units and "Format characters" for field type information
 const struct LogStructure Sub::log_structure[] = {
     LOG_COMMON_STRUCTURES,
-    { LOG_OPTFLOW_MSG, sizeof(log_Optflow),       
-      "OF",   "QBffff",   "TimeUS,Qual,flowX,flowY,bodyX,bodyY", "s-EEEE", "F-0000" },
     { LOG_CONTROL_TUNING_MSG, sizeof(log_Control_Tuning),
       "CTUN", "Qfffffffccfhh", "TimeUS,ThI,ABst,ThO,ThH,DAlt,Alt,BAlt,DSAlt,SAlt,TAlt,DCRt,CRt", "s----mmmmmmnn", "F----00BBBBBB" },
     { LOG_MOTBATT_MSG, sizeof(log_MotBatt),
-      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,BatRes,ThLimit", "s-vw-", "F-00-" },
+      "MOTB", "Qffff",  "TimeUS,LiftMax,BatVolt,ThGainFW,ThLimit", "s-vw-", "F-00-" },
     { LOG_EVENT_MSG, sizeof(log_Event),         
       "EV",   "QB",           "TimeUS,Id", "s-", "F-" },
     { LOG_DATA_INT16_MSG, sizeof(log_Data_Int16t),         
@@ -364,7 +322,6 @@ void Sub::log_init()
 
 #else // LOGGING_ENABLED
 
-void Sub::do_erase_logs(void) {}
 void Sub::Log_Write_Control_Tuning() {}
 void Sub::Log_Write_Performance() {}
 void Sub::Log_Write_Attitude(void) {}
@@ -379,10 +336,6 @@ void Sub::Log_Write_Error(uint8_t sub_system, uint8_t error_code) {}
 void Sub::Log_Sensor_Health() {}
 void Sub::Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target) {}
 void Sub::Log_Write_Vehicle_Startup_Messages() {}
-
-#if OPTFLOW == ENABLED
-void Sub::Log_Write_Optflow() {}
-#endif
 
 void Sub::log_init(void) {}
 

@@ -53,7 +53,6 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(gcs_data_stream_send,   50,    500),
     SCHED_TASK(update_events,          50,    150),
     SCHED_TASK_CLASS(AP_BattMonitor, &plane.battery, read, 10, 300),
-    SCHED_TASK(compass_accumulate,     50,    200),
     SCHED_TASK_CLASS(AP_Baro, &plane.barometer, accumulate, 50, 150),
     SCHED_TASK(update_notify,          50,    300),
     SCHED_TASK(read_rangefinder,       50,    100),
@@ -61,14 +60,14 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(compass_cal_update,     50,    50),
     SCHED_TASK(accel_cal_update,       10,    50),
 #if OPTFLOW == ENABLED
-    SCHED_TASK(update_optical_flow,    50,    50),
+    SCHED_TASK_CLASS(OpticalFlow, &plane.optflow, update,    50,    50),
 #endif
     SCHED_TASK(one_second_loop,         1,    400),
     SCHED_TASK(check_long_failsafe,     3,    400),
     SCHED_TASK(rpm_update,             10,    100),
     SCHED_TASK(airspeed_ratio_update,   1,    100),
 #if MOUNT == ENABLED
-    SCHED_TASK_CLASS(AP_Mount, &plane.camera_mount, update, 50, 100),
+    SCHED_TASK_CLASS(AP_Mount, &plane.camera_mount, update, 400, 100),
 #endif // MOUNT == ENABLED
 #if CAMERA == ENABLED
     SCHED_TASK_CLASS(AP_Camera, &plane.camera, update_trigger, 50, 100),
@@ -78,7 +77,9 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK(Log_Write_Fast,         25,    300),
     SCHED_TASK(update_logging1,        25,    300),
     SCHED_TASK(update_logging2,        25,    300),
+#if SOARING_ENABLED == ENABLED
     SCHED_TASK(update_soaring,         50,    400),
+#endif
     SCHED_TASK(parachute_check,        10,    200),
 #if AP_TERRAIN_AVAILABLE
     SCHED_TASK_CLASS(AP_Terrain, &plane.terrain, update, 10, 200),
@@ -89,12 +90,19 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #endif
     SCHED_TASK_CLASS(AP_InertialSensor, &plane.ins, periodic, 50, 50),
     SCHED_TASK(avoidance_adsb_update,  10,    100),
+    SCHED_TASK(read_aux_all,           10,    200),
     SCHED_TASK_CLASS(AP_Button, &plane.g2.button, update, 5, 100),
 #if STATS_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Stats, &plane.g2.stats, update, 1, 100),
 #endif
 #if GRIPPER_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Gripper, &plane.g2.gripper, update, 10, 75),
+#endif
+#if OSD_ENABLED == ENABLED
+    SCHED_TASK(publish_osd_info, 1, 10),
+#endif
+#if LANDING_GEAR_ENABLED == ENABLED
+    SCHED_TASK(landing_gear_update, 5, 50),
 #endif
 };
 
@@ -126,9 +134,19 @@ void Plane::update_soft_armed()
     DataFlash.set_vehicle_armed(hal.util->get_soft_armed());
 }
 
+void Plane::read_aux_all()
+{
+    plane.g2.rc_channels.read_aux_all();
+}
+
 // update AHRS system
 void Plane::ahrs_update()
 {
+    log_thin_counter++;
+    if (log_thin_counter >= 8) {
+        log_thin_counter = 0;
+    }
+
     update_soft_armed();
 
 #if HIL_SUPPORT
@@ -140,7 +158,7 @@ void Plane::ahrs_update()
 
     ahrs.update();
 
-    if (should_log(MASK_LOG_IMU)) {
+    if (should_log(MASK_LOG_IMU) && (log_thin_counter == 0)) {
         DataFlash.Log_Write_IMU();
     }
 
@@ -191,16 +209,6 @@ void Plane::update_compass(void)
 }
 
 /*
-  if the compass is enabled then try to accumulate a reading
- */
-void Plane::compass_accumulate(void)
-{
-    if (g.compass_enabled) {
-        compass.accumulate();
-    }    
-}
-
-/*
   do 10Hz logging
  */
 void Plane::update_logging1(void)
@@ -232,6 +240,10 @@ void Plane::update_logging2(void)
 
     if (should_log(MASK_LOG_IMU))
         DataFlash.Log_Write_Vibration();
+
+    if (should_log(MASK_LOG_MOTBATT))
+        quadplane.Log_Write_MotBatt();
+
 }
 
 
@@ -244,14 +256,10 @@ void Plane::afs_fs_check(void)
     afs.check(failsafe.last_heartbeat_ms, geofence_breached(), failsafe.AFS_last_valid_rc_ms);
 }
 
-
-/*
-  update aux servo mappings
- */
-void Plane::update_aux(void)
-{
-    SRV_Channels::enable_aux_servos();
-}
+#if HAL_WITH_IO_MCU
+#include <AP_IOMCU/AP_IOMCU.h>
+extern AP_IOMCU iomcu;
+#endif
 
 void Plane::one_second_loop()
 {
@@ -268,6 +276,10 @@ void Plane::one_second_loop()
     }
 #endif // CONFIG_HAL_BOARD
 
+#if HAL_WITH_IO_MCU
+    iomcu.setup_mixing(&rcmap, g.override_channel.get(), g.mixing_gain, g2.manual_rc_mask);
+#endif
+
     // make it possible to change orientation at runtime
     ahrs.set_orientation();
 
@@ -277,7 +289,7 @@ void Plane::one_second_loop()
     // sync MAVLink system ID
     mavlink_system.sysid = g.sysid_this_mav;
 
-    update_aux();
+    SRV_Channels::enable_aux_servos();
 
     // update notify flags
     AP_Notify::flags.pre_arm_check = arming.pre_arm_checks(false);
@@ -481,13 +493,19 @@ void Plane::update_flight_mode(void)
     // ensure we are fly-forward when we are flying as a pure fixed
     // wing aircraft. This helps the EKF produce better state
     // estimates as it can make stronger assumptions
+    static uint32_t fly_forward_off_ms=0;
     if (quadplane.in_vtol_mode() ||
         quadplane.in_assisted_flight()) {
         ahrs.set_fly_forward(false);
+        fly_forward_off_ms = AP_HAL::millis();
     } else if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
         ahrs.set_fly_forward(landing.is_flying_forward());
     } else {
-        ahrs.set_fly_forward(true);
+        if  (AP_HAL::millis() - fly_forward_off_ms > 5000) {
+            ahrs.set_fly_forward(true);
+        } else {
+            ahrs.set_fly_forward(false);
+        }
     }
 
     switch (effective_mode) 
@@ -651,15 +669,25 @@ void Plane::update_flight_mode(void)
     case QLOITER:
     case QLAND:
     case QRTL: {
-        // set nav_roll and nav_pitch using sticks
+        // set nav_roll and nav_pitch initially using control stick inputs - these can be subsequently overwritten
+
+        // Apply a separate roll limit for TVBS airframes which normally require
+        // more pitch than roll movement range due to wing drag
         int16_t roll_limit = MIN(roll_limit_cd, quadplane.aparm.angle_max);
+        if (quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS) {
+            roll_limit = MIN(roll_limit, 100 * quadplane.attitude_control->lean_angle_max_lat());
+        }
+
         nav_roll_cd  = (channel_roll->get_control_in() / 4500.0) * roll_limit;
         nav_roll_cd = constrain_int32(nav_roll_cd, -roll_limit, roll_limit);
         float pitch_input = channel_pitch->norm_input();
         // Scale from normalized input [-1,1] to centidegrees
         if (quadplane.tailsitter_active()) {
-            // For tailsitters, the pitch range is symmetrical: [-Q_ANGLE_MAX,Q_ANGLE_MAX]
-            nav_pitch_cd = pitch_input * quadplane.aparm.angle_max;
+            if (pitch_input >= 0.0f) {
+                nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_fwd(), quadplane.aparm.angle_max));
+            } else {
+                nav_pitch_cd = (int32_t)(pitch_input * MAX(100.0f * quadplane.attitude_control->lean_angle_max_aft(), quadplane.aparm.angle_max));
+            }
         } else {
             // pitch is further constrained by LIM_PITCH_MIN/MAX which may impose
             // tighter (possibly asymmetrical) limits than Q_ANGLE_MAX
@@ -688,6 +716,11 @@ void Plane::update_navigation()
     uint16_t qrtl_radius = abs(g.rtl_radius);
     if (qrtl_radius == 0) {
         qrtl_radius = abs(aparm.loiter_radius);
+    }
+
+    // set over-ride radius to zero on each mode change
+    if (control_mode != previous_mode) {
+        loiter.override_radius = 0;
     }
     
     switch(control_mode) {
@@ -746,7 +779,59 @@ void Plane::update_navigation()
     case LOITER:
     case AVOID_ADSB:
     case GUIDED:
-        update_loiter(radius);
+        {
+            // Special case using corvo hand controller where 2-axis stick is used to move ROI NE position and up/down
+            // buttons adjust ROI height.
+            if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+                // When in guided mode, allow stick inputs to move point
+                const float scaler = 0.01f * aparm.airspeed_cruise_cm / 4500.0f;
+                plane.loiter.velNE.x = - scaler * channel_pitch->get_control_in();
+                plane.loiter.velNE.y = scaler * channel_roll->get_control_in();
+
+                // Move target waypoint at constant velocity
+                float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
+                location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
+
+                // The up/down buttons are mapped to throttle channel and used to make the target location move up or down
+                float control_min = 0.0f;
+                float control_mid = 0.0f;
+                const float control_max = channel_throttle->get_range();
+                const float control_in = get_throttle_input();
+                switch (channel_throttle->get_type()) {
+                    case RC_Channel::RC_CHANNEL_TYPE_ANGLE:
+                        control_min = -control_max;
+                        break;
+                    case RC_Channel::RC_CHANNEL_TYPE_RANGE:
+                        control_mid = channel_throttle->get_control_mid();
+                        break;
+                }
+
+                loiter.last_update_ms = millis();
+                guided_WP_loc = next_WP_loc;
+
+                // Set mount target location to guided waypoint
+                Location target_loc_demand = camera_mount.get_roi_target();
+                target_loc_demand.lat = guided_WP_loc.lat;
+                target_loc_demand.lng = guided_WP_loc.lng;
+
+                // Adjust ROI height using climb/descent buttons
+                // Note: initial height is set in Plane::set_mode function
+                const float dz_frac = 0.1f;
+                float dz_up = dz_frac * (control_max - control_mid);
+                float dz_down = dz_frac * (control_mid - control_min);
+                if (control_in <= (control_mid - dz_down)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(-g.flybywire_sink_rate, 0.0f, control_in, control_min, (control_mid - dz_down));
+                } else if (control_in >= (control_mid + dz_up)) {
+                    target_loc_demand.alt += 100.0f * time_delta *
+                            linear_interpolate(0.0f, g.flybywire_climb_rate, control_in, (control_mid + dz_up), control_max);
+                }
+
+                // Send adjusted ROI target back to mount
+                camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
+            }
+            update_loiter(radius);
+        }
         break;
 
     case CRUISE:
@@ -821,14 +906,36 @@ void Plane::update_alt()
             distance_beyond_land_wp = get_distance(current_loc, next_WP_loc);
         }
 
-        SpdHgt_Controller->update_pitch_throttle(relative_target_altitude_cm(),
+        bool soaring_active = false;
+#if SOARING_ENABLED == ENABLED
+        if (g2.soaring_controller.is_active() && g2.soaring_controller.get_throttle_suppressed()) {
+            soaring_active = true;
+        }
+#endif
+
+        // customisation to prevent diving immediately after FW transition due to overshoot of takeoff height
+        // also nudge throttle 10% to ensure adequate airspeed
+        int32_t rel_alt_demand_cm = relative_target_altitude_cm();
+        int16_t net_throttle_nudge = throttle_nudge;
+        if ((millis() - fw_trans_time_ms) < 3000) {
+            rel_alt_demand_cm = MAX(rel_alt_demand_cm , fw_trans_alt_floor_cm);
+            net_throttle_nudge += 10;
+        }
+
+        if (!ahrs.airspeed_sensor_enabled()) {
+            // send the demanded airspeed to the EKF to use as a default observation value when there is no direct measurement
+            ahrs.set_default_airspeed(0.01f * target_airspeed_cm);
+        }
+
+        SpdHgt_Controller->update_pitch_throttle(rel_alt_demand_cm,
                                                  target_airspeed_cm,
                                                  flight_stage,
                                                  distance_beyond_land_wp,
                                                  get_takeoff_pitch_min_cd(),
-                                                 throttle_nudge,
+                                                 net_throttle_nudge,
                                                  tecs_hgt_afe(),
-                                                 aerodynamic_load_factor);
+                                                 aerodynamic_load_factor,
+                                                 soaring_active);
     }
 }
 
@@ -848,7 +955,7 @@ void Plane::update_flight_stage(void)
                 if (landing.is_commanded_go_around() || flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
                     // abort mode is sticky, it must complete while executing NAV_LAND
                     set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND);
-                } else if (landing.get_abort_throttle_enable() && channel_throttle->get_control_in() >= 90 &&
+                } else if (landing.get_abort_throttle_enable() && get_throttle_input() >= 90 &&
                            landing.request_go_around()) {
                     gcs().send_text(MAV_SEVERITY_INFO,"Landing aborted via throttle");
                     set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND);
@@ -878,34 +985,6 @@ void Plane::update_flight_stage(void)
 }
 
 
-
-
-#if OPTFLOW == ENABLED
-// called at 50hz
-void Plane::update_optical_flow(void)
-{
-    static uint32_t last_of_update = 0;
-
-    // exit immediately if not enabled
-    if (!optflow.enabled()) {
-        return;
-    }
-
-    // read from sensor
-    optflow.update();
-
-    // write to log and send to EKF if new data has arrived
-    if (optflow.last_update() != last_of_update) {
-        last_of_update = optflow.last_update();
-        uint8_t flowQuality = optflow.quality();
-        Vector2f flowRate = optflow.flowRate();
-        Vector2f bodyRate = optflow.bodyRate();
-        const Vector3f &posOffset = optflow.get_pos_offset();
-        ahrs.writeOptFlowMeas(flowQuality, flowRate, bodyRate, last_of_update, posOffset);
-        Log_Write_Optflow();
-    }
-}
-#endif
 
 
 /*
@@ -952,5 +1031,17 @@ float Plane::tecs_hgt_afe(void)
     }
     return hgt_afe;
 }
+
+#if OSD_ENABLED == ENABLED
+void Plane::publish_osd_info()
+{
+    AP_OSD::NavInfo nav_info;
+    nav_info.wp_distance = auto_state.wp_distance;
+    nav_info.wp_bearing = nav_controller->target_bearing_cd();
+    nav_info.wp_xtrack_error = nav_controller->crosstrack_error();
+    nav_info.wp_number = mission.get_current_nav_index();
+    osd.set_nav_info(nav_info);
+}
+#endif
 
 AP_HAL_MAIN_CALLBACKS(&plane);

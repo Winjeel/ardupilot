@@ -87,10 +87,10 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(throttle_loop,         50,     75),
     SCHED_TASK(update_GPS,            50,    200),
 #if OPTFLOW == ENABLED
-    SCHED_TASK(update_optical_flow,  200,    160),
+    SCHED_TASK_CLASS(OpticalFlow,          &copter.optflow,             update,         200, 160),
 #endif
     SCHED_TASK(update_batt_compass,   10,    120),
-    SCHED_TASK(read_aux_switches,     10,     50),
+    SCHED_TASK(read_aux_all,          10,     50),
     SCHED_TASK(arm_motors_check,      10,     50),
 #if TOY_MODE_ENABLED == ENABLED
     SCHED_TASK_CLASS(ToyMode,              &copter.g2.toy_mode,         update,          10,  50),
@@ -115,9 +115,11 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if MODE_SMARTRTL_ENABLED == ENABLED
     SCHED_TASK_CLASS(Copter::ModeSmartRTL, &copter.mode_smartrtl,       save_position,    3, 100),
 #endif
+#if SPRAYER_ENABLED == ENABLED
+    SCHED_TASK_CLASS(AC_Sprayer,           &copter.sprayer,             update,           3,  90),
+#endif
     SCHED_TASK(three_hz_loop,          3,     75),
     SCHED_TASK_CLASS(AP_ServoRelayEvents,  &copter.ServoRelayEvents,      update_events, 50,     75),
-    SCHED_TASK(compass_accumulate,   100,    100),
     SCHED_TASK_CLASS(AP_Baro,              &copter.barometer,           accumulate,      50,  90),
 #if PRECISION_LANDING == ENABLED
     SCHED_TASK(update_precland,      400,     50),
@@ -134,7 +136,7 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
     SCHED_TASK(gpsglitch_check,       10,     50),
     SCHED_TASK(landinggear_update,    10,     75),
     SCHED_TASK(lost_vehicle_check,    10,     50),
-    SCHED_TASK(gcs_check_input,      400,    180),
+    SCHED_TASK(gcs_update,           400,    180),
     SCHED_TASK(gcs_send_heartbeat,     1,    110),
     SCHED_TASK(gcs_send_deferred,     50,    550),
     SCHED_TASK(gcs_data_stream_send,  50,    550),
@@ -191,7 +193,16 @@ const AP_Scheduler::Task Copter::scheduler_tasks[] = {
 #if STATS_ENABLED == ENABLED
     SCHED_TASK_CLASS(AP_Stats,             &copter.g2.stats,            update,           1, 100),
 #endif
+#if OSD_ENABLED == ENABLED
+    SCHED_TASK(publish_osd_info, 1, 10),
+#endif
 };
+
+void Copter::read_aux_all()
+{
+    copter.g2.rc_channels.read_aux_all();
+}
+
 
 constexpr int8_t Copter::_failsafe_priorities[7];
 
@@ -270,7 +281,7 @@ void Copter::rc_loop()
     // Read radio and 3-position switch on radio
     // -----------------------------------------
     read_radio();
-    read_control_switch();
+    rc().read_mode_switch();
 }
 
 // throttle_loop - should be run at 50 hz
@@ -403,9 +414,6 @@ void Copter::three_hz_loop()
     fence_check();
 #endif // AC_FENCE_ENABLED
 
-#if SPRAYER_ENABLED == ENABLED
-    sprayer.update();
-#endif
 
     // update ch6 in flight tuning
     tuning();
@@ -450,6 +458,9 @@ void Copter::one_hz_loop()
     // indicates that the sensor or subsystem is present but not
     // functioning correctly
     update_sensor_status_flags();
+
+    // init compass location for declination
+    init_compass_location();
 }
 
 // called at 50hz
@@ -553,7 +564,7 @@ void Copter::read_AHRS(void)
     //-----------------------------------------------
 #if HIL_MODE != HIL_MODE_DISABLED
     // update hil before ahrs update
-    gcs_check_input();
+    gcs_update();
 #endif
 
     // we tell AHRS to skip INS update as we have already done it in fast_loop()
@@ -571,5 +582,17 @@ void Copter::update_altitude()
         Log_Write_Control_Tuning();
     }
 }
+
+#if OSD_ENABLED == ENABLED
+void Copter::publish_osd_info()
+{
+    AP_OSD::NavInfo nav_info;
+    nav_info.wp_distance = flightmode->wp_distance() * 1.0e-2f;
+    nav_info.wp_bearing = flightmode->wp_bearing();
+    nav_info.wp_xtrack_error = flightmode->crosstrack_error() * 1.0e-2f;
+    nav_info.wp_number = mission.get_current_nav_index();
+    osd.set_nav_info(nav_info);
+}
+#endif
 
 AP_HAL_MAIN_CALLBACKS(&copter);

@@ -73,14 +73,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: enable roll stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 0),
+    AP_GROUPINFO("_STAB_ROLL",  4, AP_Mount, state[0]._stab_roll, 1),
 
     // @Param: _STAB_TILT
     // @DisplayName: Stabilize mount's pitch/tilt angle
     // @Description: enable tilt/pitch stabilisation relative to Earth
     // @Values: 0:Disabled,1:Enabled
     // @User: Standard
-    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  0),
+    AP_GROUPINFO("_STAB_TILT", 5, AP_Mount, state[0]._stab_tilt,  1),
 
     // @Param: _STAB_PAN
     // @DisplayName: Stabilize mount pan/yaw angle
@@ -119,7 +119,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control tilt (pitch) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    0),
+    AP_GROUPINFO("_RC_IN_TILT",  10, AP_Mount, state[0]._tilt_rc_in,    2),
 
     // @Param: _ANGMIN_TIL
     // @DisplayName: Minimum tilt angle
@@ -144,7 +144,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Description: 0 for none, any other for the RC channel to be used to control pan (yaw) movements
     // @Values: 0:Disabled,5:RC5,6:RC6,7:RC7,8:RC8,9:RC9,10:RC10,11:RC11,12:RC12
     // @User: Standard
-    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       0),
+    AP_GROUPINFO("_RC_IN_PAN",  13, AP_Mount, state[0]._pan_rc_in,       1),
 
     // @Param: _ANGMIN_PAN
     // @DisplayName: Minimum pan angle
@@ -170,7 +170,7 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @Range: 0 100
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 0),
+    AP_GROUPINFO("_JSTICK_SPD",  16, AP_Mount, _joystick_speed, 50),
 
     // @Param: _LEAD_RLL
     // @DisplayName: Roll stabilization lead time
@@ -198,7 +198,14 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("_TYPE", 19, AP_Mount, state[0]._type, 0),
 
-    // 20 formerly _OFF_JNT
+    // @Param: _INIT_ELEV
+    // @DisplayName: Initial elevation angle
+    // @Description: When entering AHRS stabilised pointing modes, the target elevation angle will be set to this value
+    // @Units: deg
+    // @Range: -90 0
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("_INIT_ELEV", 20, AP_Mount, _ef_elev_deg, -15),
 
     // 21 formerly _OFF_ACC
 
@@ -393,10 +400,17 @@ const AP_Param::GroupInfo AP_Mount::var_info[] = {
     AP_GROUPEND
 };
 
-AP_Mount::AP_Mount(const AP_AHRS_TYPE &ahrs, const struct Location &current_loc) :
-    _ahrs(ahrs),
+AP_Mount::AP_Mount(const struct Location &current_loc) :
     _current_loc(current_loc)
 {
+    if (_singleton != nullptr) {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        AP_HAL::panic("Mount must be singleton");
+#endif
+        return;
+    }
+    _singleton = this;
+
 	AP_Param::setup_object_defaults(this, var_info);
 }
 
@@ -522,6 +536,17 @@ MAV_MOUNT_MODE AP_Mount::get_mode(uint8_t instance) const
     return state[instance]._mode;
 }
 
+// return the earth frame yaw of the payload in radians
+float AP_Mount::get_ef_yaw(uint8_t instance) const
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return 0.0f;
+    }
+
+    // get value from backend
+    return _backends[instance]->get_ef_yaw();
+}
+
 // set_mode_to_default - restores the mode to it's default mode held in the MNT_MODE parameter
 //      this operation requires 60us on a Pixhawk/PX4
 void AP_Mount::set_mode_to_default(uint8_t instance)
@@ -552,62 +577,141 @@ void AP_Mount::set_angle_targets(uint8_t instance, float roll, float tilt, float
     _backends[instance]->set_angle_targets(roll, tilt, pan);
 }
 
-/// Change the configuration of the mount
-/// triggered by a MavLink packet.
-void AP_Mount::configure_msg(uint8_t instance, mavlink_message_t* msg)
+// set yaw target in degrees
+void AP_Mount::set_yaw_target(uint8_t instance, float pan)
 {
     if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
         return;
     }
 
+    // send command to backend
+    _backends[instance]->set_yaw_target(pan);
+}
+
+// specialised mode that uses RC targeting
+// when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+// when called with park = false, causes the mount to revert to normal RC targeting operation
+void AP_Mount::set_elev_park(uint8_t instance, bool park)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->set_elev_park(park);
+}
+
+// reset the mount LOS elevation angle to the parameter defined value
+void AP_Mount::reset_elev(uint8_t instance)
+{
+    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+        return;
+    }
+
+    // send command to backend
+    _backends[instance]->reset_elev();
+}
+
+MAV_RESULT AP_Mount::handle_command_do_mount_configure(const mavlink_command_long_t &packet)
+{
+    if (_primary >= AP_MOUNT_MAX_INSTANCES || _backends[_primary] == nullptr) {
+        return MAV_RESULT_FAILED;
+    }
+    _backends[_primary]->set_mode((MAV_MOUNT_MODE)packet.param1);
+    state[0]._stab_roll = packet.param2;
+    state[0]._stab_tilt = packet.param3;
+    state[0]._stab_pan = packet.param4;
+
+    return MAV_RESULT_ACCEPTED;
+}
+
+
+MAV_RESULT AP_Mount::handle_command_do_mount_control(const mavlink_command_long_t &packet)
+{
+    if (_primary >= AP_MOUNT_MAX_INSTANCES || _backends[_primary] == nullptr) {
+        return MAV_RESULT_FAILED;
+    }
+
     // send message to backend
-    _backends[instance]->configure_msg(msg);
+    _backends[_primary]->control(packet.param1, packet.param2, packet.param3, (MAV_MOUNT_MODE) packet.param7);
+
+    return MAV_RESULT_ACCEPTED;
+}
+
+MAV_RESULT AP_Mount::handle_command_long(const mavlink_command_long_t &packet)
+{
+    switch (packet.command) {
+    case MAV_CMD_DO_MOUNT_CONFIGURE:
+        return handle_command_do_mount_configure(packet);
+    case MAV_CMD_DO_MOUNT_CONTROL:
+        return handle_command_do_mount_control(packet);
+    default:
+        return MAV_RESULT_UNSUPPORTED;
+    }
+}
+
+/// Change the configuration of the mount
+void AP_Mount::handle_mount_configure(const mavlink_message_t *msg)
+{
+    if (_primary >= AP_MOUNT_MAX_INSTANCES || _backends[_primary] == nullptr) {
+        return;
+    }
+
+    mavlink_mount_configure_t packet;
+    mavlink_msg_mount_configure_decode(msg, &packet);
+
+    // send message to backend
+    _backends[_primary]->handle_mount_configure(packet);
 }
 
 /// Control the mount (depends on the previously set mount configuration)
-/// triggered by a MavLink packet.
-void AP_Mount::control_msg(uint8_t instance, mavlink_message_t *msg)
+void AP_Mount::handle_mount_control(const mavlink_message_t *msg)
 {
-    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
+    if (_primary >= AP_MOUNT_MAX_INSTANCES || _backends[_primary] == nullptr) {
         return;
     }
 
-    // send message to backend
-    _backends[instance]->control_msg(msg);
-}
-
-void AP_Mount::control(uint8_t instance, int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, enum MAV_MOUNT_MODE mount_mode)
-{
-    if (instance >= AP_MOUNT_MAX_INSTANCES || _backends[instance] == nullptr) {
-        return;
-    }
+    mavlink_mount_control_t packet;
+    mavlink_msg_mount_control_decode(msg, &packet);
 
     // send message to backend
-    _backends[instance]->control(pitch_or_lat, roll_or_lon, yaw_or_alt, mount_mode);
+    _backends[_primary]->handle_mount_control(packet);
 }
 
 /// Return mount status information
-void AP_Mount::status_msg(mavlink_channel_t chan)
+void AP_Mount::send_mount_status(mavlink_channel_t chan)
 {
-    // call status_msg for  each instance
+    // call send_mount_status for  each instance
     for (uint8_t instance=0; instance<AP_MOUNT_MAX_INSTANCES; instance++) {
         if (_backends[instance] != nullptr) {
-            _backends[instance]->status_msg(chan);
+            _backends[instance]->send_mount_status(chan);
         }
     }
 }
 
 // set_roi_target - sets target location that mount should attempt to point towards
-void AP_Mount::set_roi_target(uint8_t instance, const struct Location &target_loc)
+void AP_Mount::set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE)
 {
     // call instance's set_roi_cmd
     if (instance < AP_MOUNT_MAX_INSTANCES && _backends[instance] != nullptr) {
-        _backends[instance]->set_roi_target(target_loc);
+        _backends[instance]->set_roi_target(target_loc, roi_velNE);
+    }
+}
+
+// get_roi_target - gets target location that mount is attempting to point towards
+Location AP_Mount::get_roi_target(uint8_t instance)
+{
+    // call instance's set_roi_cmd
+    if (instance < AP_MOUNT_MAX_INSTANCES && _backends[instance] != nullptr) {
+        return _backends[instance]->get_roi_target();
+    } else {
+        Location ret = {};
+        return ret;
     }
 }
 
 // pass a GIMBAL_REPORT message to the backend
-void AP_Mount::handle_gimbal_report(mavlink_channel_t chan, mavlink_message_t *msg)
+void AP_Mount::handle_gimbal_report(mavlink_channel_t chan, const mavlink_message_t *msg)
 {
     for (uint8_t instance=0; instance<AP_MOUNT_MAX_INSTANCES; instance++) {
         if (_backends[instance] != nullptr) {
@@ -616,8 +720,28 @@ void AP_Mount::handle_gimbal_report(mavlink_channel_t chan, mavlink_message_t *m
     }
 }
 
+void AP_Mount::handle_message(mavlink_channel_t chan, const mavlink_message_t *msg)
+{
+    switch (msg->msgid) {
+    case MAVLINK_MSG_ID_GIMBAL_REPORT:
+        handle_gimbal_report(chan, msg);
+        break;
+    case MAVLINK_MSG_ID_MOUNT_CONFIGURE:
+        handle_mount_configure(msg);
+        break;
+    case MAVLINK_MSG_ID_MOUNT_CONTROL:
+        handle_mount_control(msg);
+        break;
+    default:
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+        AP_HAL::panic("Unhandled mount case");
+#endif
+        break;
+    }
+}
+
 // handle PARAM_VALUE
-void AP_Mount::handle_param_value(mavlink_message_t *msg)
+void AP_Mount::handle_param_value(const mavlink_message_t *msg)
 {
     for (uint8_t instance=0; instance<AP_MOUNT_MAX_INSTANCES; instance++) {
         if (_backends[instance] != nullptr) {
@@ -635,3 +759,16 @@ void AP_Mount::send_gimbal_report(mavlink_channel_t chan)
         }
     }    
 }
+
+
+// singleton instance
+AP_Mount *AP_Mount::_singleton;
+
+namespace AP {
+
+AP_Mount *mount()
+{
+    return AP_Mount::get_singleton();
+}
+
+};

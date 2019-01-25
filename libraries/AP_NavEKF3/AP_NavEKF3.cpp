@@ -576,6 +576,16 @@ const AP_Param::GroupInfo NavEKF3::var_info[] = {
     // @Units: m/s
     AP_GROUPINFO("WENC_VERR", 53, NavEKF3, _wencOdmVelErr, 0.1f),
 
+    // @Param: EAS_DEFAULT
+    // @DisplayName: Default airspeed measurement (m/s)
+    // @Description: Set it to the nominal cruise equivalent airspeed to improve wind estimation and enable GPS denied dead-reckoning when there is no airspeed sensor fitted. Parameter values 5.0 m/s or lower will be ignored.
+    // @Range: 0.0 25.0
+    // @Increment: 0.5
+    // @User: Advanced
+    // @Units: m/s
+    // @RebootRequired: True
+    AP_GROUPINFO("EAS_DEFAULT", 54, NavEKF3, _easDefault, 0.0f),
+
     AP_GROUPEND
 };
 
@@ -709,7 +719,7 @@ bool NavEKF3::InitialiseFilter(void)
 
     // zero the structs used capture reset events
     memset(&yaw_reset_data, 0, sizeof(yaw_reset_data));
-    memset(&pos_reset_data, 0, sizeof(pos_reset_data));
+    memset((void *)&pos_reset_data, 0, sizeof(pos_reset_data));
     memset(&pos_down_reset_data, 0, sizeof(pos_down_reset_data));
 
     check_log_write();
@@ -940,16 +950,22 @@ void NavEKF3::getEkfControlLimits(float &ekfGndSpdLimit, float &ekfNavVelGainSca
 {
     if (core) {
         core[primary].getEkfControlLimits(ekfGndSpdLimit, ekfNavVelGainScaler);
+    } else {
+        ekfGndSpdLimit = 400.0f; //return 80% of max filter speed
+        ekfNavVelGainScaler = 1.0f;
     }
 }
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void NavEKF3::getWind(int8_t instance, Vector3f &wind) const
+// returns true if wind state estimation is active
+bool NavEKF3::getWind(int8_t instance, Vector3f &wind) const
 {
+    bool ret = false;
     if (instance < 0 || instance >= num_cores) instance = primary;
     if (core) {
-        core[instance].getWind(wind);
+        ret = core[instance].getWind(wind);
     }
+    return ret;
 }
 
 // return earth magnetic field estimates in measurement units / 1000
@@ -1126,11 +1142,21 @@ bool NavEKF3::use_compass(void) const
 // The sign convention is that a RH physical rotation of the sensor about an axis produces both a positive flow and gyro rate
 // msecFlowMeas is the scheduler time in msec when the optical flow data was received from the sensor.
 // posOffset is the XYZ flow sensor position in the body frame in m
-void NavEKF3::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset)
+void NavEKF3::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset)
 {
     if (core) {
         for (uint8_t i=0; i<num_cores; i++) {
             core[i].writeOptFlowMeas(rawFlowQuality, rawFlowRates, rawGyroRates, msecFlowMeas, posOffset);
+        }
+    }
+}
+
+// set value of default airspeed to be assumed when there is no airspeed measurement and we are doing wind estimation
+void NavEKF3::set_default_airspeed(float spd)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].set_default_airspeed(spd);
         }
     }
 }

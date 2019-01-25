@@ -17,8 +17,8 @@ extern const AP_HAL::HAL& hal;
  # define POSCONTROL_ACC_Z_DT                   0.02f   // vertical acceleration controller dt default
  # define POSCONTROL_POS_XY_P                   1.0f    // horizontal position controller P gain default
  # define POSCONTROL_VEL_XY_P                   1.4f    // horizontal velocity controller P gain default
- # define POSCONTROL_VEL_XY_I                   0.7f    // horizontal velocity controller I gain default
- # define POSCONTROL_VEL_XY_D                   0.35f   // horizontal velocity controller D gain default
+ # define POSCONTROL_VEL_XY_I                   0.0f    // horizontal velocity controller I gain default
+ # define POSCONTROL_VEL_XY_D                   0.0f   // horizontal velocity controller D gain default
  # define POSCONTROL_VEL_XY_IMAX                1000.0f // horizontal velocity controller IMAX gain default
  # define POSCONTROL_VEL_XY_FILT_HZ             5.0f    // horizontal velocity controller input filter
  # define POSCONTROL_VEL_XY_FILT_D_HZ           5.0f    // horizontal velocity controller input filter for D
@@ -59,7 +59,13 @@ extern const AP_HAL::HAL& hal;
 #endif
 
 const AP_Param::GroupInfo AC_PosControl::var_info[] = {
-    // 0 was used for HOVER
+    // @Param: _WING_Z
+    // @DisplayName: Fraction of wing normal force to compensate for in throttle calculation
+    // @Description: The fraction of measured wing normal acceleration the accel to throttle calculation will account for.
+    // @Range: 0.0 1.0
+    // @Increment: 0.05
+    // @User: Advanced
+    AP_GROUPINFO("_WING_Z", 0, AC_PosControl, _accel_z_wing_k, 0.7f),
 
     // @Param: _ACC_XY_FILT
     // @DisplayName: XY Acceleration filter cutoff frequency
@@ -169,14 +175,98 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_SUBGROUPINFO(_pid_vel_xy, "_VELXY_", 6, AC_PosControl, AC_PID_2D),
 
-    // @Param: _ANGLE_MAX
-    // @DisplayName: Position Control Angle Max
-    // @Description: Maximum lean angle autopilot can request.  Set to zero to use ANGLE_MAX parameter value
-    // @Units: deg
-    // @Range: 0 45
+    // 7 unused. Used previously by _ANGLE_MAX which was deprecated.
+
+    // 8 unused. Used previously by _WING_XY which was deprecated.
+
+    // 8 unused. Used previously by _TRIM_SPD which was deprecated.
+
+    // 10 unused. Used previously by _TRIM_EXP which was deprecated.
+
+    // 11 unused. Used previously by _TRIM_METHOD which was deprecated.
+
+    // 12 unused. Used previously by _TRIM_BIAS which was deprecated.
+
+    // @Param: _TRIM_TAU
+    // @DisplayName: Time constant applied to trim correction
+    // @Range: 0.1 5.0
+    // @Units: sec
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("_TRIM_TAU", 13, AC_PosControl, _trim_tau, 1.0f),
+
+    // @Param: _AIRSPD_I
+    // @DisplayName: Gain from integral of ground velocity error to demanded airspeed.
+    // @Range: 0.0 1.0
+    // @Increment: 0.05
+    // @User: Advanced
+    AP_GROUPINFO("_AIRSPD_I", 14, AC_PosControl, _vel_err_i_gain, 1.0f),
+
+    // @Param: _FWD_SPD_MAX
+    // @DisplayName: Maximum forward airspeed in VTOL mode.
+    // @Units: m/s
+    // @Range: 10 20
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("_ANGLE_MAX",  7, AC_PosControl, _lean_angle_max, 0.0f),
+    AP_GROUPINFO("_FWD_SPD_MAX",  15, AC_PosControl, _fwd_spd_max, 15.0f),
+
+    // 16 unused. Used previously by _AFT_SPD_MAX which was deprecated.
+
+    // @Param: _FWD_AZ_GF
+    // @DisplayName: Vertical PD Gain Reduction Factor.
+    // @Description: Used to compensate for the increased sensitivity from rotor tilt angle to vertical g during high speed VTOL operation due to wing lift.
+    // @Range: 0.0 0.9
+    // @Increment: 0.05
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_AZ_GF",  17, AC_PosControl, _fwd_az_gf, 0.5f),
+
+    // @Param: _FWD_BCOEF
+    // @DisplayName: Profile drag ballistic coefficient for forward flight.
+    // @Description: Is equivalent to mass / (area * drag_coef). Set initially to a value consistent with profile drag at _FWD_SPD_MAX.
+    // @Range: 10.0 1000.0
+    // @Increment: 5
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_BCOEF",  18, AC_PosControl, _fwd_bcoef, 110.0f),
+
+    // @Param: _FWD_INFLOW
+    // @DisplayName: Propeller inflow correction factor.
+    // @Description: Gain from estimated inflow to demanded throttle and normalised using hover throttle. Used to correct for reduction in thrust when flying forward. For example a value of 0.01 will increase the throttle by 0.1 (10%) when flying with props tilted forward into a 10m/s airflow.
+    // @Range: 0.0 0.05
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_INFLOW",  19, AC_PosControl, _fwd_inflow_thrust_factor, 0.007f),
+
+    // @Param: _LAND_GYRY
+    // @DisplayName: Landed detector wing pitch rate threshold.
+    // @Description: Wing pitch rate required to trigger landed detector.
+    // @Range: 0.5 5.0
+    // @Units: rad/sec
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_GYRY",  20, AC_PosControl, _landed_gyro_y, 2.0f),
+
+    // @Param: _LAND_PITCH
+    // @DisplayName: Landed detector wing pitch threshold.
+    // @Description: Wing pitch angle required to trigger landed detector.
+    // @Range: 0.0 0.05
+    // @Units: rad
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_PITCH",  21, AC_PosControl, _landed_pitch, 0.25f),
+
+    // @Param: _LAND_ACCEL
+    // @DisplayName: Landed detector accceleration threshold.
+    // @Description: IMU acceleration required to trigger landed detector.
+    // @Range: 15.0 30.0
+    // @Units: m/s/s
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_ACCEL",  22, AC_PosControl, _landed_accel, 20.0f),
+
+    // @Param: _FWD_DB_THR
+    // @DisplayName: Rotor Drag Brake Threshold.
+    // @Description: Decel due to aero drag has to fall below this value before rotors will tilt rearwards to perform a braking manoeuvre. Smaller values make the controller wait for longer before rotors are tilted back past vertical to complete a braking or reversal manoevre which prevents loss of control due to reverse flow through rotors. Increase value if time spent with rotors level during braking manoeuvres is excessive.
+    // @Range: 0.05 0.5
+    // @Units: g
+    // @User: Advanced
+    AP_GROUPINFO("_FWD_DB_THR",  23, AC_PosControl, _drag_brake_g_thrhld, 0.15f),
+
 
     AP_GROUPEND
 };
@@ -185,9 +275,10 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
 // Note that the Vector/Matrix constructors already implicitly zero
 // their values.
 //
-AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& inav,
+AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing, const AP_InertialNav& inav,
                              const AP_Motors& motors, AC_AttitudeControl& attitude_control) :
     _ahrs(ahrs),
+    _ahrs_wing(ahrs_wing),
     _inav(inav),
     _motors(motors),
     _attitude_control(attitude_control),
@@ -197,21 +288,31 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& ina
     _p_pos_xy(POSCONTROL_POS_XY_P),
     _pid_vel_xy(POSCONTROL_VEL_XY_P, POSCONTROL_VEL_XY_I, POSCONTROL_VEL_XY_D, POSCONTROL_VEL_XY_IMAX, POSCONTROL_VEL_XY_FILT_HZ, POSCONTROL_VEL_XY_FILT_D_HZ, POSCONTROL_DT_50HZ),
     _dt(POSCONTROL_DT_400HZ),
-    _last_update_xy_ms(0),
-    _last_update_z_ms(0),
     _speed_down_cms(POSCONTROL_SPEED_DOWN),
     _speed_up_cms(POSCONTROL_SPEED_UP),
     _speed_cms(POSCONTROL_SPEED),
     _accel_z_cms(POSCONTROL_ACCEL_Z),
-    _accel_last_z_cms(0.0f),
     _accel_cms(POSCONTROL_ACCEL_XY),
     _leash(POSCONTROL_LEASH_LENGTH_MIN),
     _leash_down_z(POSCONTROL_LEASH_LENGTH_MIN),
     _leash_up_z(POSCONTROL_LEASH_LENGTH_MIN),
-    _roll_target(0.0f),
-    _pitch_target(0.0f),
+    _accel_target_filter(POSCONTROL_ACCEL_FILTER_HZ),
+    _roll_target_cd(0.0f),
+    _pitch_target_cd(0.0f),
+    _vel_xy_integ_length_prev(0.0f),
     _distance_to_target(0.0f),
-    _accel_target_filter(POSCONTROL_ACCEL_FILTER_HZ)
+    _pitch_trim_rad(0.0f),
+    _accel_target_xy_updated(false),
+    _vel_forward_filt(0.0f),
+    _last_log_time_ms(0),
+    _vel_err_i_gain_scale(1.0f),
+    _taking_off(true),
+    _land_expect_time_ms(0),
+    _land_detect_time_ms(0),
+    _land_pitch_rate_time_ms(0),
+    _land_pitch_ang_time_ms(0),
+    _land_accz_time_ms(0),
+    _is_landed(false)
 {
     AP_Param::setup_object_defaults(this, var_info);
 
@@ -245,15 +346,15 @@ void AC_PosControl::set_dt(float delta_sec)
     _pid_accel_z.set_dt(_dt);
     _pid_vel_xy.set_dt(_dt);
 
-    // update rate z-axis velocity error and accel error filters
+    // update rate z-axis velocity error and wing normal force accel filters
     _vel_error_filter.set_cutoff_frequency(POSCONTROL_VEL_ERROR_CUTOFF_FREQ);
+    _wing_lift_accel_filter.set_cutoff_frequency(POSCONTROL_ACCEL_FILTER_HZ);
+    _wing_drag_accel_filter.set_cutoff_frequency(POSCONTROL_ACCEL_FILTER_HZ);
 }
 
-/// set_speed_z - sets maximum climb and descent rates
+/// set_max_speed_z - set the maximum climb and descent rates
 /// To-Do: call this in the main code as part of flight mode initialisation
-///     calc_leash_length_z should be called afterwards
-///     speed_down should be a negative number
-void AC_PosControl::set_speed_z(float speed_down, float speed_up)
+void AC_PosControl::set_max_speed_z(float speed_down, float speed_up)
 {
     // ensure speed_down is always negative
     speed_down = -fabsf(speed_down);
@@ -266,8 +367,8 @@ void AC_PosControl::set_speed_z(float speed_down, float speed_up)
     }
 }
 
-/// set_accel_z - set vertical acceleration in cm/s/s
-void AC_PosControl::set_accel_z(float accel_cmss)
+/// set_max_accel_z - set the maximum vertical acceleration in cm/s/s
+void AC_PosControl::set_max_accel_z(float accel_cmss)
 {
     if (fabsf(_accel_z_cms-accel_cmss) > 1.0f) {
         _accel_z_cms = accel_cmss;
@@ -448,9 +549,12 @@ void AC_PosControl::get_stopping_point_z(Vector3f& stopping_point) const
 /// init_takeoff - initialises target altitude if we are taking off
 void AC_PosControl::init_takeoff()
 {
+    // Set demanded position to current value
     const Vector3f& curr_pos = _inav.get_position();
-
     _pos_target.z = curr_pos.z;
+
+    // tell the position controller to keep rotors level until takeoff is confirmed
+    _taking_off = true;
 
     // freeze feedforward to avoid jump
     freeze_ff_z();
@@ -460,6 +564,7 @@ void AC_PosControl::init_takeoff()
 
     // initialise ekf reset handler
     init_ekf_z_reset();
+
 }
 
 // is_active_z - returns true if the z-axis position controller has been run very recently
@@ -486,7 +591,7 @@ void AC_PosControl::update_z_controller()
     calc_leash_length_z();
 
     // call z-axis position controller
-    run_z_controller();
+    calc_roll_pitch_throttle();
 }
 
 /// calc_leash_length - calculates the vertical leash lengths from maximum speed, acceleration
@@ -500,11 +605,9 @@ void AC_PosControl::calc_leash_length_z()
     }
 }
 
-// run position control for Z axis
-// target altitude should be set with one of these functions: set_alt_target, set_target_to_stopping_point_z, init_takeoff
-// calculates desired rate in earth-frame z axis and passes to rate controller
-// vel_up_max, vel_down_max should have already been set before calling this method
-void AC_PosControl::run_z_controller()
+// Calculates throttle, roll and pitch demands required to track vertical position and velocity
+// and horizontal velocity and acceleration demands.
+void AC_PosControl::calc_roll_pitch_throttle()
 {
     float curr_alt = _inav.get_altitude();
 
@@ -578,6 +681,8 @@ void AC_PosControl::run_z_controller()
         // Reset Filter
         _vel_error.z = 0;
         _vel_error_filter.reset(0);
+        _wing_lift_accel_filter.reset(0);
+        _wing_drag_accel_filter.reset(0);
         _flags.reset_rate_to_accel_z = false;
     } else {
         // calculate rate error and filter with cut off frequency of 2 Hz
@@ -630,18 +735,208 @@ void AC_PosControl::run_z_controller()
     // get d term
     d = _pid_accel_z.get_d();
 
-    float thr_out = (p+i+d)*0.001f +_motors.get_throttle_hover();
+    // calculate the lift g demand scaled as an equivalent throttle
+    float az_pd_gain = constrain_float(1.0f - _fwd_az_gf * _ahrs_wing.cos_pitch(), 0.1f, 1.0f);
+    float lift_g_pid = (az_pd_gain * p + i + az_pd_gain * d) * 0.001f;
+    float lift_g_demand = (1.0f + lift_g_pid);
 
-    // send throttle to attitude controller with angle boost
-    _attitude_control.set_throttle_out(thr_out, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+    if (_taking_off) {
+        // send lift demand direct to throttle and keep rotors level
+        _attitude_control.set_throttle_out(lift_g_demand * _motors.get_throttle_hover(), false, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+        _pitch_target_cd = 0.0f;
+        _roll_target_cd = 0.0f;
+
+        // if wing has pitched up past 45 degrees, assume we have cleared the ground
+        if (_ahrs_wing.cos_pitch() < 0.7071f) {
+            _taking_off = false;
+        }
+
+        return;
+    }
+
+    // estimate wing force normal g in lift direction
+    float wing_lift_g = _accel_z_wing_k * _ahrs_wing.cos_pitch() * _ahrs_wing.cos_pitch();
+    wing_lift_g = _wing_lift_accel_filter.apply(wing_lift_g, _dt);
+    wing_lift_g = constrain_float(wing_lift_g, 0.0f, 1.0f);
+
+    // get the lift g required from the rotors taking wing lift into account
+    lift_g_demand -=  wing_lift_g;
+    lift_g_demand = constrain_float(lift_g_demand, -0.25f, 2.0f);
+
+    // Logging for debug and tuning of TVBS positon controller mods
+    uint32_t now = AP_HAL::millis();
+    if (now - _last_log_time_ms >= 50) {
+        _last_log_time_ms = now;
+        DataFlash_Class::instance()->Log_Write("TVB1", "TimeUS,LGP,HT,WLG,LGD", "Qffff",
+                                               AP_HAL::micros64(),
+                                               (double)lift_g_pid,
+                                               (double)_motors.get_throttle_hover(),
+                                               (double)wing_lift_g,
+                                               (double)lift_g_demand);
+
+    }
+
+    // calculate the throttle demand using one of two methods
+    // the first combines the horizontal velocity and acceleration demand from the positon controller with the lift_g_demand
+    // the second is if there is no horizontal demand, and the pilot is demanding rotor tilt directly.
+    float throttle_demand;
+    if (_accel_target_xy_updated) {
+        _accel_target_xy_updated = false;
+        // get component of velocity demand forward in wind coordinates
+        float vel_forward = 0.01f * ((_vel_target.x + _vel_xy_error_integ.x) * _ahrs.cos_yaw() + (_vel_target.y + _vel_xy_error_integ.y) * _ahrs.sin_yaw());
+        float alpha_coef = constrain_float(_dt / MAX(_trim_tau,0.1f),0.0f,1.0f);
+        _vel_forward_filt = alpha_coef * vel_forward + (1.0f - alpha_coef) * _vel_forward_filt;
+
+        // use forward velocity to calculate a profile drag that needs to be overcome by the rotors
+        float rho = 1.225f / sqrtf(_ahrs.get_EAS2TAS());
+        float fwd_g_trim = (rho / (2.0f * MAX(_fwd_bcoef, 1.0f))) * (_vel_forward_filt * _vel_forward_filt) / GRAVITY_MSS;
+        if (_vel_forward_filt < 0.0f) {
+            fwd_g_trim = - fwd_g_trim;
+        }
+
+        // compensate for wing normal force in the forward flight direction that needs to be overcome by the rotors
+        fwd_g_trim += _accel_z_wing_k * _ahrs_wing.sin_pitch() * _ahrs_wing.cos_pitch() * _ahrs_wing.cos_roll();
+        fwd_g_trim = _wing_drag_accel_filter.apply(fwd_g_trim, _dt);
+        fwd_g_trim = constrain_float(fwd_g_trim, -1.0f, 1.0f);
+
+        // rotate position controller accelerations into body forward-right frame
+        float fwd_g_posctl = (_accel_target.x*_ahrs.cos_yaw() + _accel_target.y*_ahrs.sin_yaw()) / GRAVITY_CMSS;
+        fwd_g_posctl = constrain_float(fwd_g_posctl, -1.0f, 1.0f);
+        float right_g_posctl = (-_accel_target.x*_ahrs.sin_yaw() + _accel_target.y*_ahrs.cos_yaw()) / GRAVITY_CMSS;
+        right_g_posctl = constrain_float(right_g_posctl, -1.0f, 1.0f);
+
+
+        // Check if a touchdown is expected and if detected, set fwd and lateral g demands to zero
+        if ((now - _land_expect_time_ms) < 1000) {
+
+            // wing pitch rate on touchdown
+            float pitch_rate_mag = fabsf(_ahrs_wing.get_gyro_latest().y);
+            if (pitch_rate_mag > _landed_gyro_y) {
+                _land_pitch_rate_time_ms = now;
+            }
+
+            // wing within touchdown pitch angle range
+            float wing_pitch_ang = _ahrs_wing.pitch;
+            if (wing_pitch_ang < _landed_pitch) {
+                _land_pitch_ang_time_ms = now;
+            }
+
+            // landing shock detected.
+            float accel_mag = _ahrs_wing.get_accel_ef_blended().length();
+            if (accel_mag > _landed_accel) {
+                _land_accz_time_ms = now;
+            }
+
+            // declare landing detected if 2 out of 3 criteria were met in the last second
+            // only require one check if already detected
+            uint8_t counter = 0;
+            if ((now - _land_pitch_rate_time_ms) < 1000) {
+                counter++;
+            }
+            if ((now - _land_pitch_ang_time_ms) < 1000) {
+                counter++;
+            }
+            if ((now - _land_accz_time_ms) < 1000) {
+                counter++;
+            }
+            if ((counter >= 2) || ((counter >= 1) && _is_landed)) {
+                _is_landed = true;
+                _land_detect_time_ms = now;
+            } else {
+                _is_landed = false;
+            }
+
+            // if landing detected, zero horizontal g maneouvre demands to point rotors up and prevent horizontal dragging and prop strike
+            if ((now - _land_detect_time_ms) < 3000) {
+                fwd_g_trim = fwd_g_posctl = right_g_posctl = 0.0f;
+                lift_g_demand = MAX(lift_g_demand, 1e-6f);
+            }
+
+            DataFlash_Class::instance()->Log_Write("VLND", "TimeUS,GYRY,PITCH,ACCEL,COUNT", "QfffB",
+                                                       AP_HAL::micros64(),
+                                                       (double)pitch_rate_mag,
+                                                       (double)wing_pitch_ang,
+                                                       (double)accel_mag,
+                                                       (uint8_t)counter);
+        } else {
+            _land_detect_time_ms = 0;
+            _land_pitch_rate_time_ms = 0;
+            _land_pitch_ang_time_ms = 0;
+            _land_accz_time_ms = 0;
+            _is_landed = false;
+        }
+
+        // Combine fwd and vertical g demands to obtain the required thrust g vector. Prevent loss of control due to
+        // reverse flow during braking maneouvres by waiting until g due to aero drag has fallen before allowing
+        // rotors to tilt past vertical.
+        float fwd_g_demand = fwd_g_trim + fwd_g_posctl;
+        if (fwd_g_trim > _drag_brake_g_thrhld) {
+            fwd_g_demand = fmaxf(fwd_g_demand, 0.0f);
+        } else if (fwd_g_trim < -_drag_brake_g_thrhld) {
+            fwd_g_demand = fminf(fwd_g_demand, 0.0f);
+        }
+        float pitch_target_rad = atan2f(-fwd_g_demand , lift_g_demand);
+        float thrust_g_demand = sqrtf(fwd_g_demand * fwd_g_demand + lift_g_demand * lift_g_demand);
+
+        // Limit the pitch target
+        float min_pitch_angle = -radians(_attitude_control.lean_angle_max_fwd());
+        float max_pitch_angle = radians(_attitude_control.lean_angle_max_aft());
+        pitch_target_rad = constrain_float(pitch_target_rad, min_pitch_angle, max_pitch_angle);
+
+        // calculate throttle required to generate thrust
+        // rough correction for prop inflow is included - needs refinement
+        float vel_inflow = MAX(- _vel_forward_filt * sinf(pitch_target_rad), 0.0f);
+        float thrust_g_inflow = _fwd_inflow_thrust_factor * vel_inflow;
+        throttle_demand = constrain_float((thrust_g_demand + thrust_g_inflow) * _motors.get_throttle_hover(), 0.0f, 1.0f);
+
+        // rotate the thrust vector and adjust the magnitude to maintain lift and achieve the required forward acceleration
+        // calculate the roll assuming only rotor  provides significant force in that direction
+        float cos_pitch_target = cosf(pitch_target_rad);
+        _pitch_target_cd = 100.0f *  degrees(pitch_target_rad);
+        _roll_target_cd = degrees(atanf(right_g_posctl * cos_pitch_target)) ;
+        _roll_target_cd = 100.0f * constrain_float(_roll_target_cd, -_attitude_control.lean_angle_max_lat(), _attitude_control.lean_angle_max_lat());
+
+
+        // send throttle to attitude controller without angle boost
+        _attitude_control.set_throttle_out(throttle_demand, false, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+
+        // Logging for debug and tuning of TVBS positon controller mods
+        if (now - _last_log_time_ms >= 50 || now == _last_log_time_ms) {
+            _last_log_time_ms = now;
+
+            DataFlash_Class::instance()->Log_Write("TVB2", "TimeUS,VXI,VYI,VFF,FGP,RGP,FGT,TGD,TGI,PTC,RTC", "Qffffffffff",
+                                                   AP_HAL::micros64(),
+                                                   (double)(0.01f*_vel_xy_error_integ.x),
+                                                   (double)(0.01f*_vel_xy_error_integ.y),
+                                                   (double)_vel_forward_filt,
+                                                   (double)fwd_g_posctl,
+                                                   (double)right_g_posctl,
+                                                   (double)fwd_g_trim,
+                                                   (double)thrust_g_demand,
+                                                   (float)thrust_g_inflow,
+                                                   (double)_pitch_target_cd,
+                                                   (double)_roll_target_cd);
+
+            // write generic multicopter position control message
+            write_log();
+        }
+
+    } else {
+        // multiply by hover throttle (only works properly when motors are pointing up)
+        throttle_demand = lift_g_demand * _motors.get_throttle_hover();
+
+        // send throttle to attitude controller with angle boost
+        _attitude_control.set_throttle_out(throttle_demand, true, POSCONTROL_THROTTLE_CUTOFF_FREQ);
+
+    }
 }
 
 ///
 /// lateral position controller
 ///
 
-/// set_accel_xy - set horizontal acceleration in cm/s/s
-void AC_PosControl::set_accel_xy(float accel_cmss)
+/// set_max_accel_xy - set the maximum horizontal acceleration in cm/s/s
+void AC_PosControl::set_max_accel_xy(float accel_cmss)
 {
     if (fabsf(_accel_cms-accel_cmss) > 1.0f) {
         _accel_cms = accel_cmss;
@@ -650,8 +945,8 @@ void AC_PosControl::set_accel_xy(float accel_cmss)
     }
 }
 
-/// set_speed_xy - set horizontal speed maximum in cm/s
-void AC_PosControl::set_speed_xy(float speed_cms)
+/// set_max_speed_xy - set the maximum horizontal speed maximum in cm/s
+void AC_PosControl::set_max_speed_xy(float speed_cms)
 {
     if (fabsf(_speed_cms-speed_cms) > 1.0f) {
         _speed_cms = speed_cms;
@@ -700,7 +995,7 @@ void AC_PosControl::set_target_to_stopping_point_xy()
 /// get_stopping_point_xy - calculates stopping point based on current position, velocity, vehicle acceleration
 ///     distance_max allows limiting distance to stopping point
 ///     results placed in stopping_position vector
-///     set_accel_xy() should be called before this method to set vehicle acceleration
+///     set_max_accel_xy() should be called before this method to set vehicle acceleration
 ///     set_leash_length() should have been called before this method
 void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
 {
@@ -749,7 +1044,7 @@ void AC_PosControl::get_stopping_point_xy(Vector3f &stopping_point) const
 /// get_distance_to_target - get horizontal distance to target position in cm
 float AC_PosControl::get_distance_to_target() const
 {
-    return _distance_to_target;
+    return norm(_pos_error.x, _pos_error.y);
 }
 
 /// get_bearing_to_target - get bearing to target position in centi-degrees
@@ -767,28 +1062,25 @@ bool AC_PosControl::is_active_xy() const
 /// get_lean_angle_max_cd - returns the maximum lean angle the autopilot may request
 float AC_PosControl::get_lean_angle_max_cd() const
 {
-    if (is_zero(_lean_angle_max)) {
-        return _attitude_control.lean_angle_max();
-    }
-    return _lean_angle_max * 100.0f;
+    return 100.0f * MIN(MIN(_attitude_control.lean_angle_max_fwd(), _attitude_control.lean_angle_max_aft()), _attitude_control.lean_angle_max_lat());
 }
 
 /// init_xy_controller - initialise the xy controller
+///     this should be called after setting the position target and the desired velocity and acceleration
 ///     sets target roll angle, pitch angle and I terms based on vehicle current lean angles
 ///     should be called once whenever significant changes to the position target are made
 ///     this does not update the xy target
-void AC_PosControl::init_xy_controller(bool reset_I)
+void AC_PosControl::init_xy_controller()
 {
     // set roll, pitch lean angle targets to current attitude
-    _roll_target = _ahrs.roll_sensor;
-    _pitch_target = _ahrs.pitch_sensor;
+    // todo: this should probably be based on the desired attitude not the current attitude
+    _roll_target_cd = _ahrs.roll_sensor;
+    _pitch_target_cd = _ahrs.pitch_sensor;
 
     // initialise I terms from lean angles
-    if (reset_I) {
-        // reset last velocity if this controller has just been engaged or dt is zero
-        lean_angles_to_accel(_accel_target.x, _accel_target.y);
-        _pid_vel_xy.set_integrator(_accel_target-_accel_desired);
-    }
+    _pid_vel_xy.reset_filter();
+    lean_angles_to_accel(_accel_target.x, _accel_target.y);
+    _pid_vel_xy.set_integrator(_accel_target-_accel_desired);
 
     // flag reset required in rate to accel step
     _flags.reset_desired_vel_to_pos = true;
@@ -796,10 +1088,23 @@ void AC_PosControl::init_xy_controller(bool reset_I)
 
     // initialise ekf xy reset handler
     init_ekf_xy_reset();
+
+    // Set velocity error integrator to reciprocal of estimated wind speed
+    Vector3f wind_vec = _ahrs_wing.wind_estimate();
+    _vel_xy_error_integ.x = -100.0f * wind_vec.x;
+    _vel_xy_error_integ.y = -100.0f * wind_vec.y;
+
+    // Reset remaining horizontal control states
+    _vel_xy_integ_length_prev = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+    _vel_error_filter.reset(0);
+    _accel_target_xy_updated = false;
+    _vel_forward_filt = 0.0f;
+    _last_log_time_ms = 0;
+
 }
 
 /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
-void AC_PosControl::update_xy_controller(float ekfNavVelGainScaler)
+void AC_PosControl::update_xy_controller()
 {
     // compute dt
     uint32_t now = AP_HAL::millis();
@@ -808,6 +1113,19 @@ void AC_PosControl::update_xy_controller(float ekfNavVelGainScaler)
     // sanity check dt
     if (dt >= POSCONTROL_ACTIVE_TIMEOUT_MS*1.0e-3f) {
         dt = 0.0f;
+
+        // Set velocity error integrator to reciprocal of estimated wind speed
+        Vector3f wind_vec = _ahrs_wing.wind_estimate();
+        _vel_xy_error_integ.x = -100.0f * wind_vec.x;
+        _vel_xy_error_integ.y = -100.0f * wind_vec.y;
+
+        // Reset required horizontal control states
+        _vel_xy_integ_length_prev = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+        _vel_error_filter.reset(0);
+        _accel_target_xy_updated = false;
+        _vel_forward_filt = 0.0f;
+        _last_log_time_ms = 0;
+
     }
 
     // check for ekf xy position reset
@@ -820,7 +1138,7 @@ void AC_PosControl::update_xy_controller(float ekfNavVelGainScaler)
     desired_vel_to_pos(dt);
 
     // run horizontal position controller
-    run_xy_controller(dt, ekfNavVelGainScaler);
+    run_xy_controller(dt);
 
     // update xy update time
     _last_update_xy_ms = now;
@@ -858,16 +1176,17 @@ void AC_PosControl::write_log()
                                            (double)accel_target.y,
                                            (double)accel_x,
                                            (double)accel_y);
+
 }
 
 /// init_vel_controller_xyz - initialise the velocity controller - should be called once before the caller attempts to use the controller
 void AC_PosControl::init_vel_controller_xyz()
 {
     // set roll, pitch lean angle targets to current attitude
-    _roll_target = _ahrs.roll_sensor;
-    _pitch_target = _ahrs.pitch_sensor;
+    _roll_target_cd = _ahrs.roll_sensor;
+    _pitch_target_cd = _ahrs.pitch_sensor;
 
-    // reset last velocity if this controller has just been engaged or dt is zero
+    _pid_vel_xy.reset_filter();
     lean_angles_to_accel(_accel_target.x, _accel_target.y);
     _pid_vel_xy.set_integrator(_accel_target);
 
@@ -896,7 +1215,7 @@ void AC_PosControl::init_vel_controller_xyz()
 ///     velocity targets should we set using set_desired_velocity_xy() method
 ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
 ///     throttle targets will be sent directly to the motors
-void AC_PosControl::update_vel_controller_xy(float ekfNavVelGainScaler)
+void AC_PosControl::update_vel_controller_xy()
 {
     // capture time since last iteration
     uint32_t now = AP_HAL::millis();
@@ -918,7 +1237,7 @@ void AC_PosControl::update_vel_controller_xy(float ekfNavVelGainScaler)
     desired_vel_to_pos(dt);
 
     // run position controller
-    run_xy_controller(dt, ekfNavVelGainScaler);
+    run_xy_controller(dt);
 
     // update xy update time
     _last_update_xy_ms = now;
@@ -929,9 +1248,9 @@ void AC_PosControl::update_vel_controller_xy(float ekfNavVelGainScaler)
 ///     velocity targets should we set using set_desired_velocity_xyz() method
 ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
 ///     throttle targets will be sent directly to the motors
-void AC_PosControl::update_vel_controller_xyz(float ekfNavVelGainScaler)
+void AC_PosControl::update_vel_controller_xyz()
 {
-    update_vel_controller_xy(ekfNavVelGainScaler);
+    update_vel_controller_xy();
 
     // update altitude target
     set_alt_target_from_climb_rate_ff(_vel_desired.z, _dt, false);
@@ -999,8 +1318,11 @@ void AC_PosControl::desired_vel_to_pos(float nav_dt)
 ///     desired velocity (_vel_desired) is combined into final target velocity
 ///     converts desired velocities in lat/lon directions to accelerations in lat/lon frame
 ///     converts desired accelerations provided in lat/lon frame to roll/pitch angles
-void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
+void AC_PosControl::run_xy_controller(float dt)
 {
+    float ekfGndSpdLimit, ekfNavVelGainScaler;
+    AP::ahrs_navekf().getEkfControlLimits(ekfGndSpdLimit, ekfNavVelGainScaler);
+
     Vector3f curr_pos = _inav.get_position();
     float kP = ekfNavVelGainScaler * _p_pos_xy.kP(); // scale gains to compensate for noisy optical flow measurement in the EKF
 
@@ -1021,7 +1343,6 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
             _pos_target.x = curr_pos.x + _pos_error.x;
             _pos_target.y = curr_pos.y + _pos_error.y;
         }
-        _distance_to_target = norm(_pos_error.x, _pos_error.y);
 
         _vel_target = sqrt_controller(_pos_error, kP, _accel_cms);
     }
@@ -1047,6 +1368,22 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
     _vel_error.y = _vel_target.y - _vehicle_horiz_vel.y;
     // TODO: constrain velocity error and velocity target
 
+    // calculate integral of velocity error and constrain
+    // integrator gain can be scaled externally, but asymptotes back to unity over a 1 second time constant if not updated
+    _vel_err_i_gain_scale = constrain_float((1.0f - dt) * _vel_err_i_gain_scale + dt, 1.0f , 10.0f);
+    _vel_xy_error_integ.x += _vel_err_i_gain_scale * _vel_err_i_gain * _vel_error.x * dt;
+    _vel_xy_error_integ.y += _vel_err_i_gain_scale * _vel_err_i_gain * _vel_error.y * dt;
+    float _vel_xy_error_integ_norm = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+    float _max_airspeed_cms = 100.0f * _fwd_spd_max;
+    if (_vel_xy_error_integ_norm > _max_airspeed_cms) {
+        _vel_xy_error_integ = _vel_xy_error_integ * (_max_airspeed_cms / _vel_xy_error_integ_norm);
+    }
+    if (!_limit.accel_xy && !_motors.limit.throttle_upper) {
+        _vel_xy_integ_length_prev = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+    } else if (norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y) > _vel_xy_integ_length_prev) {
+        _vel_xy_error_integ = _vel_xy_error_integ * (_vel_xy_integ_length_prev / _vel_xy_error_integ_norm);
+    }
+
     // call pi controller
     _pid_vel_xy.set_input(_vel_error);
 
@@ -1064,7 +1401,6 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
     // get d
     vel_xy_d = _pid_vel_xy.get_d();
 
-
     // acceleration to correct for velocity error and scale PID output to compensate for optical flow measurement induced EKF noise
     accel_target.x = (vel_xy_p.x + vel_xy_i.x + vel_xy_d.x) * ekfNavVelGainScaler;
     accel_target.y = (vel_xy_p.y + vel_xy_i.y + vel_xy_d.y) * ekfNavVelGainScaler;
@@ -1075,7 +1411,7 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
          _flags.reset_accel_to_lean_xy = false;
      }
 
-    // filter correction acceleration
+     // filter correction acceleration
     _accel_target_filter.set_cutoff_frequency(MIN(_accel_xy_filt_hz, 5.0f*ekfNavVelGainScaler));
     _accel_target_filter.apply(accel_target, dt);
 
@@ -1087,15 +1423,24 @@ void AC_PosControl::run_xy_controller(float dt, float ekfNavVelGainScaler)
     _accel_target.x += _accel_desired.x;
     _accel_target.y += _accel_desired.y;
 
-    // the following section converts desired accelerations provided in lat/lon frame to roll/pitch angles
+    // limit acceleration
+    _limit.accel_xy = limit_vector_length(_accel_target.x, _accel_target.y, POSCONTROL_ACCEL_XY_MAX);
 
-    // limit acceleration using maximum lean angles
-    float angle_max = MIN(_attitude_control.get_althold_lean_angle_max(), get_lean_angle_max_cd());
-    float accel_max = MIN(GRAVITY_MSS * 100.0f * tanf(ToRad(angle_max * 0.01f)), POSCONTROL_ACCEL_XY_MAX);
-    _limit.accel_xy = limit_vector_length(_accel_target.x, _accel_target.y, accel_max);
+    _accel_target_xy_updated = true;
 
-    // update angle targets that will be passed to stabilize controller
-    accel_to_lean_angles(_accel_target.x, _accel_target.y, _roll_target, _pitch_target);
+}
+
+void AC_PosControl::reset_wind_drift_integ()
+{
+    float vel_forward = 0.01f * (_vehicle_horiz_vel.x * _ahrs.cos_yaw() + _vehicle_horiz_vel.y * _ahrs.sin_yaw());
+    float vel_forward_diff = _vel_forward_filt - vel_forward;
+    _vel_xy_error_integ.x += 100.0f * vel_forward_diff * _ahrs.cos_yaw();
+    _vel_xy_error_integ.y += 100.0f * vel_forward_diff * _ahrs.sin_yaw();
+    float _vel_xy_error_integ_norm = norm(_vel_xy_error_integ.x, _vel_xy_error_integ.y);
+    float _max_airspeed_cms = 100.0f * _fwd_spd_max;
+    if (_vel_xy_error_integ_norm > _max_airspeed_cms) {
+        _vel_xy_error_integ = _vel_xy_error_integ * (_max_airspeed_cms / _vel_xy_error_integ_norm);
+    }
 }
 
 // get_lean_angles_to_accel - convert roll, pitch lean angles to lat/lon frame accelerations in cm/s/s
@@ -1104,6 +1449,7 @@ void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss,
     float accel_right, accel_forward;
 
     // rotate accelerations into body forward-right frame
+    // todo: this should probably be based on the desired heading not the current heading
     accel_forward = accel_x_cmss*_ahrs.cos_yaw() + accel_y_cmss*_ahrs.sin_yaw();
     accel_right = -accel_x_cmss*_ahrs.sin_yaw() + accel_y_cmss*_ahrs.cos_yaw();
 
@@ -1117,6 +1463,7 @@ void AC_PosControl::accel_to_lean_angles(float accel_x_cmss, float accel_y_cmss,
 void AC_PosControl::lean_angles_to_accel(float& accel_x_cmss, float& accel_y_cmss) const
 {
     // rotate our roll, pitch angles into lat/lon frame
+    // todo: this should probably be based on the desired attitude not the current attitude
     accel_x_cmss = (GRAVITY_MSS * 100) * (-_ahrs.cos_yaw() * _ahrs.sin_pitch() * _ahrs.cos_roll() - _ahrs.sin_yaw() * _ahrs.sin_roll()) / MAX(_ahrs.cos_roll()*_ahrs.cos_pitch(), 0.5f);
     accel_y_cmss = (GRAVITY_MSS * 100) * (-_ahrs.sin_yaw() * _ahrs.sin_pitch() * _ahrs.cos_roll() + _ahrs.cos_yaw() * _ahrs.sin_roll()) / MAX(_ahrs.cos_roll()*_ahrs.cos_pitch(), 0.5f);
 }
@@ -1196,7 +1543,7 @@ void AC_PosControl::check_for_ekf_z_reset()
 bool AC_PosControl::limit_vector_length(float& vector_x, float& vector_y, float max_length)
 {
     float vector_length = norm(vector_x, vector_y);
-    if ((vector_length > max_length) && is_positive(max_length)) {
+    if ((vector_length > max_length) && is_positive(vector_length)) {
         vector_x *= (max_length / vector_length);
         vector_y *= (max_length / vector_length);
         return true;

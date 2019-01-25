@@ -16,7 +16,7 @@
 // position controller default definitions
 #define POSCONTROL_ACCELERATION_MIN             50.0f   // minimum horizontal acceleration in cm/s/s - used for sanity checking acceleration in leash length calculation
 #define POSCONTROL_ACCEL_XY                     100.0f  // default horizontal acceleration in cm/s/s.  This is overwritten by waypoint and loiter controllers
-#define POSCONTROL_ACCEL_XY_MAX                 980.0f  // max horizontal acceleration in cm/s/s that the position velocity controller will ask from the lower accel controller
+#define POSCONTROL_ACCEL_XY_MAX                 490.0f  // max horizontal acceleration in cm/s/s that the position velocity controller will ask from the lower accel controller
 #define POSCONTROL_STOPPING_DIST_UP_MAX         300.0f  // max stopping distance (in cm) vertically while climbing
 #define POSCONTROL_STOPPING_DIST_DOWN_MAX       200.0f  // max stopping distance (in cm) vertically while descending
 
@@ -45,7 +45,7 @@ class AC_PosControl
 public:
 
     /// Constructor
-    AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& inav,
+    AC_PosControl(const AP_AHRS_View& ahrs, const AP_AHRS& ahrs_wing, const AP_InertialNav& inav,
                   const AP_Motors& motors, AC_AttitudeControl& attitude_control);
 
     ///
@@ -61,26 +61,26 @@ public:
     /// z position controller
     ///
 
-    /// set_speed_z - sets maximum climb and descent rates
+    /// set_max_speed_z - sets maximum climb and descent rates
     ///     speed_down can be positive or negative but will always be interpreted as a descent speed
-    ///     leash length will be recalculated the next time update_z_controller() is called
-    void set_speed_z(float speed_down, float speed_up);
+    ///     leash length will be recalculated
+    void set_max_speed_z(float speed_down, float speed_up);
 
-    /// get_speed_up - accessor for current up speed in cm/s
-    float get_speed_up() const { return _speed_up_cms; }
+    /// get_max_speed_up - accessor for current maximum up speed in cm/s
+    float get_max_speed_up() const { return _speed_up_cms; }
 
-    /// get_speed_down - accessors for current down speed in cm/s.  Will be a negative number
-    float get_speed_down() const { return _speed_down_cms; }
+    /// get_max_speed_down - accessors for current maximum down speed in cm/s.  Will be a negative number
+    float get_max_speed_down() const { return _speed_down_cms; }
 
     /// get_vel_target_z - returns current vertical speed in cm/s
     float get_vel_target_z() const { return _vel_target.z; }
 
-    /// set_accel_z - set vertical acceleration in cm/s/s
-    ///     leash length will be recalculated the next time update_z_controller() is called
-    void set_accel_z(float accel_cmss);
+    /// set_max_accel_z - set the maximum vertical acceleration in cm/s/s
+    ///     leash length will be recalculated
+    void set_max_accel_z(float accel_cmss);
 
-    /// get_accel_z - returns current vertical acceleration in cm/s/s
-    float get_accel_z() const { return _accel_z_cms; }
+    /// get_max_accel_z - returns current maximum vertical acceleration in cm/s/s
+    float get_max_accel_z() const { return _accel_z_cms; }
 
     /// calc_leash_length - calculates the vertical leash lengths from maximum speed, acceleration
     ///     called by update_z_controller if z-axis speed or accelerations are changed
@@ -123,8 +123,7 @@ public:
     /// relax_alt_hold_controllers - set all desired and targets to measured
     void relax_alt_hold_controllers(float throttle_setting);
 
-    /// get_alt_target, get_desired_alt - get desired altitude (in cm above home) from loiter or wp controller which should be fed into throttle controller
-    /// To-Do: remove one of the two functions below
+    /// get_alt_target - get desired altitude (in cm above home) from loiter or wp controller which should be fed into throttle controller
     float get_alt_target() const { return _pos_target.z; }
 
     /// get_alt_error - returns altitude error in cm
@@ -163,17 +162,19 @@ public:
     ///     sets target roll angle, pitch angle and I terms based on vehicle current lean angles
     ///     should be called once whenever significant changes to the position target are made
     ///     this does not update the xy target
-    void init_xy_controller(bool reset_I = true);
+    void init_xy_controller();
 
-    /// set_accel_xy - set horizontal acceleration in cm/s/s
-    ///     leash length will be recalculated the next time update_xy_controller() is called
-    void set_accel_xy(float accel_cmss);
-    float get_accel_xy() const { return _accel_cms; }
+    /// set_max_accel_xy - set the maximum horizontal acceleration in cm/s/s
+    ///     leash length will be recalculated
+    void set_max_accel_xy(float accel_cmss);
+    float get_max_accel_xy() const { return _accel_cms; }
 
-    /// set_speed_xy - set horizontal speed maximum in cm/s
-    ///     leash length will be recalculated the next time update_xy_controller() is called
-    void set_speed_xy(float speed_cms);
-    float get_speed_xy() const { return _speed_cms; }
+    /// set_max_speed_xy - set the maximum horizontal speed maximum in cm/s
+    ///     leash length will be recalculated
+    void set_max_speed_xy(float speed_cms);
+    float get_max_speed_xy() const { return _speed_cms; }
+
+    float get_max_fwd_airspd() const { return _fwd_spd_max; }
 
     /// set_limit_accel_xy - mark that accel has been limited
     ///     this prevents integrator buildup
@@ -225,12 +226,22 @@ public:
     /// freeze_ff_z - used to stop the feed forward being calculated during a known discontinuity
     void freeze_ff_z() { _flags.freeze_ff_z = true; }
 
-    // is_active_xy - returns true if the xy position controller has been run very recently
+    /// scale wind drift integrator gain - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
+    /// if not updated, scale factor decays to unity
+    void scale_wind_drift_integ_gain(float scale) {_vel_err_i_gain_scale = scale; }
+
+    /// resets the wind drift integrator state - used shortly after takeoff with VTOL types to reduce time required to adjust for wind drift
+    void reset_wind_drift_integ();
+
+    /// is_active_xy - returns true if the xy position controller has been run very recently
     bool is_active_xy() const;
+
+    /// The position controller will run the VTOL landing detection for 1000 msec after this is called.
+    void set_vtol_landing_expected() { _land_expect_time_ms = AP_HAL::millis(); }
 
     /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
     ///     when use_desired_velocity is true the desired velocity (i.e. feed forward) is incorporated at the pos_to_rate step
-    void update_xy_controller(float ekfNavVelGainScaler);
+    void update_xy_controller();
 
     /// set_target_to_stopping_point_xy - sets horizontal target to reasonable stopping position in cm from home
     void set_target_to_stopping_point_xy();
@@ -257,17 +268,17 @@ public:
     ///     velocity targets should we set using set_desired_velocity_xy() method
     ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
     ///     throttle targets will be sent directly to the motors
-    void update_vel_controller_xy(float ekfNavVelGainScaler);
+    void update_vel_controller_xy();
     
     /// update_velocity_controller_xyz - run the velocity controller - should be called at 100hz or higher
     ///     velocity targets should we set using set_desired_velocity_xyz() method
     ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
     ///     throttle targets will be sent directly to the motors
-    void update_vel_controller_xyz(float ekfNavVelGainScaler);
+    void update_vel_controller_xyz();
 
     /// get desired roll, pitch which should be fed into stabilize controllers
-    float get_roll() const { return _roll_target; }
-    float get_pitch() const { return _pitch_target; }
+    float get_roll() const { return _roll_target_cd; }
+    float get_pitch() const { return _pitch_target_cd; }
 
     // get_leash_xy - returns horizontal leash length in cm
     float get_leash_xy() const { return _leash; }
@@ -294,6 +305,9 @@ public:
 
     // write log to dataflash
     void write_log();
+
+    /// returns current value of _is_landed
+    bool get_is_landed() const { return _is_landed; }
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -325,12 +339,13 @@ protected:
     /// z controller private methods
     ///
 
-    // run position control for Z axis
+    // Calculates throttle, roll and pitch demands required to track vertical position and velocity
+    // and horizontal velocity and acceleration demands.
     // target altitude should be set with one of these functions
     //          set_alt_target
     //          set_target_to_stopping_point_z
     //          init_takeoff
-    void run_z_controller();
+    void calc_roll_pitch_throttle();
 
     ///
     /// xy controller private methods
@@ -347,7 +362,7 @@ protected:
     ///     desired velocity (_vel_desired) is combined into final target velocity
     ///     converts desired velocities in lat/lon directions to accelerations in lat/lon frame
     ///     converts desired accelerations provided in lat/lon frame to roll/pitch angles
-    void run_xy_controller(float dt, float ekfNavVelGainScaler);
+    void run_xy_controller(float dt);
 
     /// calc_leash_length - calculates the horizontal leash length given a maximum speed, acceleration and position kP gain
     float calc_leash_length(float speed_cms, float accel_cms, float kP) const;
@@ -366,18 +381,30 @@ protected:
 
     // references to inertial nav and ahrs libraries
     const AP_AHRS_View &        _ahrs;
+    const AP_AHRS &             _ahrs_wing;
     const AP_InertialNav&       _inav;
     const AP_Motors&            _motors;
     AC_AttitudeControl&         _attitude_control;
 
     // parameters
+    AP_Float    _accel_z_wing_k;        // fraction of wing noraml force accounted for in throttle calculation
     AP_Float    _accel_xy_filt_hz;      // XY acceleration filter cutoff frequency
-    AP_Float    _lean_angle_max;        // Maximum autopilot commanded angle (in degrees). Set to zero for Angle Max
     AC_P        _p_pos_z;
     AC_P        _p_vel_z;
     AC_PID      _pid_accel_z;
     AC_P        _p_pos_xy;
     AC_PID_2D   _pid_vel_xy;
+    AP_Float    _trim_tau;              // time constant applied to trim corrections
+    AP_Float    _vel_err_i_gain;        // gain from integral of ground velocity error to demanded airspeed
+    AP_Float    _fwd_spd_max;           // trim speed in m/s at max forward lean specified by _fwd_lean_max
+    AP_Float    _fwd_az_gf;             // AZ PD gain reduction applied during forward flight
+    AP_Float    _fwd_bcoef;             // forward flight ballistic coefficient
+    AP_Float    _fwd_inflow_thrust_factor; // prop throttle inflow correction factor 1/(m/s)
+    AP_Float    _landed_gyro_y;         // Landed detector wing pitch rate threshold (rad/sec)
+    AP_Float    _landed_pitch;          // Landed detector wing pitch angle threshold (rad)
+    AP_Float    _landed_accel;          // Landed detector accceleration threshold
+    AP_Float    _drag_brake_g_thrhld;   // Rotor drag brake threshold (g)
+
 
     // internal variables
     float       _dt;                    // time difference (in seconds) between calls from the main program
@@ -394,22 +421,40 @@ protected:
     float       _leash_up_z;            // vertical leash up in cm.  target will never be further than this distance above the vehicle
 
     // output from controller
-    float       _roll_target;           // desired roll angle in centi-degrees calculated by position controller
-    float       _pitch_target;          // desired roll pitch in centi-degrees calculated by position controller
+    float       _roll_target_cd;        // desired roll angle in centi-degrees calculated by position controller
+    float       _pitch_target_cd;       // desired roll pitch in centi-degrees calculated by position controller
 
     // position controller internal variables
     Vector3f    _pos_target;            // target location in cm from home
     Vector3f    _pos_error;             // error between desired and actual position in cm
     Vector3f    _vel_desired;           // desired velocity in cm/s
     Vector3f    _vel_target;            // velocity target in cm/s calculated by pos_to_rate step
-    Vector3f    _vel_error;             // error between desired and actual acceleration in cm/s
+    Vector3f    _vel_error;             // error between desired and actual velocity in cm/s
     Vector3f    _vel_last;              // previous iterations velocity in cm/s
     Vector3f    _accel_desired;         // desired acceleration in cm/s/s (feed forward)
     Vector3f    _accel_target;          // acceleration target in cm/s/s
     Vector3f    _accel_error;           // acceleration error in cm/s/s
     Vector2f    _vehicle_horiz_vel;     // velocity to use if _flags.vehicle_horiz_vel_override is set
+    Vector2f    _vel_xy_error_integ;    // integral of error between NE desired and actual velocity in cm/s and equivalent to reciprocal of wind velocity vector
+    float       _vel_xy_integ_length_prev;
     float       _distance_to_target;    // distance to position target - for reporting only
+    float       _pitch_trim_rad;        // feed forward pitch trim angle in radians
+    float       _thr_trim;              // feed forward throttle trim [0 ... 1]
     LowPassFilterFloat _vel_error_filter;   // low-pass-filter on z-axis velocity error
+    LowPassFilterFloat _wing_lift_accel_filter;   // low-pass-filter on wing normal force lift accel filter
+    LowPassFilterFloat _wing_drag_accel_filter;   // low-pass-filter on wing normal force drag accel filter
+    bool _accel_target_xy_updated;      // true when the accel target has been updated on the last cycle and has not been converted toa tit and throttle demand
+    float _vel_forward_filt;            // filtered forward velocity (m/s)
+    uint32_t _last_log_time_ms;         // system time of last position controller log
+    float _vel_err_i_gain_scale;        // scaler applied to wind drift integrator - asymptotes to 1 if not changed
+    bool _taking_off;                   // set to true prior to takeoff and cleared when in-air checks pass
+    bool _landing_expected;             // set to true when a landing is expected
+    uint32_t _land_expect_time_ms;      // last time land_expected() was called (msec)
+    uint32_t _land_detect_time_ms;      // time ground contact was first detected when _landing_expected true (msec)
+    uint32_t _land_pitch_rate_time_ms;  // last time a touchdown wing pitch rate was detected (msec)
+    uint32_t _land_pitch_ang_time_ms;   // last time a landed wing pitch angle was detected (msec)
+    uint32_t _land_accz_time_ms;        // last time a landed accel shock was detected (msec)
+    bool _is_landed;                    // true when landed detection has activated and rotors are being held vertical
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 

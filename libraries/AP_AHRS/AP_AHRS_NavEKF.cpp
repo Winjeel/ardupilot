@@ -70,6 +70,9 @@ const Vector3f &AP_AHRS_NavEKF::get_gyro_drift(void) const
 //  should be called if gyro offsets are recalculated
 void AP_AHRS_NavEKF::reset_gyro_drift(void)
 {
+    // support locked access functions to AHRS data
+    WITH_SEMAPHORE(_rsem);
+    
     // update DCM
     AP_AHRS_DCM::reset_gyro_drift();
 
@@ -80,6 +83,9 @@ void AP_AHRS_NavEKF::reset_gyro_drift(void)
 
 void AP_AHRS_NavEKF::update(bool skip_ins_update)
 {
+    // support locked access functions to AHRS data
+    WITH_SEMAPHORE(_rsem);
+    
     // drop back to normal priority if we were boosted by the INS
     // calling delay_microseconds_boost()
     hal.scheduler->boost_end();
@@ -88,7 +94,6 @@ void AP_AHRS_NavEKF::update(bool skip_ins_update)
     if (_ekf_type == 1) {
         _ekf_type.set(2);
     }
-
 
     update_DCM(skip_ins_update);
 
@@ -366,6 +371,9 @@ const Vector3f &AP_AHRS_NavEKF::get_accel_ef_blended(void) const
 
 void AP_AHRS_NavEKF::reset(bool recover_eulers)
 {
+    // support locked access functions to AHRS data
+    WITH_SEMAPHORE(_rsem);
+    
     AP_AHRS_DCM::reset(recover_eulers);
     _dcm_attitude(roll, pitch, yaw);
     if (_ekf2_started) {
@@ -379,6 +387,9 @@ void AP_AHRS_NavEKF::reset(bool recover_eulers)
 // reset the current attitude, used on new IMU calibration
 void AP_AHRS_NavEKF::reset_attitude(const float &_roll, const float &_pitch, const float &_yaw)
 {
+    // support locked access functions to AHRS data
+    WITH_SEMAPHORE(_rsem);
+    
     AP_AHRS_DCM::reset_attitude(_roll, _pitch, _yaw);
     _dcm_attitude(roll, pitch, yaw);
     if (_ekf2_started) {
@@ -392,24 +403,18 @@ void AP_AHRS_NavEKF::reset_attitude(const float &_roll, const float &_pitch, con
 // dead-reckoning support
 bool AP_AHRS_NavEKF::get_position(struct Location &loc) const
 {
-    Vector3f ned_pos;
-    Location origin;
     switch (active_EKF_type()) {
     case EKF_TYPE_NONE:
         return AP_AHRS_DCM::get_position(loc);
 
     case EKF_TYPE2:
-        if (EKF2.getLLH(loc) && EKF2.getPosD(-1,ned_pos.z) && EKF2.getOriginLLH(-1,origin)) {
-            // fixup altitude using relative position from EKF origin
-            loc.alt = origin.alt - ned_pos.z*100;
+        if (EKF2.getLLH(loc)) {
             return true;
         }
         break;
 
     case EKF_TYPE3:
-        if (EKF3.getLLH(loc) && EKF3.getPosD(-1,ned_pos.z) && EKF3.getOriginLLH(-1,origin)) {
-            // fixup altitude using relative position from EKF origin
-            loc.alt = origin.alt - ned_pos.z*100;
+        if (EKF3.getLLH(loc)) {
             return true;
         }
         break;
@@ -456,7 +461,17 @@ Vector3f AP_AHRS_NavEKF::wind_estimate(void) const
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     case EKF_TYPE_SITL:
-        wind.zero();
+        {
+            bool ret = false;
+            if (EKF3.getWind(-1,wind)) {
+                 ret = true;
+            } else if (EKF2.getWind(-1,wind)) {
+                ret = true;
+            }
+            if (!ret) {
+                wind.zero();
+            }
+        }
         break;
 #endif
 
@@ -476,7 +491,65 @@ Vector3f AP_AHRS_NavEKF::wind_estimate(void) const
 // if we have an estimate
 bool AP_AHRS_NavEKF::airspeed_estimate(float *airspeed_ret) const
 {
-    return AP_AHRS_DCM::airspeed_estimate(airspeed_ret);
+    bool ret = false;
+    if (airspeed_sensor_enabled()) {
+        *airspeed_ret = _airspeed->get_airspeed();
+        return true;
+    }
+
+    if (!_flags.wind_estimation) {
+        return false;
+    }
+
+    // estimate it via nav velocity and wind estimates
+
+    // get wind estimates
+    Vector3f wind_vel;
+    switch (active_EKF_type()) {
+    case EKF_TYPE_NONE:
+        wind_vel = AP_AHRS_DCM::wind_estimate();
+        break;
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKF_TYPE_SITL:
+        if (EKF3.getWind(-1,wind_vel)) {
+             ret = true;
+        } else if (EKF2.getWind(-1,wind_vel)) {
+            ret = true;
+        } else {
+            ret = false;
+        }
+        break;
+#endif
+
+    case EKF_TYPE2:
+        ret = EKF2.getWind(-1,wind_vel);
+        break;
+
+    case EKF_TYPE3:
+        ret = EKF3.getWind(-1,wind_vel);
+        break;
+
+    }
+
+    // estimate it via nav velocity and wind estimates
+    Vector3f nav_vel;
+    float true_airspeed;
+    if (ret && have_inertial_nav() && get_velocity_NED(nav_vel)) {
+        Vector3f true_airspeed_vec = nav_vel - wind_vel;
+        true_airspeed = true_airspeed_vec.length();
+        float gnd_speed = nav_vel.length();
+        if (_wind_max > 0) {
+            float tas_lim_lower = MAX(0.0f, (gnd_speed - _wind_max));
+            float tas_lim_upper = MAX(tas_lim_lower, (gnd_speed + _wind_max));
+            true_airspeed = constrain_float(true_airspeed, tas_lim_lower, tas_lim_upper);
+        } else {
+            true_airspeed = MAX(0.0f, true_airspeed);
+        }
+        *airspeed_ret = true_airspeed / get_EAS2TAS();
+    }
+
+    return ret;
 }
 
 // true if compass is being used
@@ -1170,7 +1243,7 @@ bool AP_AHRS_NavEKF::get_filter_status(nav_filter_status &status) const
 }
 
 // write optical flow data to EKF
-void  AP_AHRS_NavEKF::writeOptFlowMeas(uint8_t &rawFlowQuality, Vector2f &rawFlowRates, Vector2f &rawGyroRates, uint32_t &msecFlowMeas, const Vector3f &posOffset)
+void  AP_AHRS_NavEKF::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &rawFlowRates, const Vector2f &rawGyroRates, const uint32_t msecFlowMeas, const Vector3f &posOffset)
 {
     EKF2.writeOptFlowMeas(rawFlowQuality, rawFlowRates, rawGyroRates, msecFlowMeas, posOffset);
     EKF3.writeOptFlowMeas(rawFlowQuality, rawFlowRates, rawGyroRates, msecFlowMeas, posOffset);
@@ -1395,6 +1468,9 @@ uint32_t AP_AHRS_NavEKF::getLastPosDownReset(float &posDelta) const
 // If using a range finder for height no reset is performed and it returns false
 bool AP_AHRS_NavEKF::resetHeightDatum(void)
 {
+    // support locked access functions to AHRS data
+    WITH_SEMAPHORE(_rsem);
+    
     switch (ekf_type()) {
 
     case 2:

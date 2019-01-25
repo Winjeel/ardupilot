@@ -123,6 +123,7 @@ enum tuning_pid_bits {
     TUNING_BITS_YAW   = (1 <<  2),
     TUNING_BITS_STEER = (1 <<  3),
     TUNING_BITS_LAND  = (1 <<  4),
+    TUNING_BITS_ACCZ  = (1 <<  5),
     TUNING_BITS_END // dummy just used for static checking
 };
 
@@ -139,7 +140,6 @@ enum log_messages {
     LOG_SONAR_MSG,
     LOG_ARM_DISARM_MSG,
     LOG_STATUS_MSG,
-    LOG_OPTFLOW_MSG,
     LOG_QTUN_MSG,
     LOG_PARAMTUNE_MSG,
     LOG_THERMAL_MSG,
@@ -149,6 +149,7 @@ enum log_messages {
     LOG_PIQY_MSG,
     LOG_PIQA_MSG,
     LOG_AETR_MSG,
+    LOG_MOTBATT_MSG,
 };
 
 #define MASK_LOG_ATTITUDE_FAST          (1<<0)
@@ -167,6 +168,7 @@ enum log_messages {
 #define MASK_LOG_RC                     (1<<13)
 #define MASK_LOG_SONAR                  (1<<14)
 #define MASK_LOG_ARM_DISARM             (1<<15)
+#define MASK_LOG_MOTBATT                (1UL<<17)
 #define MASK_LOG_IMU_RAW                (1UL<<19)
 
 // altitude control algorithms
@@ -196,4 +198,10 @@ enum {
     USE_REVERSE_THRUST_CRUISE                   = (1<<8),
     USE_REVERSE_THRUST_FBWB                     = (1<<9),
     USE_REVERSE_THRUST_GUIDED                   = (1<<10),
+};
+
+enum FlightOptions {
+    DIRECT_RUDDER_ONLY   = (1 << 0),
+    CRUISE_TRIM_THROTTLE = (1 << 1),
+    DISABLE_TOFF_ATTITUDE_CHK = (1 << 2),
 };

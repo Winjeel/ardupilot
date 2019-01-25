@@ -165,11 +165,11 @@ public:
         k_param_serial0_baud_old,   // deprecated
         k_param_gcs2,               // stream rates for uartD
         k_param_serial2_baud_old,   // deprecated
-        k_param_serial2_protocol,   // deprecated
 
-        // 120: Fly-by-wire control
+        // 119: Fly-by-wire control
         //
-        k_param_airspeed_min = 120,
+        k_param_flybywire_sink_rate = 119,
+        k_param_airspeed_min,
         k_param_airspeed_max,
         k_param_FBWB_min_altitude_cm,  // 0=disabled, minimum value for altitude in cm (for first time try 30 meters = 3000 cm)
         k_param_flybywire_elev_reverse,
@@ -215,7 +215,7 @@ public:
         k_param_pitch_limit_min_cd,
         k_param_airspeed_cruise_cm,
         k_param_RTL_altitude_cm,
-        k_param_inverted_flight_ch,
+        k_param_inverted_flight_ch_unused, // unused
         k_param_min_gndspeed_cm,
         k_param_crosstrack_use_wind, // unused
 
@@ -336,9 +336,8 @@ public:
         k_param_pidNavPitchAirspeed, // unused
         k_param_pidServoRudder, // unused
         k_param_pidTeThrottle, // unused
-        k_param_pidNavPitchAltitude, // unused
-        k_param_pidWheelSteer, // unused
-
+        k_param_mixing_gain_tvbs,
+        k_param_mixing_offset_tvbs,
         k_param_mixing_offset,
         k_param_dspoiler_rud_rate,
 
@@ -407,6 +406,7 @@ public:
     //
     AP_Int8 flybywire_elev_reverse;
     AP_Int8 flybywire_climb_rate;
+    AP_Int8 flybywire_sink_rate;
 
     // Throttle
     //
@@ -448,6 +448,8 @@ public:
     AP_Int8 rudder_only;
     AP_Float mixing_gain;
     AP_Int16 mixing_offset;
+    AP_Float mixing_gain_tvbs;
+    AP_Int16 mixing_offset_tvbs;
     AP_Int16 dspoiler_rud_rate;
     AP_Int16 num_resets;
     AP_Int32 log_bitmask;
@@ -467,7 +469,6 @@ public:
     AP_Int8 flap_2_percent;
     AP_Int8 flap_2_speed;
     AP_Int8 takeoff_flap_percent;  
-    AP_Int8 inverted_flight_ch;             // 0=disabled, 1-8 is channel for inverted flight trigger
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;
     AP_Float takeoff_throttle_min_accel;
@@ -488,7 +489,7 @@ public:
     AP_Int8 fbwa_tdrag_chan;
     AP_Int8 rangefinder_landing;
     AP_Int8 flap_slewrate;
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4
+#if HAVE_PX4_MIXER || HAL_WITH_IO_MCU
     AP_Int8 override_channel;
     AP_Int8 override_safety;
 #endif
@@ -518,16 +519,18 @@ public:
     AP_ICEngine ice_control;
 
     // RC input channels
-    RC_Channels rc_channels;
+    RC_Channels_Plane rc_channels;
     
     // control over servo output ranges
     SRV_Channels servo_channels;
 
     // whether to enforce acceptance of packets only from sysid_my_gcs
     AP_Int8 sysid_enforce;
-    
+
+#if SOARING_ENABLED == ENABLED
     // ArduSoar parameters
     SoaringController soaring_controller;
+#endif
 
     // dual motor tailsitter rudder to differential thrust scaling: 0-100%
     AP_Int8 rudd_dt_gain;
@@ -541,6 +544,18 @@ public:
 #if GRIPPER_ENABLED == ENABLED
     // Payload Gripper
     AP_Gripper gripper;
+#endif
+
+    AP_Int32 flight_options;
+
+#ifdef ENABLE_SCRIPTING
+    AP_Scripting scripting;
+#endif // ENABLE_SCRIPTING
+
+    AP_Int8 takeoff_throttle_accel_count;
+
+#if LANDING_GEAR_ENABLED == ENABLED
+    AP_LandingGear landing_gear;
 #endif
 };
 

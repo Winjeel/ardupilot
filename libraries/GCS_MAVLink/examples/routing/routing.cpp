@@ -28,10 +28,8 @@ public:
 protected:
 
     uint32_t telem_delay() const override { return 0; }
-    Compass *get_compass() const override { return nullptr; };
     AP_Mission *get_mission() override { return nullptr; }
     AP_Rally *get_rally() const override { return nullptr; }
-    AP_Camera *get_camera() const override { return nullptr; };
     uint8_t sysid_my_gcs() const override { return 1; }
     bool set_mode(uint8_t mode) override { return false; };
 
@@ -44,7 +42,7 @@ protected:
 private:
 
     void handleMessage(mavlink_message_t * msg) { }
-    bool handle_guided_request(AP_Mission::Mission_Command &cmd) override { return false ; }
+    bool handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius) override { return false ; }
     void handle_change_alt_request(AP_Mission::Mission_Command &cmd) override { }
     bool try_send_message(enum ap_message id) override { return false; }
 

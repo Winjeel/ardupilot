@@ -21,12 +21,12 @@
 #include <AP_SpdHgtControl/AP_SpdHgtControl.h>
 #include <AP_Navigation/AP_Navigation.h>
 #include <GCS_MAVLink/GCS.h>
-#include "AP_Landing_Deepstall.h"
+#include "AP_Landing_VTOL.h"
 
 /// @class  AP_Landing
 /// @brief  Class managing ArduPlane landing methods
 class AP_Landing {
-    friend class AP_Landing_Deepstall;
+    friend class AP_Landing_VTOL;
 
 public:
     FUNCTOR_TYPEDEF(set_target_altitude_proportion_fn_t, void, const Location&, float);
@@ -52,7 +52,7 @@ public:
     // NOTE: make sure to update is_type_valid()
     enum Landing_Type {
         TYPE_STANDARD_GLIDE_SLOPE = 0,
-        TYPE_DEEPSTALL = 1,
+        TYPE_VTOL = 1,
 //      TODO: TYPE_PARACHUTE,
 //      TODO: TYPE_HELICAL,
     };
@@ -134,9 +134,12 @@ private:
     adjusted_relative_altitude_cm_fn_t adjusted_relative_altitude_cm_fn;
     disarm_if_autoland_complete_fn_t disarm_if_autoland_complete_fn;
     update_flight_stage_fn_t update_flight_stage_fn;
+    
+    // saved bearing for yaw correction after touchdown
+    float runway_bearing;
 
-    // support for deepstall landings
-    AP_Landing_Deepstall deepstall;
+    // support for wind adaptive VTOL landings
+    AP_Landing_VTOL vtol;
 
     AP_Int16 pitch_cd;
     AP_Float flare_alt;
@@ -152,6 +155,7 @@ private:
     AP_Int8 flap_percent;
     AP_Int8 throttle_slewrate;
     AP_Int8 type;
+    AP_Float touchdown_altitude;
 
     // Land Type STANDARD GLIDE SLOPE
 
@@ -165,8 +169,9 @@ private:
     struct {
         // once landed, post some landing statistics to the GCS
         bool post_stats:1;
-
+        bool force_flare:1;
         bool has_aborted_due_to_slope_recalc:1;
+        bool touched_down:1;
     } type_slope_flags;
 
     void type_slope_do_land(const AP_Mission::Mission_Command& cmd, const float relative_altitude);

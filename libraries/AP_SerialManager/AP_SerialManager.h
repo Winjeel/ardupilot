@@ -147,6 +147,7 @@ private:
         AP_Int8 protocol;
         AP_Int32 baud;
         AP_HAL::UARTDriver* uart;
+        AP_Int16 options;
     } state[SERIALMANAGER_NUM_PORTS];
 
     // search through managed serial connections looking for the
@@ -158,6 +159,12 @@ private:
 
     // protocol_match - returns true if the protocols match
     bool protocol_match(enum SerialProtocol protocol1, enum SerialProtocol protocol2) const;
+
+    // setup any special options
+    void set_options(uint8_t i);
+
+    // true when there is a GPS2 protocol port configured
+    bool have_gps2;
 };
 
 namespace AP {

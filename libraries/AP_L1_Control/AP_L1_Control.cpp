@@ -12,7 +12,7 @@ const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
     // @Range: 1 60
     // @Increment: 1
     // @User: Standard
-    AP_GROUPINFO("PERIOD",    0, AP_L1_Control, _L1_period, 20),
+    AP_GROUPINFO("PERIOD",    0, AP_L1_Control, _L1_period, 17),
 
     // @Param: DAMPING
     // @DisplayName: L1 control damping ratio
@@ -32,7 +32,7 @@ const AP_Param::GroupInfo AP_L1_Control::var_info[] = {
 
     // @Param: LIM_BANK
     // @DisplayName: Loiter Radius Bank Angle Limit
-    // @Description: The sealevel bank angle limit for a continous loiter. (Used to calculate airframe loading limits at higher altitudes). Setting to 0, will instead just scale the loiter radius directly
+    // @Description: The sealevel bank angle limit for a continous loiter. If left at zero, loiter radius will be increased with altitude to maintain the sea level load factor. If set to a positive value grester than 10 degrees, the loiter radius will be incressed if necessary, taking into account both wind and altitude so that the specified bank angle limit can be respected and still maintain a constant radius loiter.
     // @Units: deg
     // @Range: 0 89
     // @User: Advanced
@@ -137,36 +137,44 @@ float AP_L1_Control::turn_distance(float wp_radius, float turn_angle) const
 
 float AP_L1_Control::loiter_radius(const float radius) const
 {
-    // prevent an insane loiter bank limit
-    float sanitized_bank_limit = constrain_float(_loiter_bank_limit, 0.0f, 89.0f);
-    float lateral_accel_sea_level = tanf(radians(sanitized_bank_limit)) * GRAVITY_MSS;
-
-    float nominal_velocity_sea_level;
-    if(_spdHgtControl == nullptr) {
-        nominal_velocity_sea_level = 0.0f;
+    // Increase the loiter radius if necessary to prevent bank angle saturating
+    float eas2tas = _ahrs.get_EAS2TAS();
+    float min_radius = radius;
+    if (_loiter_bank_limit > 10.0f) {
+        // user has specified navigation bank angle limit, so respect that
+        Vector3f wind = _ahrs.wind_estimate();
+        float wind_speed = sqrtf(wind.x*wind.x+wind.y*wind.y);
+        float true_airspeed = _spdHgtControl->get_target_airspeed() * eas2tas;
+        float max_speed = true_airspeed + wind_speed;
+        float lateral_accel = GRAVITY_MSS * tanf(radians(MIN(_loiter_bank_limit, 80.0f)));
+        min_radius = (max_speed * max_speed) / lateral_accel;
     } else {
-        nominal_velocity_sea_level =  _spdHgtControl->get_target_airspeed();
+        // no sensible bank angle limit has been specified so only adjust for altitude
+        min_radius = min_radius / (eas2tas * eas2tas);
     }
 
-    float eas2tas_sq = sq(_ahrs.get_EAS2TAS());
+    return MAX(min_radius, radius);
+}
 
-    if (is_zero(sanitized_bank_limit) || is_zero(nominal_velocity_sea_level) ||
-        is_zero(lateral_accel_sea_level)) {
-        // Missing a sane input for calculating the limit, or the user has
-        // requested a straight scaling with altitude. This will always vary
-        // with the current altitude, but will at least protect the airframe
-        return radius * eas2tas_sq;
+Vector2f AP_L1_Control::loiter_offset(const float radius) const
+{
+    // calculate a NE offset  to apply to the loiter circle that minimises the variation in body frame relative yaw
+    Vector2f delta_vec;
+    Vector3f wind = _ahrs.wind_estimate();
+    if (wind.length() > 0.1f) {
+        float eas2tas = _ahrs.get_EAS2TAS();
+        float true_airspeed = _spdHgtControl->get_target_airspeed() * eas2tas;
+        float wind_speed = sqrtf(wind.x*wind.x+wind.y*wind.y);
+        float spd_ratio = wind_speed / MAX(5.0f, true_airspeed);
+        const float sin_gamma_max = sinf(radians(45.0f));
+        float gamma = asinf(constrain_float(spd_ratio, 0.0f, sin_gamma_max));
+        float delta_length = fabsf(radius) * tanf(gamma);
+        wind = wind.normalized();
+        delta_vec = {-delta_length * wind.y , delta_length * wind.x};
     } else {
-        float sea_level_radius = sq(nominal_velocity_sea_level) / lateral_accel_sea_level;
-        if (sea_level_radius > radius) {
-            // If we've told the plane that its sea level radius is unachievable fallback to
-            // straight altitude scaling
-            return radius * eas2tas_sq;
-        } else {
-            // select the requested radius, or the required altitude scale, whichever is safer
-            return MAX(sea_level_radius * eas2tas_sq, radius);
-        }
+        delta_vec.zero();
     }
+    return delta_vec;
 }
 
 bool AP_L1_Control::reached_loiter_target(void)
@@ -195,13 +203,22 @@ void AP_L1_Control::_prevent_indecision(float &Nu)
 }
 
 // update L1 control for waypoint navigation
-void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min)
+void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct Location &next_WP, float dist_min, float radius, bool wind_comp, int8_t loiter_direction)
 {
 
     struct Location _current_loc;
     float Nu;
     float xtrackVel;
     float ltrackVel;
+
+    // calculate an offset that minimises the variation in vehicle relative camera yaw required when the camera is looking at next_WP.
+    Location next_WP_adj = next_WP;
+    if (wind_comp) {
+        radius = loiter_radius(radius);
+        Vector2f offset_vec = loiter_offset(radius);
+        offset_vec *= (float)loiter_direction;
+        location_offset(next_WP_adj, offset_vec.x, offset_vec.y);
+    }
 
     uint32_t now = AP_HAL::micros();
     float dt = (now - _last_update_waypoint_us) * 1.0e-6f;
@@ -224,7 +241,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     Vector2f _groundspeed_vector = _ahrs.groundspeed_vector();
 
     // update _target_bearing_cd
-    _target_bearing_cd = get_bearing_cd(_current_loc, next_WP);
+    _target_bearing_cd = get_bearing_cd(_current_loc, next_WP_adj);
 
     //Calculate groundspeed
     float groundSpeed = _groundspeed_vector.length();
@@ -241,13 +258,13 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     _L1_dist = MAX(0.3183099f * _L1_damping * _L1_period * groundSpeed, dist_min);
 
     // Calculate the NE position of WP B relative to WP A
-    Vector2f AB = location_diff(prev_WP, next_WP);
+    Vector2f AB = location_diff(prev_WP, next_WP_adj);
     float AB_length = AB.length();
 
     // Check for AB zero length and track directly to the destination
     // if too small
     if (AB.length() < 1.0e-6f) {
-        AB = location_diff(_current_loc, next_WP);
+        AB = location_diff(_current_loc, next_WP_adj);
         if (AB.length() < 1.0e-6f) {
             AB = Vector2f(cosf(get_yaw()), sinf(get_yaw()));
         }
@@ -276,7 +293,7 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
     } else if (alongTrackDist > AB_length + groundSpeed*3) {
         // we have passed point B by 3 seconds. Head towards B
         // Calc Nu to fly To WP B
-        Vector2f B_air = location_diff(next_WP, _current_loc);
+        Vector2f B_air = location_diff(next_WP_adj, _current_loc);
         Vector2f B_air_unit = (B_air).normalized(); // Unit vector from WP B to aircraft
         xtrackVel = _groundspeed_vector % (-B_air_unit); // Velocity across line
         ltrackVel = _groundspeed_vector * (-B_air_unit); // Velocity along line
@@ -330,13 +347,21 @@ void AP_L1_Control::update_waypoint(const struct Location &prev_WP, const struct
 }
 
 // update L1 control for loitering
-void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction)
+void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius, int8_t loiter_direction, Vector2f center_velNE, bool wind_comp)
 {
     struct Location _current_loc;
 
     // scale loiter radius with square of EAS2TAS to allow us to stay
-    // stable at high altitude
+    // stable at high altitude and allow for tail wind
     radius = loiter_radius(radius);
+
+    // calculate an offset that minimises the variation in vehicle relative camera yaw required when the camera is looking at next_WP.
+    Location centre_WP_adj = center_WP;
+    if (wind_comp) {
+        Vector2f offset_vec = loiter_offset(radius);
+        offset_vec *= (float)loiter_direction;
+        location_offset(centre_WP_adj, offset_vec.x, offset_vec.y);
+    }
 
     // Calculate guidance gains used by PD loop (used during circle tracking)
     float omega = (6.2832f / _L1_period);
@@ -353,14 +378,14 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
         return;
     }
 
-    Vector2f _groundspeed_vector = _ahrs.groundspeed_vector();
+    Vector2f _groundspeed_vector = _ahrs.groundspeed_vector() - center_velNE;
 
-    //Calculate groundspeed
+    // Calculate groundspeed
     float groundSpeed = MAX(_groundspeed_vector.length() , 1.0f);
 
 
     // update _target_bearing_cd
-    _target_bearing_cd = get_bearing_cd(_current_loc, center_WP);
+    _target_bearing_cd = get_bearing_cd(_current_loc, centre_WP_adj);
 
 
     // Calculate time varying control parameters
@@ -369,22 +394,27 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     _L1_dist = 0.3183099f * _L1_damping * _L1_period * groundSpeed;
 
     //Calculate the NE position of the aircraft relative to WP A
-    Vector2f A_air = location_diff(center_WP, _current_loc);
+    Vector2f A_air = location_diff(centre_WP_adj, _current_loc);
 
     // Calculate the unit vector from WP A to aircraft
     // protect against being on the waypoint and having zero velocity
     // if too close to the waypoint, use the velocity vector
     // if the velocity vector is too small, use the heading vector
     Vector2f A_air_unit;
+    Vector2f heading_vec = {cosf(_ahrs.yaw), sinf(_ahrs.yaw)};
     if (A_air.length() > 0.1f) {
         A_air_unit = A_air.normalized();
     } else {
         if (_groundspeed_vector.length() < 0.1f) {
-            A_air_unit = Vector2f(cosf(_ahrs.yaw), sinf(_ahrs.yaw));
+            A_air_unit = heading_vec;
         } else {
             A_air_unit = _groundspeed_vector.normalized();
         }
     }
+
+    // check if we are flying forwards
+    // dot product uses * operator overloaded
+    bool flying_forwards = heading_vec * _groundspeed_vector > 0.0f;
 
     //Calculate Nu to capture center_WP
     float xtrackVelCap = A_air_unit % _groundspeed_vector; // Velocity across line - perpendicular to radial inbound to WP
@@ -396,8 +426,16 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
 
     Nu = constrain_float(Nu, -M_PI_2, M_PI_2); //Limit Nu to +- Pi/2
 
-    //Calculate lat accln demand to capture center_WP (use L1 guidance law)
-    float latAccDemCap = K_L1 * groundSpeed * groundSpeed / _L1_dist * sinf(Nu);
+    // Calculate lat accln demand to capture center_WP (use L1 guidance law)
+    float latAccDemCap;
+    if (flying_forwards) {
+        latAccDemCap = K_L1 * groundSpeed * groundSpeed / _L1_dist * sinf(Nu);
+    } else {
+        // if flying backwards relative to waypoint, point nose at waypoint
+        float yaw_dem = atan2f(-A_air.y , -A_air.x);
+        float yaw_err = wrap_PI(yaw_dem - _ahrs.yaw);
+        latAccDemCap = - yaw_err / _L1_period;
+    }
 
     //Calculate radial position and velocity errors
     float xtrackVelCirc = -ltrackVelCap; // Radial outbound velocity - reuse previous radial inbound velocity

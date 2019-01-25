@@ -43,8 +43,9 @@ static const double RAD_TO_DEG_DOUBLE = 1 / DEG_TO_RAD_DOUBLE;
 
 #define RadiansToCentiDegrees(x) (static_cast<float>(x) * RAD_TO_DEG * static_cast<float>(100))
 
-// acceleration due to gravity in m/s/s
+// acceleration due to gravity in m/s/s and cm/s/s
 #define GRAVITY_MSS     9.80665f
+#define GRAVITY_CMSS    980.665f
 
 // radius of earth in meters
 #define RADIUS_OF_EARTH 6378100
@@ -82,6 +83,8 @@ static const double WGS84_E = (sqrt(2 * WGS84_F - WGS84_F * WGS84_F));
 #define SSL_AIR_DENSITY         1.225f // kg/m^3
 #define SSL_AIR_PRESSURE 101325.01576f // Pascal
 #define SSL_AIR_TEMPERATURE    288.15f // K
+
+#define INCH_OF_H2O_TO_PASCAL 248.84f
 
 /*
   use AP_ prefix to prevent conflict with OS headers, such as NuttX

@@ -18,14 +18,18 @@
 #pragma once
 
 #include "AP_RCProtocol.h"
+#include "SoftSerial.h"
+
 #define SUMD_MAX_CHANNELS	32
 #define SUMD_FRAME_MAXLEN   40
 class AP_RCProtocol_SUMD : public AP_RCProtocol_Backend {
 public:
     AP_RCProtocol_SUMD(AP_RCProtocol &_frontend) : AP_RCProtocol_Backend(_frontend) {}
     void process_pulse(uint32_t width_s0, uint32_t width_s1) override;
-    void process_byte(uint8_t byte) override;
+    void process_byte(uint8_t byte, uint32_t baudrate) override;
+
 private:
+    void _process_byte(uint32_t timestamp_us, uint8_t byte);
     static uint16_t sumd_crc16(uint16_t crc, uint8_t value);
     static uint8_t sumd_crc8(uint8_t crc, uint8_t value);
 
@@ -34,7 +38,7 @@ private:
         uint8_t	header;							///< 0xA8 for a valid packet
         uint8_t	status;							///< 0x01 valid and live SUMD data frame / 0x00 = SUMH / 0x81 = Failsafe
         uint8_t	length;							///< Channels
-        uint8_t	sumd_data[SUMD_MAX_CHANNELS * 2];	///< ChannelData (High Byte/ Low Byte)
+        uint8_t	sumd_data[(SUMD_MAX_CHANNELS+1) * 2];	///< ChannelData (High Byte/ Low Byte)
         uint8_t	crc16_high;						///< High Byte of 16 Bit CRC
         uint8_t	crc16_low;						///< Low Byte of 16 Bit CRC
         uint8_t	telemetry;						///< Telemetry request
@@ -61,9 +65,7 @@ private:
     uint16_t 	_crc16  = 0x0000;
     bool 		_sumd	= true;
     bool		_crcOK	= false;
-    struct {
-        uint16_t bytes[40];
-        uint16_t bit_ofs;
-        bool packet_parsed;
-    } sumd_state;
+    uint32_t last_packet_us;
+
+    SoftSerial ss{115200, SoftSerial::SERIAL_CONFIG_8N1};
 };

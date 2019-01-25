@@ -156,8 +156,8 @@ private:
     struct dm_block *next_block();
 
     void periodic_10Hz(uint32_t now) override;
-    void periodic_1Hz(uint32_t now) override;
-    void periodic_fullrate(uint32_t now) override;
+    void periodic_1Hz() override;
+    void periodic_fullrate() override;
     
     void stats_init();
     void stats_reset();
@@ -178,7 +178,7 @@ private:
     AP_HAL::Util::perf_counter_t  _perf_packing;
     AP_HAL::Util::perf_counter_t  _perf_overruns;
 
-    AP_HAL::Semaphore *semaphore;
+    HAL_Semaphore semaphore;
 };
 
 #endif // DATAFLASH_MAVLINK_SUPPORT

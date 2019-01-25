@@ -54,7 +54,7 @@ class upload_fw(Task.Task):
     def run(self):
         upload_tools = self.env.get_flat('UPLOAD_TOOLS')
         src = self.inputs[0]
-        return self.exec_command("python '{}/px_uploader.py' '{}'".format(upload_tools, src))
+        return self.exec_command("{} '{}/uploader.py' '{}'".format(self.env.get_flat('PYTHON'), upload_tools, src))
 
     def exec_command(self, cmd, **kw):
         kw['stdout'] = sys.stdout
@@ -93,7 +93,7 @@ class generate_bin(Task.Task):
 
 class generate_apj(Task.Task):
     color='CYAN'
-    run_str="python '${UPLOAD_TOOLS}/px_mkfw.py' --image '${SRC}' --prototype '${BUILDROOT}/apj.prototype' > '${TGT}'"
+    run_str="${PYTHON} '${MKFW_TOOLS}/px_mkfw.py' --image '${SRC}' --prototype '${BUILDROOT}/apj.prototype' > '${TGT}'"
     always_run = True
     def keyword(self):
         return "Generating"
@@ -215,6 +215,8 @@ def load_env_vars(env):
         else:
             env[k] = v
             print("env set %s=%s" % (k, v))
+    if env.ENABLE_ASSERTS:
+        env.CHIBIOS_BUILD_FLAGS += ' ENABLE_ASSERTS=yes'
 
 def configure(cfg):
     cfg.find_program('make', var='MAKE')
@@ -238,7 +240,8 @@ def configure(cfg):
     env.BUILDROOT = bldpath('')
     env.SRCROOT = srcpath('')
     env.PT_DIR = srcpath('Tools/ardupilotwaf/chibios/image')
-    env.UPLOAD_TOOLS = srcpath('Tools/ardupilotwaf')
+    env.MKFW_TOOLS = srcpath('Tools/ardupilotwaf')
+    env.UPLOAD_TOOLS = srcpath('Tools/scripts')
     env.CHIBIOS_SCRIPTS = srcpath('libraries/AP_HAL_ChibiOS/hwdef/scripts')
     env.TOOLS_SCRIPTS = srcpath('Tools/scripts')
     env.APJ_TOOL = srcpath('Tools/scripts/apj_tool.py')
@@ -275,8 +278,9 @@ def configure(cfg):
     hwdef_out = env.BUILDROOT
     if not os.path.exists(hwdef_out):
         os.mkdir(hwdef_out)
+    python = sys.executable
     try:
-        cmd = "python '{0}' -D '{1}' '{2}' {3}".format(hwdef_script, hwdef_out, env.HWDEF, env.BOOTLOADER_OPTION)
+        cmd = "{0} '{1}' -D '{2}' '{3}' {4}".format(python, hwdef_script, hwdef_out, env.HWDEF, env.BOOTLOADER_OPTION)
         ret = subprocess.call(cmd, shell=True)
     except Exception:
         cfg.fatal("Failed to process hwdef.dat")
@@ -294,10 +298,12 @@ def pre_build(bld):
         bld.get_board().with_uavcan = True
 
 def build(bld):
+
     bld(
         # build hwdef.h and apj.prototype from hwdef.dat. This is needed after a waf clean
         source=bld.path.ant_glob(bld.env.HWDEF),
-        rule="python '${AP_HAL_ROOT}/hwdef/scripts/chibios_hwdef.py' -D '${BUILDROOT}' '%s' %s" % (bld.env.HWDEF, bld.env.BOOTLOADER_OPTION),
+        rule="%s '${AP_HAL_ROOT}/hwdef/scripts/chibios_hwdef.py' -D '${BUILDROOT}' '%s' %s" % (
+            bld.env.get_flat('PYTHON'), bld.env.HWDEF, bld.env.BOOTLOADER_OPTION),
         group='dynamic_sources',
         target=[bld.bldnode.find_or_declare('hwdef.h'),
                 bld.bldnode.find_or_declare('apj.prototype'),
@@ -330,6 +336,6 @@ def build(bld):
 
     bld.env.LIB += ['ch']
     bld.env.LIBPATH += ['modules/ChibiOS/']
-    wraplist = ['strerror_r', 'fclose', 'freopen', 'fread']
+    wraplist = ['strerror_r', 'fclose', 'freopen', 'fread', 'fprintf', 'sscanf', 'snprintf']
     for w in wraplist:
         bld.env.LINKFLAGS += ['-Wl,--wrap,%s' % w]

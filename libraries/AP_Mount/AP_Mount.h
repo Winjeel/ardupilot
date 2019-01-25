@@ -55,12 +55,16 @@ class AP_Mount
     friend class AP_Mount_SToRM32_serial;
 
 public:
-    AP_Mount(const AP_AHRS_TYPE &ahrs, const struct Location &current_loc);
+    AP_Mount(const struct Location &current_loc);
 
     /* Do not allow copies */
     AP_Mount(const AP_Mount &other) = delete;
     AP_Mount &operator=(const AP_Mount&) = delete;
 
+    // get singleton instance
+    static AP_Mount *get_singleton() {
+        return _singleton;
+    }
 
     // Enums
     enum MountType {
@@ -93,6 +97,10 @@ public:
     enum MAV_MOUNT_MODE get_mode() const { return get_mode(_primary); }
     enum MAV_MOUNT_MODE get_mode(uint8_t instance) const;
 
+    // return the earth frame yaw of the payload in radians
+    float get_ef_yaw() const {return get_ef_yaw(_primary); };
+    float get_ef_yaw(uint8_t instance) const;
+
     // set_mode - sets mount's mode
     //  returns true if mode is successfully set
     void set_mode(enum MAV_MOUNT_MODE mode) { return set_mode(_primary, mode); }
@@ -107,44 +115,52 @@ public:
     void set_angle_targets(float roll, float tilt, float pan) { set_angle_targets(_primary, roll, tilt, pan); }
     void set_angle_targets(uint8_t instance, float roll, float tilt, float pan);
 
-    // set_roi_target - sets target location that mount should attempt to point towards
-    void set_roi_target(const struct Location &target_loc) { set_roi_target(_primary,target_loc); }
-    void set_roi_target(uint8_t instance, const struct Location &target_loc);
+    // set yaw target in degrees
+    void set_yaw_target(float pan) { set_yaw_target(_primary, pan); }
+    void set_yaw_target(uint8_t instance, float pan);
 
-    // control - control the mount
-    void control(int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, enum MAV_MOUNT_MODE mount_mode) { control(_primary, pitch_or_lat, roll_or_lon, yaw_or_alt, mount_mode); }
-    void control(uint8_t instance, int32_t pitch_or_lat, int32_t roll_or_lon, int32_t yaw_or_alt, enum MAV_MOUNT_MODE mount_mode);
+    // specialised mode that uses RC targeting
+    // when called with park = true, gimbal is held at last demanded earth frame elevation angle, roll is held to zero and yaw moves with vehicle yaw
+    // when called with park = false, causes the mount to revert to normal RC targeting operation
+    void set_elev_park(bool park) { set_elev_park(_primary, park); }
+    void set_elev_park(uint8_t instance, bool park);
 
-    // configure_msg - process MOUNT_CONFIGURE messages received from GCS
-    void configure_msg(mavlink_message_t* msg) { configure_msg(_primary, msg); }
-    void configure_msg(uint8_t instance, mavlink_message_t* msg);
+    // reset the mount LOS elevation angle to the parameter defined value
+    void reset_elev() { reset_elev(_primary); }
+    void reset_elev(uint8_t instance);
 
-    // control_msg - process MOUNT_CONTROL messages received from GCS
-    void control_msg(mavlink_message_t* msg) { control_msg(_primary, msg); }
-    void control_msg(uint8_t instance, mavlink_message_t* msg);
+    // set_roi_target - sets target location that mount should attempt to point towards and its NE velocity
+    void set_roi_target(const struct Location &target_loc, Vector2f &roi_velNE) { set_roi_target(_primary,target_loc, roi_velNE); }
+    void set_roi_target(uint8_t instance, const struct Location &target_loc, Vector2f &roi_velNE);
 
-    // handle a PARAM_VALUE message
-    void handle_param_value(mavlink_message_t *msg);
+    // get_roi_target - gets target location that mount is currently pointing towards
+    Location get_roi_target(void) { return get_roi_target(_primary); }
+    Location get_roi_target(uint8_t instance);
 
-    // handle a GIMBAL_REPORT message
-    void handle_gimbal_report(mavlink_channel_t chan, mavlink_message_t *msg);
+    // mavlink message handling:
+    MAV_RESULT handle_command_long(const mavlink_command_long_t &packet);
+    void handle_param_value(const mavlink_message_t *msg);
+    void handle_message(mavlink_channel_t chan, const mavlink_message_t *msg);
 
     // send a GIMBAL_REPORT message to GCS
     void send_gimbal_report(mavlink_channel_t chan);
 
-    // status_msg - called to allow mounts to send their status to GCS using the MOUNT_STATUS message
-    void status_msg(mavlink_channel_t chan);
+    // send a MOUNT_STATUS message to GCS:
+    void send_mount_status(mavlink_channel_t chan);
 
     // parameter var table
     static const struct AP_Param::GroupInfo        var_info[];
 
 protected:
+
+    static AP_Mount *_singleton;
+
     // private members
-    const AP_AHRS_TYPE     &_ahrs;
     const struct Location   &_current_loc;  // reference to the vehicle's current location
 
     // frontend parameters
     AP_Int8             _joystick_speed;    // joystick gain
+    AP_Int8             _ef_elev_deg;       // default earth frame elevation angle when entering stabilised modes
 
     // front end members
     uint8_t             _num_instances;     // number of mounts instantiated
@@ -179,7 +195,22 @@ protected:
         AP_Float        _roll_stb_lead;     // roll lead control gain
         AP_Float        _pitch_stb_lead;    // pitch lead control gain
 
+
         MAV_MOUNT_MODE  _mode;              // current mode (see MAV_MOUNT_MODE enum)
         struct Location _roi_target;        // roi target location
     } state[AP_MOUNT_MAX_INSTANCES];
+
+private:
+
+    void handle_gimbal_report(mavlink_channel_t chan, const mavlink_message_t *msg);
+    void handle_mount_configure(const mavlink_message_t *msg);
+    void handle_mount_control(const mavlink_message_t *msg);
+
+    MAV_RESULT handle_command_do_mount_configure(const mavlink_command_long_t &packet);
+    MAV_RESULT handle_command_do_mount_control(const mavlink_command_long_t &packet);
+
+};
+
+namespace AP {
+    AP_Mount *mount();
 };

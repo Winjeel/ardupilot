@@ -30,7 +30,7 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 	// @Range: 0 4
 	// @Increment: 0.25
     // @User: Advanced
-	AP_GROUPINFO("SLIP",    0, AP_YawController, _K_A,    0),
+    AP_GROUPINFO("SLIP",    0, AP_YawController, gains.P,    0),
 
 	// @Param: INT
 	// @DisplayName: Sideslip control integrator
@@ -38,7 +38,7 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 	// @Range: 0 2
 	// @Increment: 0.25
     // @User: Advanced
-	AP_GROUPINFO("INT",    1, AP_YawController, _K_I,    0),
+    AP_GROUPINFO("INT",    1, AP_YawController, gains.I,    0),
 
 	// @Param: DAMP
 	// @DisplayName: Yaw damping
@@ -46,7 +46,7 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 	// @Range: 0 2
 	// @Increment: 0.25
     // @User: Advanced
-	AP_GROUPINFO("DAMP",   2, AP_YawController, _K_D,    0),
+    AP_GROUPINFO("DAMP",   2, AP_YawController, gains.D,    0),
 
 	// @Param: RLL
 	// @DisplayName: Yaw coordination gain
@@ -54,13 +54,12 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 	// @Range: 0.8 1.2
 	// @Increment: 0.05
     // @User: Advanced
-	AP_GROUPINFO("RLL",   3, AP_YawController, _K_FF,   1),
+    AP_GROUPINFO("RLL",   3, AP_YawController, gains.FF,   1),
 
     /*
       Note: index 4 should not be used - it was used for an incorrect
       AP_Int8 version of the IMAX in the 2.74 release
      */
-
 
 	// @Param: IMAX
 	// @DisplayName: Integrator limit
@@ -70,7 +69,16 @@ const AP_Param::GroupInfo AP_YawController::var_info[] = {
 	// @User: Advanced
 	AP_GROUPINFO("IMAX",  5, AP_YawController, _imax,        1500),
 
-	AP_GROUPEND
+    // @Param: TAU
+    // @DisplayName: Yaw rate washout filter time constant
+    // @Description: This sets the time constant of the high pass filter that is applied to the turn coordination yaw rate error.
+    // @Units: sec
+    // @Range: 1.0 10.0
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("TAU",  6, AP_YawController, _tau, 5.0f),
+
+    AP_GROUPEND
 };
 
 int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
@@ -102,7 +110,7 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	    // If no airspeed available use average of min and max
         aspeed = 0.5f*(float(aspd_min) + float(aparm.airspeed_max));
 	}
-    rate_offset = (GRAVITY_MSS / MAX(aspeed , float(aspd_min))) * sinf(bank_angle) * _K_FF;
+    rate_offset = (GRAVITY_MSS / MAX(aspeed , float(aspd_min))) * sinf(bank_angle) * gains.FF;
 
     // Get body rate vector (radians/sec)
 	float omega_z = _ahrs.get_gyro().z;
@@ -115,20 +123,24 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 	float rate_hp_in = ToDeg(omega_z - rate_offset);
 	
 	// Apply a high-pass filter to the rate to washout any steady state error
-	// due to bias errors in rate_offset
-	// Use a cut-off frequency of omega = 0.2 rad/sec
-	// Could make this adjustable by replacing 0.9960080 with (1 - omega * dt)
-	float rate_hp_out = 0.9960080f * _last_rate_hp_out + rate_hp_in - _last_rate_hp_in;
+    // due to bias errors in rate_offset using a bi-linear discretisation method
+    float omega = 1.0f / MAX(_tau , 0.1f);
+    float alpha = omega * delta_time;
+    float a0 = alpha + 2.0f;
+    float a1 = (alpha - 2.0f) / a0;
+    float b0 = 2.0f / a0;
+    float b1 = -b0;
+    float rate_hp_out = -a1 * _last_rate_hp_out + b0 * rate_hp_in + b1 * _last_rate_hp_in;
 	_last_rate_hp_out = rate_hp_out;
 	_last_rate_hp_in = rate_hp_in;
 
 	//Calculate input to integrator
-	float integ_in = - _K_I * (_K_A * accel_y + rate_hp_out);
+    float integ_in = - gains.I * (gains.P * accel_y + rate_hp_out);
 	
 	// Apply integrator, but clamp input to prevent control saturation and freeze integrator below min FBW speed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
 	// Don't integrate if _K_D is zero as integrator will keep winding up
-	if (!disable_integrator && _K_D > 0) {
+    if (!disable_integrator && gains.D > 0) {
 		//only integrate if airspeed above min value
 		if (aspeed > float(aspd_min))
 		{
@@ -146,34 +158,41 @@ int32_t AP_YawController::get_servo_out(float scaler, bool disable_integrator)
 		_integrator = 0;
 	}
 
-    if (_K_D < 0.0001f) {
+    if (gains.D < 0.0001f) {
         // yaw damping is disabled, and the integrator is scaled by damping, so return 0
         return 0;
     }
 	
     // Scale the integration limit
-    float intLimScaled = _imax * 0.01f / (_K_D * scaler * scaler);
+    float intLimScaled = _imax * 0.01f / (gains.D * scaler * scaler);
 
     // Constrain the integrator state
     _integrator = constrain_float(_integrator, -intLimScaled, intLimScaled);
 	
 	// Protect against increases to _K_D during in-flight tuning from creating large control transients
 	// due to stored integrator values
-	if (_K_D > _K_D_last && _K_D > 0) {
-	    _integrator = _K_D_last/_K_D * _integrator;
+    if (gains.D > _K_D_last && gains.D > 0) {
+        _integrator = _K_D_last/gains.D * _integrator;
 	}
-	_K_D_last = _K_D;
+    _K_D_last = gains.D;
 	
 	// Calculate demanded rudder deflection, +Ve deflection yaws nose right
 	// Save to last value before application of limiter so that integrator limiting
 	// can detect exceedance next frame
 	// Scale using inverse dynamic pressure (1/V^2)
-	_pid_info.I = _K_D * _integrator * scaler * scaler;
-	_pid_info.D = _K_D * (-rate_hp_out) * scaler * scaler;
+    _pid_info.I = gains.D * _integrator * scaler * scaler;
+    _pid_info.D = gains.D * (-rate_hp_out) * scaler * scaler;
 	_last_out =  _pid_info.I + _pid_info.D;
 
-	// Convert to centi-degrees and constrain
-	return constrain_float(_last_out * 100, -4500, 4500);
+    // Piggyback un-used controller states for diagnostic logging
+    _pid_info.desired = integ_in;
+    _pid_info.FF = aspeed;
+    _pid_info.P = rate_hp_out;
+    _pid_info.Dmod = accel_y;
+
+    // Convert to centi-degrees and constrain
+    return int32_t(constrain_float(_last_out * 100.0f, -4500.0f, 4500.0f));
+
 }
 
 void AP_YawController::reset_I()

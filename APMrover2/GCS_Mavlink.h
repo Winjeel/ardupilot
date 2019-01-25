@@ -14,10 +14,8 @@ protected:
     uint32_t telem_delay() const override;
     bool accept_packet(const mavlink_status_t &status, mavlink_message_t &msg) override;
 
-    Compass *get_compass() const override;
     AP_Mission *get_mission() override;
-    AP_Rally *get_rally() const override { return nullptr; };
-    AP_Camera *get_camera() const override;
+    AP_Rally *get_rally() const override;
     AP_AdvancedFailsafe *get_advanced_failsafe() const override;
     AP_VisualOdom *get_visual_odom() const override;
 
@@ -36,7 +34,7 @@ protected:
 private:
 
     void handleMessage(mavlink_message_t * msg) override;
-    bool handle_guided_request(AP_Mission::Mission_Command &cmd) override;
+    bool handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius) override;
     void handle_change_alt_request(AP_Mission::Mission_Command &cmd) override;
     bool try_send_message(enum ap_message id) override;
 

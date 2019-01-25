@@ -18,17 +18,10 @@ void Rover::init_compass()
 }
 
 /*
-  if the compass is enabled then try to accumulate a reading
-  also update initial location used for declination
+  initialise compass's location used for declination
  */
-void Rover::compass_accumulate(void)
+void Rover::init_compass_location(void)
 {
-    if (!g.compass_enabled) {
-        return;
-    }
-
-    compass.accumulate();
-
     // update initial location used for declination
     if (!compass_init_location) {
         Location loc;
@@ -246,6 +239,14 @@ void Rover::init_proximity(void)
 {
     g2.proximity.init();
     g2.proximity.set_rangefinder(&rangefinder);
+}
+
+/*
+  ask airspeed sensor for a new value, duplicated from plane
+ */
+void Rover::read_airspeed(void)
+{
+    g2.airspeed.update(should_log(MASK_LOG_IMU));
 }
 
 // update error mask of sensors and subsystems. The mask

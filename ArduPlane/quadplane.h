@@ -1,3 +1,5 @@
+#pragma once
+
 #include <AP_Motors/AP_Motors.h>
 #include <AC_PID/AC_PID.h>
 #include <AC_AttitudeControl/AC_AttitudeControl_Multi.h> // Attitude control library
@@ -61,7 +63,7 @@ public:
       return true if we are a tailsitter transitioning to VTOL flight
     */
     bool in_tailsitter_vtol_transition(void) const;
-    
+
     bool handle_do_vtol_transition(enum MAV_VTOL_STATE state);
 
     bool do_vtol_takeoff(const AP_Mission::Mission_Command& cmd);
@@ -70,6 +72,12 @@ public:
     bool verify_vtol_land(void);
     bool in_vtol_auto(void) const;
     bool in_vtol_mode(void) const;
+
+    // not in a mode suitable for corvo X to takeoff
+    bool corvo_takeoff_inhibit(void) const;
+
+    // return true if transition to a forward flight mode is allowed
+    bool fw_transition_allowed(void) const;
 
     // vtol help for is_flying()
     bool is_flying(void);
@@ -80,11 +88,14 @@ public:
     }
 
     // return desired forward throttle percentage
-    int8_t forward_throttle_pct(void);        
+    int8_t forward_throttle_pct(void);
+
+    // return yaw rate demand in centi-degrees/sec required to yaw the vehicle into the wind
+    // if operating in a payload control mode return the yaw rate required to zero the payload body frame yaw angle
     float get_weathervane_yaw_rate_cds(void);
 
     // see if we are flying from vtol point of view
-    bool is_flying_vtol(void);
+    bool is_flying_vtol(void) const;
 
     // return true when tailsitter frame configured
     bool is_tailsitter(void) const;
@@ -95,6 +106,9 @@ public:
     // create outputs for tailsitters
     void tailsitter_output(void);
 
+    // create outputs for twin vectored belly sitters
+    void tvbs_output(void);
+
     // handle different tailsitter input types
     void tailsitter_check_input(void);
     
@@ -104,11 +118,21 @@ public:
     // check if we have completed transition to vtol
     bool tailsitter_transition_vtol_complete(void) const;
 
+    // check if we have completed the initial pullup
+    bool tailsitter_transition_pullup_complete(void) const;
+
     // account for surface speed scaling in hover
     void tailsitter_speed_scaling(void);
     
     // user initiated takeoff for guided mode
     bool do_user_takeoff(float takeoff_altitude);
+
+    // return true if the wp_nav controller is being updated
+    bool using_wp_nav(void) const;
+
+    float get_fw_throttle_factor(void) { return _fw_throttle_factor; }
+
+    bool attitude_control_lost(void) {return control_loss_declared; }
     
     struct PACKED log_QControl_Tuning {
         LOG_PACKET_HEADER;
@@ -124,8 +148,20 @@ public:
         float    dax;
         float    day;
         float    throttle_mix;
+        float    tvbs_gain_mod;
     };
-        
+
+    struct PACKED log_MotBatt {
+        LOG_PACKET_HEADER;
+        uint64_t time_us;
+        float   lift_max;
+        float   bat_volt;
+        float   fw_th_gain;
+        float   th_limit;
+    };
+
+    void Log_Write_MotBatt();
+
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
@@ -153,7 +189,7 @@ private:
     bool assistance_needed(float aspeed);
 
     // update transition handling
-    void update_transition(void);
+    void update_transition_to_fw(void);
 
     // check for an EKF yaw reset
     void check_yaw_reset(void);
@@ -165,13 +201,13 @@ private:
     void hold_stabilize(float throttle_in);    
 
     // get pilot desired yaw rate in cd/s
-    float get_pilot_input_yaw_rate_cds(void);
+    float get_pilot_input_yaw_rate_cds(void) const;
 
     // get overall desired yaw rate in cd/s
     float get_desired_yaw_rate_cds(void);
     
     // get desired climb rate in cm/s
-    float get_pilot_desired_climb_rate_cms(void);
+    float get_pilot_desired_climb_rate_cms(void) const;
 
     // initialise throttle_wait when entering mode
     void init_throttle_wait();
@@ -183,28 +219,30 @@ private:
     void init_stabilize(void);
     void control_stabilize(void);
 
+    void check_attitude_relax(void);
     void init_hover(void);
     void control_hover(void);
-    void run_rate_controller(void);
 
     void init_loiter(void);
-    void init_land(void);
+    void init_qland(void);
     void control_loiter(void);
     void check_land_complete(void);
 
     void init_qrtl(void);
     void control_qrtl(void);
     
-    float assist_climb_rate_cms(void);
+    float assist_climb_rate_cms(void) const;
 
-    // calculate desired yaw rate for assistance
-    float desired_auto_yaw_rate_cds(void);
+    void control_qland(void);
+
+     // calculate desired yaw rate for assistance
+    float desired_auto_yaw_rate_cds(void) const;
 
     bool should_relax(void);
-    void motors_output(void);
+    void motors_output(bool run_rate_controller = true);
     void Log_Write_QControl_Tuning();
-    float landing_descent_rate_cms(float height_above_ground);
-    
+    float landing_descent_rate_cms(float height_above_ground) const;
+
     // setup correct aux channels for frame class
     void setup_default_channels(uint8_t num_motors);
 
@@ -220,12 +258,18 @@ private:
 
     // calculate a stopping distance for fixed-wing to vtol transitions
     float stopping_distance(void);
+
+    //  run corvo launch and recovery zone logic incuding automatic disarm
+    void launch_recovery_zone_logic(void);
     
     AP_Int16 transition_time_ms;
 
     // transition deceleration, m/s/s
     AP_Float transition_decel;
-    
+
+    // Quadplane trim, degrees
+    AP_Float ahrs_trim_pitch;
+
     AP_Int16 rc_speed;
 
     // min and max PWM for throttle
@@ -286,8 +330,18 @@ private:
         AP_Float gain;
         AP_Float min_roll;
         uint32_t last_pilot_input_ms;
+        uint32_t last_frame_ms;
+        float gain_modifier;
         float last_output;
+        bool moving_backwards; // true when moving backwards rel to ground
+        uint32_t last_move_back_ms; // last system time in msec that we were moving backwards rel to ground
+        bool tip_warning; // true when tilted backwards and there is a tipover risk
+        bool payload_yaw_lockout; // true when a payload pointing demanded yaw is being ignored due to conditions being outside limits
+
     } weathervane;
+
+    // total time the finallanding descent has been delayed
+    float descent_delay_time_sec = 0;
     
     bool initialised;
     
@@ -301,6 +355,9 @@ private:
 
     // pitch when we enter loiter mode
     int32_t loiter_initial_pitch_cd;
+
+    // when did we last run the attitude controller?
+    uint32_t last_att_control_ms;
 
     // true if we have reached the airspeed threshold for transition
     enum {
@@ -316,6 +373,10 @@ private:
 
     // true when quad is assisting a fixed wing mode
     bool assisted_flight:1;
+
+    // used to control pitch angle scheduling during transiton into forward flight
+    int32_t nav_pitch_init_cd = 0; // initial pitch angle on entry into pitch scheduled forward transition
+    bool fwd_transition = false;   // true when forward transition pitch scheduling is active
 
     // true when in angle assist
     bool in_angle_assist:1;
@@ -342,11 +403,14 @@ private:
     };
     struct {
         enum position_control_state state;
-        float speed_scale;
+        bool initialised;
         Vector2f target_velocity;
         float max_speed;
         Vector3f target;
         bool slow_descent:1;
+        uint32_t time_ms;
+        bool outside_cone:1;
+        float radial_error;
     } poscontrol;
 
     struct {
@@ -383,6 +447,7 @@ private:
     enum tailsitter_input {
         TAILSITTER_INPUT_MULTICOPTER = 0,
         TAILSITTER_INPUT_PLANE       = 1,
+        TAILSITTER_CORVOX            = 2,
     };
 
     enum tailsitter_mask {
@@ -402,7 +467,90 @@ private:
         AP_Float vectored_hover_gain;
         AP_Float vectored_hover_power;
         AP_Float throttle_scale_max;
+        AP_Int16 tvbs_tilt_lag_ms;          // msec of lag from demanded to achieved tilt servo deflection that is compensated for
+        AP_Int8 tvbs_ang_min_deg;           // most negative number of degrees of thrust line rotation achieved when the tilt servo is at the travel limit as set by the servos max or min PWM parameter
+        AP_Int8 tvbs_ang_max_deg;           // most positive number of degrees of thrust line rotation achieved when the tilt servo is at the travel limit as set by the servos max or min PWM parameter
+        AP_Float tvbs_rate_gain;            // number of equivalent elevator servo degrees per deg/sec of pitch rate used to damp body pitch motion during VTOL operation
+        AP_Float tvbs_rotor_to_elev_gain;   // number of equivalent elevator servo degrees per deg/sec of rotor pitch rate
+        AP_Int16 tvbs_slew_lim_dps;         // maximum allowed rate of change of demanded rotor pitch angle
+        AP_Int16 tvbs_slew_tau_msec;        // time constant in msec of the low pass filter that is applied to the demanded rotor pitch angle
+        AP_Float tvbs_dgain;                // number of equivalent elevator servo degrees per deg/sec/sec of wing pitch acceleration
+        AP_Float tvbs_dtau_sec;             // time constant in seconds of the noise filter that is appleid to the pitch rate derivative used by the wing elevator pitch control loop
+        AP_Float elev_slew_rate_max_dps;    // maximum allowed elevator channel demand slew rate in deg/sec
+        AP_Float elev_slew_rate_tau_sec;    // time constant in sec used to recover the elevator channel gain after it has been reduced due to excessive servo slew rate
+        AP_Float tvbs_tilt_slew_lim_dps;    // maximum allowed tilt servo demand slew rate in deg/sec
+        AP_Float tvbs_elev_hpf_tau_sec;     // time constant in seconds used to filter the tilt servo derivative
+        AP_Float tvbs_roll_gain;            // gain factor that modifies the amount of roll demand from the position controller used by the attitude controller
+        AP_Int16 tvbs_bt_time_msec;         // number of milliseconds taken to slew the rotors back to the hover position when doing a back transition
+        AP_Int8 tvbs_bt_pitch;              // initial pullup pitch angle used during back transition (deg)
+        AP_Int8  tvbs_elev_trim_pcnt;       // elevator as a percentage of full throw used to trim the wing during hover so that it produces zero normal force
+        AP_Int8 tvbs_ail_gf;                // gain factor percentage reduction applied to the aileron deflection when the wing is at a horizontal flying orientation
+        AP_Int8 tvbs_elev_gf;               // gain factor percentage reduction applied to the elevator deflection when the wing is at a horizontal flying orientation
+        AP_Int8 tvbs_ar_tune;               // activates tuning mode for attitude recovery
+        AP_Float tvbs_ar_gain;              // all thrust vectoring gains are multiplied by this value when attitude recovery is active
+        AP_Int8 tvbs_fw_elev_deadband_deg;  // the number of degrees of equivalent elevator deflection before thrust vectoring is added to augment control authority in forward flight
+        AP_Float tvbs_fw_elev_fwd_gain;     // the gain from equivalent elevator deflection to thrust vectoring used in forward flight
+        AP_Int8 tvbs_fw_ail_deadband_deg;   // the number of degrees of equivalent aileron deflection before thrust vectoring is added to augment control authority in forward flight
+        AP_Float tvbs_fw_ail_fwd_gain;      // the gain from equivalent aileron deflection to thrust vectoring used in forward flight
+        AP_Float tvbs_to_scaler;            // scaler applied to position controller wind drift integrator during first part of takeoff
+        AP_Float tvbs_wpe_gain;             // gain from wing pitch error to elevator
+        AP_Int8 tvbs_land_cone_elev;        // Elevation of the landing cone in degrees
+        AP_Int8 tvbs_land_cone_radius;      // Radius of the landing cone vertex in metres
+        AP_Float tvbs_yaw_gain;             // Gain from payload yaw offset to vehicle demanded yaw rate.
+        AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
+        AP_Float tvbs_jmp_alt;              // Takeoff jump altitude used by Corvo X in QLOITER mode (m)
+        AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone (m)
+
     } tailsitter;
+
+    // TVBS control variables
+    float tvbs_body_thrust_angle_dem = 0.0f; // body relative thrust pitch angle demand (deg)
+    float tvbs_body_thrust_angle_est = 0.0f; // body relative thrust pitch estimate (deg)
+    float tvbs_body_thrust_angle_est_prev = 0.0f; // body relative thrust pitch estimate from previous frame(deg)
+    float tvbs_pitch_dem_cd = 0.0f; // demanded pitch angle for the TVBS rotors in earth frame in centi-degrees after slew rate limiting
+    float tvbs_pitch_dem_filt_cd = 0.0f; // demanded pitch angle for the TVBS rotors in earth frame in centi-degrees after low pass filtering
+    uint32_t tvbs_last_filt_time_ms = 0; // time the tvbs pitch demand filter was last updated
+    bool tvbs_active = false; // true when the vehicle is flying using the TVBS controller
+    float tvbs_dt_avg = 0.002f; // average time step taken by the TVBS controller - initialise to smallest feasible time step
+    float tvbs_pitch_rate_filt = 0.0f; // wing low pass filtered pitch rate (deg/sec)
+    float peak_tilt_rate_pos = 1.0f;
+    float peak_tilt_rate_neg = 1.0f;
+    float tvbs_thrust_ang_deriv = 0.0f;
+    float prev_pitch_error_deg = 0.0f;
+    uint32_t reverse_transition_time_ms = 0; // activation time of the transition from FW to VTOL mode (msec)
+    bool reverse_transition_active = false;
+    bool reverse_transition_pullup_active = false;
+    float gyro_rate_length_filt = 0;
+    uint32_t time_control_lost_ms = 0;
+    bool control_loss_declared = false;
+    float _elev_gain_factor = 1.0f;
+    float _ail_gain_factor = 1.0f;
+    float _fw_throttle_factor = 1.0f; // scaling factor applied to fixed wing throttle demands to compensate for battery voltage and air density effects
+    bool soft_arm_status_prev = false;
+    bool takeoff_reset_complete = false;
+    float takeoff_alt_cm;
+    Vector3f takeoff_pos_cm;
+    bool init_takeoff_this_frame = false;
+
+    // elevator channel gain limit cycle control
+    float _last_elev_feedback = 0.0f;           // value of the filtered elevator channel feedback from the previous time step (deg)
+    LowPassFilterFloat _elev_slew_rate_filter;  // LPF used by elevator channel slew rate calculation
+    float _elev_slew_rate_amplitude = 0.0f;     // Amplitude of the elevator channel slew rate produced by the unmodified feedback (deg/sec)
+    float _limit_cycle_gain_modifier = 1.0f;    // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
+
+    // corvo launch/recovery
+    bool _doing_takeoff_jump = false;           // True when the vehicle is doing a max climb rate takeoff to Q_JMP_ALT
+    bool _prev_arm_status = false;              // Value of motors->armed() from previous frame. Used to detect change in arm status.
+    bool _reached_rtl_alt = false;              // Latches to true when the vehicle climbs past Q_RTL_ALT for the first time. Set to false when motors->armed() is false.
+    bool _outside_takeoff_zone = false;         // True when the horizontal distance to the home location is greater than Q_TVBS_JMP_RAD plus allowance for GPS uncertainty.
+    float _pilot_sink_rate_limit_cms = 0.0f;    // Sink rate limit applied to pilot stick inputs (cm/s). Used to prevent hard landings when using a down button for descent.
+    float _height_above_ground_m = 0.0f;        // Common height above ground used by multiple functions (m). Will use terrain data or range finder if available.
+    bool _auto_land_arrested = false;           // True when the auto landing has been temporarily arrested to enable user to gain height and adjust landing position.
+    uint32_t _no_climb_demand_ms = 0;           // Last time in msec that a pilot climb demand was not received.
+    uint32_t _no_descent_demand_ms = 0;         // Last time in msec that a pilot descend demand was not received.
+    Vector2f _land_point_offset_NE = {};        // NE offset of the landing waypoint as last adjusted by the pilot stick inputs
+    uint32_t _pitch_stick_moved_ms = 0;         // Last time in msec that the pitch axis stick was moved.
+    uint32_t _pos_ctrl_not_is_landed_ms = 0;    // Last time in msec the position controller _is_landed flag was false
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
@@ -447,6 +595,8 @@ private:
         OPTION_LEVEL_TRANSITION=(1<<0),
         OPTION_ALLOW_FW_TAKEOFF=(1<<1),
         OPTION_ALLOW_FW_LAND=(1<<2),
+        OPTION_RESPECT_TAKEOFF_FRAME=(1<<3),
+        OPTION_MISSION_LAND_FW_APPROACH=(1<<4),
     };
 
     /*

@@ -54,7 +54,6 @@
 #include <AC_PID/AC_PID_2D.h>          // PID library (2-axis)
 #include <AC_AttitudeControl/AC_AttitudeControl_Sub.h> // Attitude control library
 #include <AC_AttitudeControl/AC_PosControl_Sub.h>      // Position control library
-#include <RC_Channel/RC_Channel.h>         // RC Channel Library
 #include <AP_Motors/AP_Motors.h>          // AP Motors library
 #include <AP_RangeFinder/AP_RangeFinder.h>     // Range finder library
 #include <Filter/Filter.h>             // Filter library
@@ -82,6 +81,7 @@
 #include "defines.h"
 #include "config.h"
 #include "GCS_Mavlink.h"
+#include "RC_Channel.h"         // RC Channel Library
 #include "Parameters.h"
 #include "AP_Arming_Sub.h"
 #include "GCS_Sub.h"
@@ -130,6 +130,7 @@ public:
     friend class Parameters;
     friend class ParametersG2;
     friend class AP_Arming_Sub;
+    friend class RC_Channels_Sub;
 
     Sub(void);
 
@@ -196,21 +197,15 @@ private:
 #endif
 
     // Mission library
-    AP_Mission mission{ahrs,
+    AP_Mission mission{
             FUNCTOR_BIND_MEMBER(&Sub::start_command, bool, const AP_Mission::Mission_Command &),
             FUNCTOR_BIND_MEMBER(&Sub::verify_command_callback, bool, const AP_Mission::Mission_Command &),
             FUNCTOR_BIND_MEMBER(&Sub::exit_mission, void)};
 
     // Optical flow sensor
 #if OPTFLOW == ENABLED
-    OpticalFlow optflow{ahrs};
+    OpticalFlow optflow;
 #endif
-
-    // gnd speed limit required to observe optical flow sensor limits
-    float ekfGndSpdLimit;
-
-    // scale factor applied to velocity controller gain to prevent optical flow noise causing excessive angle demand noise
-    float ekfNavVelGainScaler;
 
     // system time in milliseconds of last recorded yaw reset from ekf
     uint32_t ekfYawReset_ms = 0;
@@ -413,7 +408,7 @@ private:
     // Camera/Antenna mount tracking and stabilisation stuff
 #if MOUNT == ENABLED
     // current_loc uses the baro/gps soloution for altitude rather than gps only.
-    AP_Mount camera_mount{ahrs, current_loc};
+    AP_Mount camera_mount{current_loc};
 #endif
 
     // AC_Fence library to reduce fly-aways
@@ -432,7 +427,7 @@ private:
 
     // terrain handling
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
-    AP_Terrain terrain{ahrs, mission, rally};
+    AP_Terrain terrain{mission, rally};
 #endif
 
     // used to allow attitude and depth control without a position system
@@ -449,13 +444,13 @@ private:
 
     uint32_t last_pilot_heading;
     uint32_t last_pilot_yaw_input_ms;
-    uint32_t fs_terrain_recover_start_ms = 0;
+    uint32_t fs_terrain_recover_start_ms;
 
     static const AP_Scheduler::Task scheduler_tasks[];
     static const AP_Param::Info var_info[];
     static const struct LogStructure log_structure[];
 
-    void compass_accumulate(void);
+    void init_compass_location();
     void compass_cal_update(void);
     void fast_loop();
     void fifty_hz_loop();
@@ -489,9 +484,7 @@ private:
 #endif
     void send_pid_tuning(mavlink_channel_t chan);
     void gcs_data_stream_send(void);
-    void gcs_check_input(void);
-    void do_erase_logs(void);
-    void Log_Write_Optflow();
+    void gcs_update(void);
     void Log_Write_Control_Tuning();
     void Log_Write_Performance();
     void Log_Write_Attitude();
@@ -623,7 +616,6 @@ private:
     void init_compass();
 #if OPTFLOW == ENABLED
     void init_optflow();
-    void update_optical_flow(void);
 #endif
     void terrain_update();
     void terrain_logging();
@@ -658,14 +650,6 @@ private:
     void do_set_home(const AP_Mission::Mission_Command& cmd);
     void do_roi(const AP_Mission::Mission_Command& cmd);
     void do_mount_control(const AP_Mission::Mission_Command& cmd);
-#if CAMERA == ENABLED
-    void do_digicam_configure(const AP_Mission::Mission_Command& cmd);
-    void do_digicam_control(const AP_Mission::Mission_Command& cmd);
-#endif
-
-#if GRIPPER_ENABLED == ENABLED
-    void do_gripper(const AP_Mission::Mission_Command& cmd);
-#endif
 
     bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
     bool verify_surface(const AP_Mission::Mission_Command& cmd);

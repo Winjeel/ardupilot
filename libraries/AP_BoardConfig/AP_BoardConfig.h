@@ -9,16 +9,10 @@
 #include <AP_Param_Helper/AP_Param_Helper.h>
 #endif
 
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || defined(HAL_CHIBIOS_ARCH_FMUV3) || defined(HAL_CHIBIOS_ARCH_FMUV4) || defined(HAL_CHIBIOS_ARCH_FMUV5) || defined(HAL_CHIBIOS_ARCH_MINDPXV2)
+#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || defined(HAL_CHIBIOS_ARCH_FMUV3) || defined(HAL_CHIBIOS_ARCH_FMUV4) || defined(HAL_CHIBIOS_ARCH_FMUV5) || defined(HAL_CHIBIOS_ARCH_MINDPXV2) || defined(HAL_CHIBIOS_ARCH_FMUV4PRO)
 #define AP_FEATURE_BOARD_DETECT 1
 #else
 #define AP_FEATURE_BOARD_DETECT 0
-#endif
-
-#if CONFIG_HAL_BOARD == HAL_BOARD_PX4 || CONFIG_HAL_BOARD == HAL_BOARD_VRBRAIN || defined(HAL_CHIBIOS_ARCH_FMUV3) || defined(HAL_CHIBIOS_ARCH_FMUV4) || defined(HAL_CHIBIOS_ARCH_FMUV5) || defined(HAL_CHIBIOS_ARCH_MINDPXV2) || defined(HAL_GPIO_PIN_SAFETY_IN)
-#define AP_FEATURE_SAFETY_BUTTON 1
-#else
-#define AP_FEATURE_SAFETY_BUTTON 0
 #endif
 
 #ifndef AP_FEATURE_RTSCTS
@@ -124,10 +118,10 @@ public:
 
     // get number of PWM outputs enabled on FMU
     static uint8_t get_pwm_count(void) {
-        return instance?instance->pwm_count.get():4;
+        return instance?instance->pwm_count.get():8;
     }
 
-#if AP_FEATURE_SAFETY_BUTTON
+#if HAL_HAVE_SAFETY_SWITCH
     enum board_safety_button_option {
         BOARD_SAFETY_OPTION_BUTTON_ACTIVE_SAFETY_OFF=1,
         BOARD_SAFETY_OPTION_BUTTON_ACTIVE_SAFETY_ON=2,
@@ -149,6 +143,19 @@ public:
 #endif
     }
 
+#if HAL_HAVE_BOARD_VOLTAGE
+    // get minimum board voltage
+    static float get_minimum_board_voltage(void) {
+        return instance?instance->_vbus_min.get():0;
+    }
+#endif
+
+#if HAL_HAVE_SERVO_VOLTAGE
+    // get minimum servo voltage
+    static float get_minimum_servo_voltage(void) {
+        return instance?instance->_vservo_min.get():0;
+    }
+#endif
     
 private:
     static AP_BoardConfig *instance;
@@ -156,7 +163,7 @@ private:
     AP_Int16 vehicleSerialNumber;
     AP_Int8 pwm_count;
     
-#if AP_FEATURE_BOARD_DETECT || defined(AP_FEATURE_BRD_PWM_COUNT_PARAM) || AP_FEATURE_SAFETY_BUTTON
+#if AP_FEATURE_BOARD_DETECT || defined(AP_FEATURE_BRD_PWM_COUNT_PARAM) || HAL_HAVE_SAFETY_SWITCH
     struct {
         AP_Int8 safety_enable;
         AP_Int16 safety_option;
@@ -190,11 +197,8 @@ private:
 
 #endif // AP_FEATURE_BOARD_DETECT
 
-#if AP_FEATURE_SAFETY_BUTTON
     void board_init_safety(void);
-    void board_setup_safety_mask(void);
-#endif
-    
+
     void board_setup_uart(void);
     void board_setup_sbus(void);
     void board_setup(void);
@@ -216,4 +220,12 @@ private:
 
     // real-time-clock; private because access is via the singleton
     AP_RTC rtc;
+
+#if HAL_HAVE_BOARD_VOLTAGE
+    AP_Float _vbus_min;
+#endif
+
+#if HAL_HAVE_SERVO_VOLTAGE
+    AP_Float _vservo_min;
+#endif
 };

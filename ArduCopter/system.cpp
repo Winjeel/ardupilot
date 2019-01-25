@@ -23,13 +23,12 @@ void Copter::init_ardupilot()
     // initialise serial port
     serial_manager.init_console();
 
-    // init vehicle capabilties
-    init_capabilities();
-
     hal.console->printf("\n\nInit %s"
                         "\n\nFree RAM: %u\n",
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
+
+    init_capabilities();
 
     //
     // Report firmware version code expect on console (check of actual EEPROM format version is done in load_parameters function)
@@ -78,7 +77,7 @@ void Copter::init_ardupilot()
     winch_init();
 
     // initialise notify system
-    notify.init(true);
+    notify.init();
     notify_flight_mode();
 
     // initialise battery monitor
@@ -137,9 +136,6 @@ void Copter::init_ardupilot()
 
     // motors initialised so parameters can be sent
     ap.initialised_params = true;
-
-    // initialise which outputs Servo and Relay events can use
-    ServoRelayEvents.set_channel_mask(~motors->get_motor_mask());
 
     relay.init();
 
@@ -237,7 +233,7 @@ void Copter::init_ardupilot()
 
 #if MODE_AUTO_ENABLED == ENABLED
     // initialise mission library
-    mission.init();
+    mode_auto.mission.init();
 #endif
 
 #if MODE_SMARTRTL_ENABLED == ENABLED
@@ -247,14 +243,12 @@ void Copter::init_ardupilot()
 
     // initialise DataFlash library
 #if MODE_AUTO_ENABLED == ENABLED
-    DataFlash.set_mission(&mission);
+    DataFlash.set_mission(&mode_auto.mission);
 #endif
     DataFlash.setVehicle_Startup_Log_Writer(FUNCTOR_BIND(&copter, &Copter::Log_Write_Vehicle_Startup_Messages, void));
 
-    // initialise the flight mode and aux switch
-    // ---------------------------
-    reset_control_switch();
-    init_aux_switches();
+    // initialise rc channels including setting mode
+    rc().init();
 
     startup_INS_ground();
 
@@ -280,9 +274,6 @@ void Copter::init_ardupilot()
     // disable safety if requested
     BoardConfig.init_safety();
 
-    // default enable RC override
-    copter.ap.rc_override_enable = true;
-    
     hal.console->printf("\nReady to FLY ");
 
     // flag that initialisation has completed
@@ -461,6 +452,7 @@ MAV_TYPE Copter::get_frame_mav_type()
         case AP_Motors::MOTOR_FRAME_SINGLE:
         case AP_Motors::MOTOR_FRAME_COAX:
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
+        case AP_Motors::MOTOR_FRAME_TVBS:
             return MAV_TYPE_COAXIAL;
         case AP_Motors::MOTOR_FRAME_DODECAHEXA:
             return MAV_TYPE_DODECAROTOR;
@@ -497,6 +489,8 @@ const char* Copter::get_frame_string()
             return "COAX";
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
             return "TAILSITTER";
+    case AP_Motors::MOTOR_FRAME_TVBS:
+        return "BELLYSITTER";
         case AP_Motors::MOTOR_FRAME_DODECAHEXA:
             return "DODECA_HEXA";
         case AP_Motors::MOTOR_FRAME_UNDEFINED:
@@ -536,6 +530,8 @@ void Copter::allocate_motors(void)
             motors_var_info = AP_MotorsCoax::var_info;
             break;
         case AP_Motors::MOTOR_FRAME_TAILSITTER:
+            motors = new AP_MotorsTailsitter(copter.scheduler.get_loop_rate_hz());
+        case AP_Motors::MOTOR_FRAME_TVBS:
             motors = new AP_MotorsTailsitter(copter.scheduler.get_loop_rate_hz());
             motors_var_info = AP_MotorsTailsitter::var_info;
             break;

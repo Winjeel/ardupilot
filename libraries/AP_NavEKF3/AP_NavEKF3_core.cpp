@@ -12,8 +12,6 @@ extern const AP_HAL::HAL& hal;
 
 // constructor
 NavEKF3_core::NavEKF3_core(void) :
-    stateStruct(*reinterpret_cast<struct state_elements *>(&statesArray)),
-
     _perf_UpdateFilter(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_UpdateFilter")),
     _perf_CovariancePrediction(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_CovariancePrediction")),
     _perf_FuseVelPosNED(hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_FuseVelPosNED")),
@@ -161,10 +159,8 @@ void NavEKF3_core::InitialiseVariables()
 
     // initialise time stamps
     imuSampleTime_ms = frontend->imuSampleTime_us / 1000;
-    lastHealthyMagTime_ms = imuSampleTime_ms;
     prevTasStep_ms = imuSampleTime_ms;
     prevBetaStep_ms = imuSampleTime_ms;
-    lastMagUpdate_us = 0;
     lastBaroReceived_ms = imuSampleTime_ms;
     lastVelPassTime_ms = 0;
     lastPosPassTime_ms = 0;
@@ -184,7 +180,6 @@ void NavEKF3_core::InitialiseVariables()
     lastGpsVelFail_ms = 0;
     lastGpsAidBadTime_ms = 0;
     timeTasReceived_ms = 0;
-    magYawResetTimer_ms = imuSampleTime_ms;
     lastPreAlignGpsCheckTime_ms = imuSampleTime_ms;
     lastPosReset_ms = 0;
     lastVelReset_ms = 0;
@@ -195,13 +190,9 @@ void NavEKF3_core::InitialiseVariables()
     // initialise other variables
     gpsNoiseScaler = 1.0f;
     hgtTimeout = true;
-    magTimeout = false;
-    allMagSensorsFailed = false;
     tasTimeout = true;
-    badMagYaw = false;
     badIMUdata = false;
     finalInflightYawInit = false;
-    finalInflightMagInit = false;
     dtIMUavg = ins.get_loop_delta_t();
     dtEkfAvg = EKF_TARGET_DT;
     dt = 0;
@@ -227,15 +218,12 @@ void NavEKF3_core::InitialiseVariables()
     velTimeout = true;
     memset(&faultStatus, 0, sizeof(faultStatus));
     hgtRate = 0.0f;
-    mag_state.q0 = 1;
-    mag_state.DCM.identity();
     onGround = true;
     prevOnGround = true;
     inFlight = false;
     prevInFlight = false;
     manoeuvring = false;
     inhibitWindStates = true;
-    inhibitMagStates = true;
     inhibitDelVelBiasStates = true;
     inhibitDelAngBiasStates = true;
     gndOffsetValid =  false;
@@ -255,7 +243,6 @@ void NavEKF3_core::InitialiseVariables()
     stateIndexLim = 23;
     baroStoreIndex = 0;
     rangeStoreIndex = 0;
-    magStoreIndex = 0;
     last_gps_idx = 0;
     tasStoreIndex = 0;
     ofStoreIndex = 0;
@@ -289,28 +276,18 @@ void NavEKF3_core::InitialiseVariables()
     flowFusionActive = false;
     airSpdFusionDelayed = false;
     sideSlipFusionDelayed = false;
+    airDataFusionWindOnly = false;
     posResetNE.zero();
     velResetNE.zero();
     posResetD = 0.0f;
     hgtInnovFiltState = 0.0f;
-    if (_ahrs->get_compass()) {
-        magSelectIndex = _ahrs->get_compass()->get_primary();
-    }
     imuDataDownSampledNew.delAng.zero();
     imuDataDownSampledNew.delVel.zero();
     imuDataDownSampledNew.delAngDT = 0.0f;
     imuDataDownSampledNew.delVelDT = 0.0f;
     runUpdates = false;
     framesSincePredict = 0;
-    lastMagOffsetsValid = false;
-    magStateResetRequest = false;
-    magStateInitComplete = false;
-    magYawResetRequest = false;
     gpsYawResetRequest = false;
-    posDownAtLastMagReset = stateStruct.position.z;
-    yawInnovAtLastMagReset = 0.0f;
-    quatAtLastMagReset = stateStruct.quat;
-    magFieldLearned = false;
     delAngBiasLearned = false;
     memset(&filterStatus, 0, sizeof(filterStatus));
     gpsInhibit = false;
@@ -325,10 +302,11 @@ void NavEKF3_core::InitialiseVariables()
     posOffsetNED.zero();
     posResetSource = DEFAULT;
     velResetSource = DEFAULT;
+    externalEasDefault = frontend->_easDefault;
 
     // range beacon fusion variables
-    memset(&rngBcnDataNew, 0, sizeof(rngBcnDataNew));
-    memset(&rngBcnDataDelayed, 0, sizeof(rngBcnDataDelayed));
+    memset((void *)&rngBcnDataNew, 0, sizeof(rngBcnDataNew));
+    memset((void *)&rngBcnDataDelayed, 0, sizeof(rngBcnDataDelayed));
     rngBcnStoreIndex = 0;
     lastRngBcnPassTime_ms = 0;
     rngBcnTestRatio = 0.0f;
@@ -366,8 +344,8 @@ void NavEKF3_core::InitialiseVariables()
     bcnOriginEstInit = false;
 
     // body frame displacement fusion
-    memset(&bodyOdmDataNew, 0, sizeof(bodyOdmDataNew));
-    memset(&bodyOdmDataDelayed, 0, sizeof(bodyOdmDataDelayed));
+    memset((void *)&bodyOdmDataNew, 0, sizeof(bodyOdmDataNew));
+    memset((void *)&bodyOdmDataDelayed, 0, sizeof(bodyOdmDataDelayed));
     lastbodyVelPassTime_ms = 0;
     memset(&bodyVelTestRatio, 0, sizeof(bodyVelTestRatio));
     memset(&varInnovBodyVel, 0, sizeof(varInnovBodyVel));
@@ -382,7 +360,6 @@ void NavEKF3_core::InitialiseVariables()
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
-    storedMag.reset();
     storedBaro.reset();
     storedTAS.reset();
     storedRange.reset();
@@ -390,6 +367,37 @@ void NavEKF3_core::InitialiseVariables()
     storedRangeBeacon.reset();
     storedBodyOdm.reset();
     storedWheelOdm.reset();
+
+    InitialiseVariablesMag();
+}
+
+
+// Use a function call rather than a constructor to initialise variables because it enables the filter to be re-started in flight if necessary.
+void NavEKF3_core::InitialiseVariablesMag()
+{
+    lastHealthyMagTime_ms = imuSampleTime_ms;
+    lastMagUpdate_us = 0;
+    magYawResetTimer_ms = imuSampleTime_ms;
+    magTimeout = false;
+    allMagSensorsFailed = false;
+    badMagYaw = false;
+    finalInflightMagInit = false;
+    mag_state.q0 = 1;
+    mag_state.DCM.identity();
+    inhibitMagStates = true;
+    magStoreIndex = 0;
+    if (_ahrs->get_compass()) {
+        magSelectIndex = _ahrs->get_compass()->get_primary();
+    }
+    lastMagOffsetsValid = false;
+    magStateResetRequest = false;
+    magStateInitComplete = false;
+    magYawResetRequest = false;
+    posDownAtLastMagReset = stateStruct.position.z;
+    yawInnovAtLastMagReset = 0.0f;
+    quatAtLastMagReset = stateStruct.quat;
+    magFieldLearned = false;
+    storedMag.reset();
 }
 
 // Initialise the states from accelerometer and magnetometer data (if present)
@@ -427,10 +435,22 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
     InitialiseVariables();
 
     // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
-    Vector3f initAccVec;
+    // TODO we should accumulate accel readings over several cycles, use average and check variance
+    Vector3f initAccVec = AP::ins().get_accel(imu_index);
 
-    // TODO we should average accel readings over several cycles
-    initAccVec = AP::ins().get_accel(imu_index);
+    // angular rate vector in XYZ body axes measured by the IMU (rad/s)
+    Vector3f initAngRateVec =  AP::ins().get_gyro(imu_index);
+
+    // require upright and not rotating too fast
+    float xy_length_sq = initAccVec.x*initAccVec.x + initAccVec.y*initAccVec.y;
+    float accel_length = initAccVec.length();
+    if (initAngRateVec.length() > 0.5f
+            || (initAccVec.z > 0.0f)
+            || (accel_length > 1.1f * GRAVITY_MSS)
+            || (accel_length < 0.9f * GRAVITY_MSS)
+            || (xy_length_sq > sq(0.5f * GRAVITY_MSS))) {
+        return false;
+    }
 
     // normalise the acceleration vector
     float pitch=0, roll=0;
@@ -484,7 +504,7 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
 void NavEKF3_core::CovarianceInit()
 {
     // zero the matrix
-    memset(P, 0, sizeof(P));
+    memset(&P[0][0], 0, sizeof(P));
 
     // define the initial angle uncertainty as variances for a rotation vector
     Vector3f rot_vec_var;

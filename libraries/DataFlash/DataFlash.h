@@ -67,6 +67,7 @@ public:
 
     // initialisation
     void Init(const struct LogStructure *structure, uint8_t num_types);
+    void set_num_types(uint8_t num_types) { _num_types = num_types; }
 
     bool CardInserted(void);
 
@@ -158,11 +159,12 @@ public:
     // This structure provides information on the internal member data of a PID for logging purposes
     struct PID_Info {
         float desired;
+        float actual;
         float P;
         float I;
         float D;
         float FF;
-        float AFF;
+        float Dmod;
     };
 
     void Log_Write_PID(uint8_t msg_type, const PID_Info &info);
@@ -185,7 +187,13 @@ public:
     uint32_t num_dropped(void) const;
 
     // accesss to public parameters
-    bool log_while_disarmed(void) const { return _params.log_disarmed != 0; }
+    void set_force_log_disarmed(bool force_logging) { _force_log_disarmed = force_logging; }
+    bool log_while_disarmed(void) const {
+        if (_force_log_disarmed) {
+            return true;
+        }
+        return _params.log_disarmed != 0;
+    }
     uint8_t log_replay(void) const { return _params.log_replay; }
     
     vehicle_startup_message_Log_Writer _vehicle_messages;
@@ -220,6 +228,9 @@ public:
 
     float quiet_nanf() const { return nanf("0x4152"); } // "AR"
     double quiet_nan() const { return nan("0x4152445550490a"); } // "ARDUPI"
+
+    // returns true if msg_type is associated with a message
+    bool msg_type_in_use(uint8_t msg_type) const;
 
 protected:
 
@@ -266,9 +277,9 @@ private:
 
     // return (possibly allocating) a log_write_fmt for a name
     struct log_write_fmt *msg_fmt_for_name(const char *name, const char *labels, const char *units, const char *mults, const char *fmt);
+    const struct log_write_fmt *log_write_fmt_for_msg_type(uint8_t msg_type) const;
 
-    // returns true if msg_type is associated with a message
-    bool msg_type_in_use(uint8_t msg_type) const;
+    const struct LogStructure *structure_for_msg_type(uint8_t msg_type);
 
     // return a msg_type which is not currently in use (or -1 if none available)
     int16_t find_free_msg_type() const;
@@ -304,7 +315,6 @@ private:
 
     void backend_starting_new_log(const DataFlash_Backend *backend);
 
-private:
     static DataFlash_Class *_instance;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
@@ -329,6 +339,7 @@ private:
     void Prep();
 
     bool _writes_enabled:1;
+    bool _force_log_disarmed:1;
 
     /* support for retrieving logs via mavlink: */
 

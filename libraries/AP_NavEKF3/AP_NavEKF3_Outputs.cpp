@@ -204,13 +204,14 @@ uint32_t NavEKF3_core::getLastVelNorthEastReset(Vector2f &vel) const
 }
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void NavEKF3_core::getWind(Vector3f &wind) const
+// returns true if wind state estimation is active
+bool NavEKF3_core::getWind(Vector3f &wind) const
 {
     wind.x = stateStruct.wind_vel.x;
     wind.y = stateStruct.wind_vel.y;
     wind.z = 0.0f; // currently don't estimate this
+    return !inhibitWindStates;
 }
-
 
 // return the NED velocity of the body frame origin in m/s
 //
@@ -313,10 +314,13 @@ bool NavEKF3_core::getHAGL(float &HAGL) const
 bool NavEKF3_core::getLLH(struct Location &loc) const
 {
     const AP_GPS &gps = AP::gps();
+    Location origin;
+    float posD;
 
-    if(validOrigin) {
+
+    if(getPosD(posD) && getOriginLLH(origin)) {
         // Altitude returned is an absolute altitude relative to the WGS-84 spherioid
-        loc.alt =  100 * (int32_t)(ekfGpsRefHgt - (double)outputDataNew.position.z);
+        loc.alt = origin.alt - posD*100;
         loc.flags.relative_alt = 0;
         loc.flags.terrain_alt = 0;
 

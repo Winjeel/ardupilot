@@ -27,9 +27,9 @@ static uint8_t last_uart;
 int16_t cin(unsigned timeout_ms)
 {
     uint8_t b = 0;
-    for (uint8_t i=0; i<ARRAY_SIZE_SIMPLE(uarts); i++) {
+    for (uint8_t i=0; i<ARRAY_SIZE(uarts); i++) {
         if (locked_uart == -1 || locked_uart == i) {
-            if (chnReadTimeout(uarts[i], &b, 1, MS2ST(timeout_ms)) == 1) {
+            if (chnReadTimeout(uarts[i], &b, 1, chTimeMS2I(timeout_ms)) == 1) {
                 last_uart = i;
                 return b;
             }
@@ -41,9 +41,9 @@ int16_t cin(unsigned timeout_ms)
 
 int cin_word(uint32_t *wp, unsigned timeout_ms)
 {
-    for (uint8_t i=0; i<ARRAY_SIZE_SIMPLE(uarts); i++) {
+    for (uint8_t i=0; i<ARRAY_SIZE(uarts); i++) {
         if (locked_uart == -1 || locked_uart == i) {
-            if (chnReadTimeout(uarts[i], (uint8_t *)wp, 4, MS2ST(timeout_ms)) == 4) {
+            if (chnReadTimeout(uarts[i], (uint8_t *)wp, 4, chTimeMS2I(timeout_ms)) == 4) {
                 last_uart = i;
                 return 0;
             }
@@ -56,7 +56,7 @@ int cin_word(uint32_t *wp, unsigned timeout_ms)
 
 void cout(uint8_t *data, uint32_t len)
 {
-    chnWriteTimeout(uarts[last_uart], data, len, MS2ST(100));
+    chnWriteTimeout(uarts[last_uart], data, len, chTimeMS2I(100));
 }
 
 static uint32_t flash_base_page;
@@ -146,14 +146,14 @@ uint32_t get_mcu_desc(uint32_t max, uint8_t *revstr)
 
     mcu_des_t des = mcu_descriptions[STM32_UNKNOWN];
 
-    for (int i = 0; i < ARRAY_SIZE_SIMPLE(mcu_descriptions); i++) {
+    for (int i = 0; i < ARRAY_SIZE(mcu_descriptions); i++) {
         if (mcuid == mcu_descriptions[i].mcuid) {
             des = mcu_descriptions[i];
             break;
         }
     }
 
-    for (int i = 0; i < ARRAY_SIZE_SIMPLE(silicon_revs); i++) {
+    for (int i = 0; i < ARRAY_SIZE(silicon_revs); i++) {
         if (silicon_revs[i].revid == revid) {
             des.rev = silicon_revs[i].rev;
         }
@@ -185,7 +185,7 @@ bool check_limit_flash_1M(void)
     uint32_t idcode = (*(uint32_t *)DBGMCU_BASE);
     uint16_t revid = ((idcode & REVID_MASK) >> 16);
 
-    for (int i = 0; i < ARRAY_SIZE_SIMPLE(silicon_revs); i++) {
+    for (int i = 0; i < ARRAY_SIZE(silicon_revs); i++) {
         if (silicon_revs[i].revid == revid) {
             return silicon_revs[i].limit_flash_size_1M;
         }
@@ -248,7 +248,7 @@ void uprintf(const char *fmt, ...)
     va_start(ap, fmt);
     uint32_t n = vsnprintf(msg, sizeof(msg), fmt, ap);
     va_end(ap);
-    chnWriteTimeout(&SDU1, (const uint8_t *)msg, n, MS2ST(100));
+    chnWriteTimeout(&SDU1, (const uint8_t *)msg, n, chTimeMS2I(100));
 #endif
 }
 
@@ -342,7 +342,7 @@ void init_uarts(void)
 #if HAL_USE_SERIAL == TRUE
     sercfg.speed = BOOTLOADER_BAUDRATE;
     
-    for (uint8_t i=0; i<ARRAY_SIZE_SIMPLE(uarts); i++) {
+    for (uint8_t i=0; i<ARRAY_SIZE(uarts); i++) {
 #if HAL_USE_SERIAL_USB == TRUE
         if (uarts[i] == (BaseChannel *)&SDU1) {
             continue;

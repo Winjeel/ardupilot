@@ -554,7 +554,8 @@ void Sub::set_auto_yaw_roi(const Location &roi_location)
             set_auto_yaw_mode(AUTO_YAW_ROI);
         }
         // send the command to the camera mount
-        camera_mount.set_roi_target(roi_location);
+        Vector2f roi_velNE = {};
+        camera_mount.set_roi_target(roi_location, roi_velNE);
 
         // TO-DO: expand handling of the do_nav_roi to support all modes of the MAVLink.  Currently we only handle mode 4 (see below)
         //      0: do nothing
@@ -646,14 +647,15 @@ bool Sub::auto_terrain_recover_start()
     mission.stop();
 
     // Reset xy target
+    loiter_nav.clear_pilot_desired_acceleration();
     loiter_nav.init_target();
 
     // Reset z axis controller
     pos_control.relax_alt_hold_controllers(motors.get_throttle_hover());
 
     // initialize vertical speeds and leash lengths
-    pos_control.set_speed_z(wp_nav.get_speed_down(), wp_nav.get_speed_up());
-    pos_control.set_accel_z(wp_nav.get_accel_z());
+    pos_control.set_max_speed_z(wp_nav.get_speed_down(), wp_nav.get_speed_up());
+    pos_control.set_max_accel_z(wp_nav.get_accel_z());
 
     // Reset vertical position and velocity targets
     pos_control.set_alt_target(inertial_nav.get_altitude());
@@ -733,7 +735,7 @@ void Sub::auto_terrain_recover_run()
     }
 
     // run loiter controller
-    loiter_nav.update(ekfGndSpdLimit, ekfNavVelGainScaler);
+    loiter_nav.update();
 
     ///////////////////////
     // update xy targets //

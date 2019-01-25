@@ -29,6 +29,7 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Param/AP_Param.h>
+#include <AP_Common/Semaphore.h>
 
 class OpticalFlow;
 #define AP_AHRS_TRIM_LIMIT 10.0f        // maximum trim angle in degrees
@@ -158,6 +159,10 @@ public:
     const OpticalFlow* get_optflow() const {
         return _optflow;
     }
+
+    // set a default value of EAS in m/s to be assumed by the AHRS estimators
+    // used to improve wind and airspeed estimation where supported
+    virtual void set_default_airspeed(float spd) = 0;
 
     // allow for runtime change of orientation
     // this makes initial config easier
@@ -545,8 +550,8 @@ public:
     }
 
     // create a view
-    AP_AHRS_View *create_view(enum Rotation rotation);
-    
+    AP_AHRS_View *create_view(enum Rotation rotation, float pitch_trim_deg=0);
+
     // return calculated AOA
     float getAOA(void);
 
@@ -571,7 +576,16 @@ public:
     // Write position and quaternion data from an external navigation system
     virtual void writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, const Quaternion &quat, float posErr, float angErr, uint32_t timeStamp_ms, uint32_t resetTime_ms) { }
 
+    // allow threads to lock against AHRS update
+    HAL_Semaphore &get_semaphore(void) {
+        return _rsem;
+    }
+    
 protected:
+    
+    // multi-thread access support
+    HAL_Semaphore_Recursive _rsem;
+    
     AHRS_VehicleClass _vehicle_class;
 
     // settable parameters

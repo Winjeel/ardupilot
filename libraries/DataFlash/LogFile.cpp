@@ -188,8 +188,10 @@ void DataFlash_Class::Log_Write_RFND(const RangeFinder &rangefinder)
         LOG_PACKET_HEADER_INIT((uint8_t)(LOG_RFND_MSG)),
         time_us       : AP_HAL::micros64(),
         dist1         : s0 ? s0->distance_cm() : (uint16_t)0,
+        status1       : s0 ? (uint8_t)s0->status() : (uint8_t)0,
         orient1       : s0 ? s0->orientation() : ROTATION_NONE,
         dist2         : s1 ? s1->distance_cm() : (uint16_t)0,
+        status2       : s1 ? (uint8_t)s1->status() : (uint8_t)0,
         orient2       : s1 ? s1->orientation() : ROTATION_NONE,
     };
     WriteBlock(&pkt, sizeof(pkt));
@@ -198,23 +200,25 @@ void DataFlash_Class::Log_Write_RFND(const RangeFinder &rangefinder)
 // Write an RCIN packet
 void DataFlash_Class::Log_Write_RCIN(void)
 {
+    uint16_t values[14] = {};
+    rc().get_radio_in(values, ARRAY_SIZE(values));
     struct log_RCIN pkt = {
         LOG_PACKET_HEADER_INIT(LOG_RCIN_MSG),
         time_us       : AP_HAL::micros64(),
-        chan1         : RC_Channels::get_radio_in(0),
-        chan2         : RC_Channels::get_radio_in(1),
-        chan3         : RC_Channels::get_radio_in(2),
-        chan4         : RC_Channels::get_radio_in(3),
-        chan5         : RC_Channels::get_radio_in(4),
-        chan6         : RC_Channels::get_radio_in(5),
-        chan7         : RC_Channels::get_radio_in(6),
-        chan8         : RC_Channels::get_radio_in(7),
-        chan9         : RC_Channels::get_radio_in(8),
-        chan10        : RC_Channels::get_radio_in(9),
-        chan11        : RC_Channels::get_radio_in(10),
-        chan12        : RC_Channels::get_radio_in(11),
-        chan13        : RC_Channels::get_radio_in(12),
-        chan14        : RC_Channels::get_radio_in(13)
+        chan1         : values[0],
+        chan2         : values[1],
+        chan3         : values[2],
+        chan4         : values[3],
+        chan5         : values[4],
+        chan6         : values[5],
+        chan7         : values[6],
+        chan8         : values[7],
+        chan9         : values[8],
+        chan10        : values[9],
+        chan11        : values[10],
+        chan12        : values[11],
+        chan13        : values[12],
+        chan14        : values[13]
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
@@ -1435,20 +1439,23 @@ void DataFlash_Class::Log_Write_Current_instance(const uint64_t time_us,
 // Write an Current data packet
 void DataFlash_Class::Log_Write_Current()
 {
+    // Big painful assert to ensure that logging won't produce suprising results when the
+    // number of battery monitors changes, does have the built in expectation that
+    // LOG_COMPASS_MSG follows the last LOG_CURRENT_CELLSx_MSG
+    static_assert(((LOG_CURRENT_MSG + AP_BATT_MONITOR_MAX_INSTANCES) == LOG_CURRENT_CELLS_MSG) &&
+                  ((LOG_CURRENT_CELLS_MSG + AP_BATT_MONITOR_MAX_INSTANCES) == LOG_COMPASS_MSG),
+                  "The number of batt monitors has changed without updating the log "
+                  "table entries. Please add new enums for LOG_CURRENT_MSG, LOG_CURRENT_CELLS_MSG "
+                  "directly following the highest indexed fields. Don't forget to update the log "
+                  "description table as well.");
+
     const uint64_t time_us = AP_HAL::micros64();
     const uint8_t num_instances = AP::battery().num_instances();
-    if (num_instances >= 1) {
+    for (uint8_t i = 0; i < num_instances; i++) {
         Log_Write_Current_instance(time_us,
-                                   0,
-                                   LOG_CURRENT_MSG,
-                                   LOG_CURRENT_CELLS_MSG);
-    }
-
-    if (num_instances >= 2) {
-        Log_Write_Current_instance(time_us,
-                                   1,
-                                   LOG_CURRENT2_MSG,
-                                   LOG_CURRENT_CELLS2_MSG);
+                                   i,
+                                   (LogMessages)((uint8_t)LOG_CURRENT_MSG + i),
+                                   (LogMessages)((uint8_t)LOG_CURRENT_CELLS_MSG + i));
     }
 }
 
@@ -1587,11 +1594,12 @@ void DataFlash_Class::Log_Write_PID(uint8_t msg_type, const PID_Info &info)
         LOG_PACKET_HEADER_INIT(msg_type),
         time_us         : AP_HAL::micros64(),
         desired         : info.desired,
+        actual          : info.actual,
         P               : info.P,
         I               : info.I,
         D               : info.D,
         FF              : info.FF,
-        AFF             : info.AFF
+        Dmod            : info.Dmod
     };
     WriteBlock(&pkt, sizeof(pkt));
 }

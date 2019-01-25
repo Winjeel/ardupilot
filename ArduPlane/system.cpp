@@ -27,6 +27,7 @@ void Plane::init_ardupilot()
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
+    init_capabilities();
 
     //
     // Check the EEPROM format version before loading any parameters from EEPROM
@@ -84,17 +85,17 @@ void Plane::init_ardupilot()
     BoardConfig_CAN.init();
 #endif
 
+    // initialise rc channels including setting mode
+    rc().init();
+
     relay.init();
 
     // initialise notify system
-    notify.init(false);
+    notify.init();
     notify_flight_mode(control_mode);
 
     init_rc_out_main();
     
-    // allow servo set on all channels except first 4
-    ServoRelayEvents.set_channel_mask(0xFFF0);
-
     // keep a record of how many resets have happened. This can be
     // used to detect in-flight resets
     g.num_resets.set_and_save(g.num_resets+1);
@@ -169,6 +170,13 @@ void Plane::init_ardupilot()
     camera_mount.init(serial_manager);
 #endif
 
+#if LANDING_GEAR_ENABLED == ENABLED
+    // initialise landing gear position
+    g2.landing_gear.init();
+    gear.last_auto_cmd = -1;
+    gear.last_cmd = -1;
+#endif
+
 #if FENCE_TRIGGERED_PIN > 0
     hal.gpio->pinMode(FENCE_TRIGGERED_PIN, HAL_GPIO_OUTPUT);
     hal.gpio->write(FENCE_TRIGGERED_PIN, 0);
@@ -179,8 +187,6 @@ void Plane::init_ardupilot()
      *  the RC library being initialised.
      */
     hal.scheduler->register_timer_failsafe(failsafe_check_static, 1000);
-
-    init_capabilities();
 
     quadplane.setup();
 
@@ -204,7 +210,7 @@ void Plane::init_ardupilot()
     // initialise sensor
 #if OPTFLOW == ENABLED
     if (optflow.enabled()) {
-        optflow.init();
+        optflow.init(-1);
     }
 #endif
 
@@ -250,6 +256,12 @@ void Plane::startup_ground(void)
         FUNCTOR_BIND(&plane, &Plane::Log_Write_Vehicle_Startup_Messages, void)
         );
 #endif
+
+#ifdef ENABLE_SCRIPTING
+    if (!g2.scripting.init()) {
+        gcs().send_text(MAV_SEVERITY_ERROR, "Scripting failed to start");
+    }
+#endif // ENABLE_SCRIPTING
 
     // reset last heartbeat time, so we don't trigger failsafe on slow
     // startup
@@ -381,9 +393,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         auto_navigation_mode = false;
         cruise_state.locked_heading = false;
         cruise_state.lock_timer_ms = 0;
-        
+
+#if SOARING_ENABLED == ENABLED
         // for ArduSoar soaring_controller
         g2.soaring_controller.init_cruising();
+#endif
         
         set_target_altitude_current();
         break;
@@ -392,9 +406,11 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         throttle_allows_nudging = false;
         auto_throttle_mode = true;
         auto_navigation_mode = false;
-        
+
+#if SOARING_ENABLED == ENABLED
         // for ArduSoar soaring_controller
         g2.soaring_controller.init_cruising();
+#endif
 
         set_target_altitude_current();
         break;
@@ -419,8 +435,10 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         next_WP_loc = prev_WP_loc = current_loc;
         // start or resume the mission, based on MIS_AUTORESET
         mission.start_or_resume();
-		
+
+#if SOARING_ENABLED == ENABLED
         g2.soaring_controller.init_cruising();
+#endif
         break;
 
     case RTL:
@@ -436,27 +454,45 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         auto_throttle_mode = true;
         auto_navigation_mode = true;
         do_loiter_at_location();
-		
+
+#if SOARING_ENABLED == ENABLED		
         if (g2.soaring_controller.is_active() &&
             g2.soaring_controller.suppress_throttle()) {
 			g2.soaring_controller.init_thermalling();
 			g2.soaring_controller.get_target(next_WP_loc); // ahead on flight path
 		}
+#endif
 		
         break;
 
     case AVOID_ADSB:
     case GUIDED:
-        throttle_allows_nudging = true;
-        auto_throttle_mode = true;
-        auto_navigation_mode = true;
-        guided_throttle_passthru = false;
-        /*
-          when entering guided mode we set the target as the current
-          location. This matches the behaviour of the copter code
-        */
-        guided_WP_loc = current_loc;
-        set_guided_WP();
+        {
+            throttle_allows_nudging = true;
+            auto_throttle_mode = true;
+            auto_navigation_mode = true;
+            guided_throttle_passthru = false;
+            /*
+              when entering guided mode we set the target as the current
+              location. This matches the behaviour of the copter code
+            */
+            guided_WP_loc = current_loc;
+            set_guided_WP();
+
+            // also set the camera ROI to current location at terrain level
+            // use height above home if terrain height unavailable
+            Location target_loc_demand = current_loc;
+            float hagl_cm = 0.0f;
+           if (terrain.status() == AP_Terrain::TerrainStatusOK) {
+               terrain.height_above_terrain(hagl_cm, false);
+               hagl_cm *= 100.0f;
+           } else {
+               hagl_cm = current_loc.alt - home.alt;
+           }
+           target_loc_demand.alt = current_loc.alt - hagl_cm;
+           camera_mount.set_mode(MAV_MOUNT_MODE_GPS_POINT);
+           camera_mount.set_roi_target(target_loc_demand, plane.loiter.velNE);
+        }
         break;
 
     case QSTABILIZE:
@@ -713,7 +749,7 @@ int8_t Plane::throttle_percentage(void)
         return quadplane.throttle_percentage();
     }
     float throttle = SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
-    if (aparm.throttle_min >= 0) {
+    if (!have_reverse_thrust()) {
         return constrain_int16(throttle, 0, 100);
     }
     return constrain_int16(throttle, -100, 100);

@@ -38,7 +38,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0.1 3.0
 	// @Increment: 0.1
 	// @User: User
-	AP_GROUPINFO("P",        1, AP_PitchController, gains.P,          0.6f),
+	AP_GROUPINFO("P",        1, AP_PitchController, gains.P,          1.0f),
 
 	// @Param: D
 	// @DisplayName: Damping Gain
@@ -46,7 +46,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0 0.1
 	// @Increment: 0.01
 	// @User: User
-	AP_GROUPINFO("D",        2, AP_PitchController, gains.D,        0.02f),
+    AP_GROUPINFO("D",        2, AP_PitchController, gains.D,        0.04f),
 
 	// @Param: I
 	// @DisplayName: Integrator Gain
@@ -54,7 +54,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @Range: 0 0.5
 	// @Increment: 0.05
 	// @User: User
-	AP_GROUPINFO("I",        3, AP_PitchController, gains.I,        0.15f),
+	AP_GROUPINFO("I",        3, AP_PitchController, gains.I,        0.3f),
 
 	// @Param: RMAX_UP
 	// @DisplayName: Pitch up max rate
@@ -98,7 +98,25 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 	// @User: User
 	AP_GROUPINFO("FF",        8, AP_PitchController, gains.FF,       0.0f),
 
-	AP_GROUPEND
+    // @Param: SRMAX
+    // @DisplayName: Servo slew rate limit
+    // @Description: Sets an upper limit on the servo slew rate produced by the D-gain (pitch rate feedback). If the amplitude of the control action produced by the pitch rate feedback exceeds this value, then the D-gain is reduced to respect the limit. This limits the amplitude of high frequency oscillations caused by an excessive D-gain. The limit should be set to no more than 25% of the servo's specified slew rate to allow for inertia and aerodynamic load effects. Note: The D-gain will not be reduced to less than 10% of the nominal value.
+    // @Units: deg/sec
+    // @Range: 50 500
+    // @Increment: 10.0
+    // @User: Advanced
+    AP_GROUPINFO("SRMAX", 9, AP_PitchController, _slew_rate_max, 150.0f),
+
+    // @Param: SRTAU
+    // @DisplayName: Servo slew rate decay time constant
+    // @Description: This sets the time constant used to recover the D gain after it has been reduced due to excessive servo slew rate.
+    // @Units: deg/sec
+    // @Range: 0.5 5.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("SRTAU", 10, AP_PitchController, _slew_rate_tau, 1.0f),
+
+    AP_GROUPEND
 };
 
 /*
@@ -177,7 +195,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
     float eas2tas = _ahrs.get_EAS2TAS();
 	float kp_ff = MAX((gains.P - gains.I * gains.tau) * gains.tau  - gains.D , 0) / eas2tas;
     float k_ff = gains.FF / eas2tas;
-	
+
 	// Calculate the demanded control surface deflection
 	// Note the scaler is applied again. We want a 1/speed scaler applied to the feed-forward
 	// path, but want a 1/speed^2 scaler applied to the rate error path. 
@@ -185,6 +203,23 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
     _pid_info.P = desired_rate * kp_ff * scaler;
     _pid_info.FF = desired_rate * k_ff * scaler;
     _pid_info.D = rate_error * gains.D * scaler;
+
+    // Calculate the slew rate amplitude produced by the unmodified D term
+    if (dt > 0) {
+        // calculate a low pass filtered slew rate
+        float Dterm_slew_rate = _slew_rate_filter.apply(((_pid_info.D - _last_pid_info_D)/ delta_time), delta_time);
+
+        // rectify and apply a decaying envelope filter
+        float alpha = 1.0f - constrain_float(delta_time/_slew_rate_tau, 0.0f , 1.0f);
+        _slew_rate_amplitude = fmaxf(fabsf(Dterm_slew_rate), alpha * _slew_rate_amplitude);
+        _slew_rate_amplitude = fminf(_slew_rate_amplitude, 10.0f*_slew_rate_max);
+    }
+    _last_pid_info_D = _pid_info.D;
+
+    // Calculate and apply the D gain adjustment
+    _pid_info.Dmod = _D_gain_modifier = _slew_rate_max / fmaxf(_slew_rate_amplitude, _slew_rate_max);
+    _pid_info.D *= _D_gain_modifier;
+
 	_last_out = _pid_info.D + _pid_info.FF + _pid_info.P;
     _pid_info.desired = desired_rate;
 
@@ -211,7 +246,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
       beyond the configured roll limit, reducing to zero at 90
       degrees
     */
-    float roll_wrapped = fabsf(_ahrs.roll_sensor);
+    float roll_wrapped = labs(_ahrs.roll_sensor);
     if (roll_wrapped > 9000) {
         roll_wrapped = 18000 - roll_wrapped;
     }

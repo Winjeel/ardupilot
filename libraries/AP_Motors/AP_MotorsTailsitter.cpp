@@ -32,7 +32,7 @@ extern const AP_HAL::HAL& hal;
 void AP_MotorsTailsitter::init(motor_frame_class frame_class, motor_frame_type frame_type)
 {
     // record successful initialisation if what we setup was the desired frame_class
-    _flags.initialised_ok = (frame_class == MOTOR_FRAME_TAILSITTER);
+    _flags.initialised_ok = (frame_class == MOTOR_FRAME_TAILSITTER) || (frame_class == MOTOR_FRAME_TVBS);
 }
 
 
@@ -104,9 +104,12 @@ void AP_MotorsTailsitter::output_to_motors()
 // calculate outputs to the motors
 void AP_MotorsTailsitter::output_armed_stabilizing()
 {
+     // normalised copter pid rate demands [-1 ... 1]
     _aileron = -_yaw_in;
     _elevator = _pitch_in;
     _rudder = _roll_in;
+
+    // normalised copter throttle demand [0 ... 1]
     _throttle = get_throttle();
 
     // sanity check throttle is above zero and below current limited throttle

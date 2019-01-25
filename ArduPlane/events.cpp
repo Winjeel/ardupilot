@@ -90,7 +90,13 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t rea
     case QSTABILIZE:
     case QHOVER:
     case QLOITER:
-        set_mode(QLAND, reason);
+        if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
+#if PARACHUTE == ENABLED
+            parachute_release();
+#endif
+        } else {
+            set_mode(QLAND, reason);
+        }
         break;
         
     case AUTO:

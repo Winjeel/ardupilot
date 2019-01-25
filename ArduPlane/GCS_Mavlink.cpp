@@ -2,6 +2,29 @@
 
 #include "Plane.h"
 
+// This enum maps to the order in which buttons are reported in the MANUAL_CONTROL message
+// and may not map to the order in which buttons are reported directly by the controller.
+// QGroundControl fills the MANUAL_CONTROL message in the order that the controller reports
+// buttons to QGC.
+typedef enum CORVO_X_HHC_ButtonMap {
+    buttonUp    = (1u << 0),
+    buttonDown  = (1u << 1),
+    trigger     = (1u << 2),
+    multi1      = (1u << 3),
+    multi2      = (1u << 4),
+    dpadPress   = (1u << 5)    
+} CORVO_X_HHC_ButtonMap;
+
+typedef enum CORVO_X_HHC_ButtonSpecialFunctionMask {
+    controlSelect = trigger,
+    modeChange    = (buttonUp | buttonDown)
+} CORVO_X_HHC_ButtonSpecialFunctionMask;
+
+typedef enum CORVO_ControllerType {
+    CORVO_ControllerNone = 0,
+    CORVO_ControllerX = 1
+} CORVO_ControllerType;
+
 MAV_TYPE GCS_MAVLINK_Plane::frame_type() const
 {
     return plane.quadplane.get_mav_type();
@@ -180,16 +203,32 @@ void Plane::send_extended_status1(mavlink_channel_t chan)
 
 void Plane::send_nav_controller_output(mavlink_channel_t chan)
 {
-    mavlink_msg_nav_controller_output_send(
-        chan,
-        nav_roll_cd * 0.01f,
-        nav_pitch_cd * 0.01f,
-        nav_controller->nav_bearing_cd() * 0.01f,
-        nav_controller->target_bearing_cd() * 0.01f,
-        MIN(auto_state.wp_distance, UINT16_MAX),
-        altitude_error_cm * 0.01f,
-        airspeed_error * 100,
-        nav_controller->crosstrack_error());
+    if (quadplane.in_vtol_mode()) {
+        const Vector3f &targets = quadplane.attitude_control->get_att_target_euler_cd();
+        bool wp_nav_valid = quadplane.using_wp_nav();
+
+        mavlink_msg_nav_controller_output_send(
+            chan,
+            targets.x * 1.0e-2f,
+            targets.y * 1.0e-2f,
+            targets.z * 1.0e-2f,
+            wp_nav_valid ? quadplane.wp_nav->get_wp_bearing_to_destination() : 0,
+            wp_nav_valid ? MIN(quadplane.wp_nav->get_wp_distance_to_destination(), UINT16_MAX) : 0,
+            (plane.control_mode != QSTABILIZE) ? quadplane.pos_control->get_alt_error() * 1.0e-2f : 0,
+            airspeed_error * 100,
+            wp_nav_valid ? quadplane.wp_nav->crosstrack_error() : 0);
+    } else {
+        mavlink_msg_nav_controller_output_send(
+            chan,
+            nav_roll_cd * 0.01f,
+            nav_pitch_cd * 0.01f,
+            nav_controller->nav_bearing_cd() * 0.01f,
+            nav_controller->target_bearing_cd() * 0.01f,
+            MIN(auto_state.wp_distance, UINT16_MAX),
+            altitude_error_cm * 0.01f,
+            airspeed_error * 100,
+            nav_controller->crosstrack_error());
+    }
 }
 
 void GCS_MAVLINK_Plane::send_position_target_global_int()
@@ -264,9 +303,11 @@ int16_t GCS_MAVLINK_Plane::vfr_hud_throttle() const
 
 float GCS_MAVLINK_Plane::vfr_hud_climbrate() const
 {
+#if SOARING_ENABLED == ENABLED
     if (plane.g2.soaring_controller.is_active()) {
         return plane.g2.soaring_controller.get_vario_reading();
     }
+#endif
     return AP::baro().get_climb_rate();
 }
 
@@ -380,7 +421,12 @@ void Plane::send_pid_tuning(mavlink_channel_t chan)
     if ((g.gcs_pid_mask & TUNING_BITS_LAND) && (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND)) {
         send_pid_info(chan, landing.get_pid_info(), PID_TUNING_LANDING, degrees(gyro.z));
     }
-}
+    if (g.gcs_pid_mask & TUNING_BITS_ACCZ && quadplane.in_vtol_mode()) {
+        const Vector3f &accel = ahrs.get_accel_ef();
+        pid_info = &quadplane.pos_control->get_accel_z_pid().get_pid_info();
+        send_pid_info(chan, pid_info, PID_TUNING_ACCZ, -accel.z);
+    }
+ }
 
 uint8_t GCS_MAVLINK_Plane::sysid_my_gcs() const
 {
@@ -450,29 +496,6 @@ bool GCS_MAVLINK_Plane::try_send_message(enum ap_message id)
     case MSG_WIND:
         CHECK_PAYLOAD_SIZE(WIND);
         plane.send_wind(chan);
-        break;
-
-    case MSG_MOUNT_STATUS:
-#if MOUNT == ENABLED
-        CHECK_PAYLOAD_SIZE(MOUNT_STATUS);
-        plane.camera_mount.status_msg(chan);
-#endif // MOUNT == ENABLED
-        break;
-
-    case MSG_OPTICAL_FLOW:
-#if OPTFLOW == ENABLED
-        if (plane.optflow.enabled()) {        
-            CHECK_PAYLOAD_SIZE(OPTICAL_FLOW);
-            send_opticalflow(plane.optflow);
-        }
-#endif
-        break;
-
-    case MSG_GIMBAL_REPORT:
-#if MOUNT == ENABLED
-        CHECK_PAYLOAD_SIZE(GIMBAL_REPORT);
-        plane.camera_mount.send_gimbal_report(chan);
-#endif
         break;
 
     case MSG_PID_TUNING:
@@ -599,6 +622,14 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("ADSB",   9, GCS_MAVLINK, streamRates[9],  5),
+
+    // @Param: CORVO_ControllerType
+    // @DisplayName: CORVO Controller Type
+    // @Description: Specify CORVO Controller Type which affects how MANUAL_CONTROL messages are interpreted
+    // @Values: 0: No CORVO Controller, 1: CORVO X Controller
+    // @User: Advanced
+    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 0),
+
     AP_GROUPEND
 };
 
@@ -690,11 +721,10 @@ bool GCS_MAVLINK_Plane::in_hil_mode() const
   handle a request to switch to guided mode. This happens via a
   callback from handle_mission_item()
  */
-bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd)
+bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd, Vector2f velNE, float radius)
 {
     if (plane.control_mode != GUIDED) {
-        // only accept position updates when in GUIDED mode
-        return false;
+        plane.set_mode(GUIDED, MODE_REASON_GCS_COMMAND);
     }
     plane.guided_WP_loc = cmd.content.location;
     
@@ -702,6 +732,19 @@ bool GCS_MAVLINK_Plane::handle_guided_request(AP_Mission::Mission_Command &cmd)
     if (plane.guided_WP_loc.flags.relative_alt) {
         plane.guided_WP_loc.alt += plane.home.alt;
         plane.guided_WP_loc.flags.relative_alt = 0;
+    }
+
+    plane.loiter.velNE.x = velNE.x;
+    plane.loiter.velNE.y = velNE.y;
+
+    if (radius > 1.0f) {
+        plane.guided_WP_loc.flags.loiter_ccw = 0;
+        plane.loiter.override_radius = (uint16_t)radius;
+    } else if (radius < 1.0f) {
+        plane.guided_WP_loc.flags.loiter_ccw = 1;
+        plane.loiter.override_radius = (uint16_t)(-radius);
+    } else {
+        plane.loiter.override_radius = 0;
     }
 
     plane.set_guided_WP();
@@ -907,35 +950,6 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
         }
         return MAV_RESULT_FAILED;
     }
-
-#if MOUNT == ENABLED
-        // Sets the region of interest (ROI) for the camera
-    case MAV_CMD_DO_SET_ROI:
-        // sanity check location
-        if (!check_latlng(packet.param5, packet.param6)) {
-            return MAV_RESULT_FAILED;
-        }
-        Location roi_loc;
-        roi_loc.lat = (int32_t)(packet.param5 * 1.0e7f);
-        roi_loc.lng = (int32_t)(packet.param6 * 1.0e7f);
-        roi_loc.alt = (int32_t)(packet.param7 * 100.0f);
-        if (roi_loc.lat == 0 && roi_loc.lng == 0 && roi_loc.alt == 0) {
-            // switch off the camera tracking if enabled
-            if (plane.camera_mount.get_mode() == MAV_MOUNT_MODE_GPS_POINT) {
-                plane.camera_mount.set_mode_to_default();
-            }
-        } else {
-            // send the command to the camera mount
-            plane.camera_mount.set_roi_target(roi_loc);
-        }
-        return MAV_RESULT_ACCEPTED;
-#endif
-
-#if MOUNT == ENABLED
-    case MAV_CMD_DO_MOUNT_CONTROL:
-        plane.camera_mount.control(packet.param1, packet.param2, packet.param3, (MAV_MOUNT_MODE) packet.param7);
-        return MAV_RESULT_ACCEPTED;
-#endif
 
     case MAV_CMD_MISSION_START:
         plane.set_mode(AUTO, MODE_REASON_GCS_COMMAND);
@@ -1146,14 +1160,6 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
     }
 #endif // GEOFENCE_ENABLED
 
-    case MAVLINK_MSG_ID_GIMBAL_REPORT:
-    {
-#if MOUNT == ENABLED
-        handle_gimbal_report(plane.camera_mount, msg);
-#endif
-        break;
-    }
-
     case MAVLINK_MSG_ID_RC_CHANNELS_OVERRIDE:
     {
         // allow override of RC channel values for HIL
@@ -1201,12 +1207,29 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         int16_t roll = (packet.y == INT16_MAX) ? 0 : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + 1000) / 2000.0f;
         int16_t pitch = (packet.x == INT16_MAX) ? 0 : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + 1000) / 2000.0f;
         int16_t throttle = (packet.z == INT16_MAX) ? 0 : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
-        int16_t yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+        int16_t yaw;
+        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+            // set to zero to prevent inadvertent operation
+            yaw = 0;
+        } else {
+            yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+        }
 
         RC_Channels::set_override(uint8_t(plane.rcmap.roll() - 1), roll, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.pitch() - 1), pitch, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.throttle() - 1), throttle, tnow);
         RC_Channels::set_override(uint8_t(plane.rcmap.yaw() - 1), yaw, tnow);
+
+        if(_corvoControllerType.get() == CORVO_ControllerType::CORVO_ControllerX) {
+            // Derive virtual RC channels from manual control button combinations (specific to CORVO X Controller)
+            //RC5 (Control Select)
+            int16_t rc5 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) == CORVO_X_HHC_ButtonSpecialFunctionMask::controlSelect) ? 2000 : 1000;
+            //RC6 (Change Mode)
+            int16_t rc6 = ((packet.buttons & CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) == CORVO_X_HHC_ButtonSpecialFunctionMask::modeChange) ? 2000 : 1000;
+
+            RC_Channels::set_override(4, rc5, tnow);
+            RC_Channels::set_override(5, rc6, tnow);
+        }
 
         // a manual control message is considered to be a 'heartbeat' from the ground station for failsafe purposes
         plane.failsafe.last_heartbeat_ms = tnow;
@@ -1284,22 +1307,6 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
 #endif
         break;
     }
-
-#if MOUNT == ENABLED
-    //deprecated. Use MAV_CMD_DO_MOUNT_CONFIGURE
-    case MAVLINK_MSG_ID_MOUNT_CONFIGURE:
-    {
-        plane.camera_mount.configure_msg(msg);
-        break;
-    }
-
-    //deprecated. Use MAV_CMD_DO_MOUNT_CONTROL
-    case MAVLINK_MSG_ID_MOUNT_CONTROL:
-    {
-        plane.camera_mount.control_msg(msg);
-        break;
-    }
-#endif // MOUNT == ENABLED
 
     case MAVLINK_MSG_ID_RADIO:
     case MAVLINK_MSG_ID_RADIO_STATUS:
@@ -1578,11 +1585,6 @@ bool GCS_MAVLINK_Plane::accept_packet(const mavlink_status_t &status, mavlink_me
     return (msg.sysid == plane.g.sysid_my_gcs);
 }
 
-Compass *GCS_MAVLINK_Plane::get_compass() const
-{
-    return &plane.compass;
-}
-
 AP_Mission *GCS_MAVLINK_Plane::get_mission()
 {
     return &plane.mission;
@@ -1595,15 +1597,6 @@ void GCS_MAVLINK_Plane::handle_mission_set_current(AP_Mission &mission, mavlink_
     if (plane.control_mode == AUTO && plane.mission.state() == AP_Mission::MISSION_STOPPED) {
         plane.mission.resume();
     }
-}
-
-AP_Camera *GCS_MAVLINK_Plane::get_camera() const
-{
-#if CAMERA == ENABLED
-    return &plane.camera;
-#else
-    return nullptr;
-#endif
 }
 
 AP_AdvancedFailsafe *GCS_MAVLINK_Plane::get_advanced_failsafe() const
@@ -1629,6 +1622,13 @@ bool GCS_MAVLINK_Plane::set_mode(const uint8_t mode)
     case ACRO:
     case FLY_BY_WIRE_A:
     case AUTOTUNE:
+    {
+        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+            // these modes can't be used when we have a corvo controller
+            return false;
+        }
+    }
+        FALLTHROUGH;
     case FLY_BY_WIRE_B:
     case CRUISE:
     case AVOID_ADSB:

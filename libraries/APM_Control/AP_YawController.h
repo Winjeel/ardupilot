@@ -4,18 +4,17 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <DataFlash/DataFlash.h>
+#include "AP_AutoTune.h"
 #include <cmath>
 
 class AP_YawController {
 public:
-    AP_YawController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms)
+    AP_YawController(AP_AHRS &ahrs, const AP_Vehicle::FixedWing &parms, DataFlash_Class &_dataflash)
         : aparm(parms)
+        , autotune(gains, AP_AutoTune::AUTOTUNE_ROLL, parms, _dataflash)
         , _ahrs(ahrs)
     {
         AP_Param::setup_object_defaults(this, var_info);
-        _pid_info.desired = 0;
-        _pid_info.FF = 0;
-        _pid_info.P = 0;
     }
 
     /* Do not allow copies */
@@ -30,14 +29,24 @@ public:
 
 	static const struct AP_Param::GroupInfo var_info[];
 
+    // tuning accessors
+    void kP(float v) { gains.P.set(v); }
+    void kI(float v) { gains.I.set(v); }
+    void kD(float v) { gains.D.set(v); }
+    void kFF(float v) { gains.FF.set(v); }
+
+    AP_Float &kP(void) { return gains.P; }
+    AP_Float &kI(void) { return gains.I; }
+    AP_Float &kD(void) { return gains.D; }
+    AP_Float &kFF(void) { return gains.FF; }
+
 private:
     const AP_Vehicle::FixedWing &aparm;
-	AP_Float _K_A;
-	AP_Float _K_I;
-	AP_Float _K_D;
-	AP_Float _K_FF;
+    AP_AutoTune::ATGains gains;
+    AP_AutoTune autotune;
     AP_Int16 _imax;
-	uint32_t _last_t;
+    AP_Float _tau;
+    uint32_t _last_t;
 	float _last_out;
 	float _last_rate_hp_out;
 	float _last_rate_hp_in;
