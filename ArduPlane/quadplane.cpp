@@ -1281,9 +1281,12 @@ void QuadPlane::control_loiter()
         // don't move vehicle because we are using sticks to control camera
         loiter_nav->set_pilot_desired_acceleration(0, 0, plane.G_Dt);
     } else {
-        loiter_nav->set_pilot_desired_acceleration(plane.channel_roll->get_control_in(),
-                                                   plane.channel_pitch->get_control_in(),
-                                                   plane.G_Dt);
+        // scale stick inputs to lean angles
+        // stick inputs are between +-4500
+        float stick_to_angle_cd = loiter_nav->get_angle_max_cd() / 4500.0f;
+        float angle_Y_cd = stick_to_angle_cd * plane.channel_roll->get_control_in();
+        float angle_X_cd = stick_to_angle_cd * plane.channel_pitch->get_control_in();
+        loiter_nav->set_pilot_desired_acceleration(angle_Y_cd, angle_X_cd, plane.G_Dt);
     }
 
     // run loiter controller
