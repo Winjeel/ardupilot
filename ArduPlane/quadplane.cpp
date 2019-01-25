@@ -1289,6 +1289,11 @@ void QuadPlane::control_loiter()
         loiter_nav->set_pilot_desired_acceleration(angle_Y_cd, angle_X_cd, plane.G_Dt);
     }
 
+    // Prevent strong winds dragging the vehicle due to the pos control internally calculated
+    // leash length being too small.
+    pos_control->set_max_accel_xy(1000.0f);
+    pos_control->set_max_speed_xy(100.0f * pos_control->get_max_fwd_airspd());
+
     // run loiter controller
     loiter_nav->update();
 
