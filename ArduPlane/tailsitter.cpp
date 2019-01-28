@@ -188,12 +188,12 @@ bool QuadPlane::tailsitter_transition_pullup_complete(void) const
         // limit time in FW decel pullup to 5 seconds
         return true;
     } else if (AP_HAL::millis() - transition_start_ms > 1000 &&
-               labs(ahrs_view->roll_sensor) > 1500) {
+               labs(ahrs.roll_sensor) > 1500) {
         // After 1 second, start checking to see if we have lost roll control which would
         // indicate stall onset.
         return true;
     } else if (AP_HAL::millis() - transition_start_ms > 2000 &&
-               (ahrs_view->pitch_sensor < 0 || inertial_nav.get_velocity_z() > 0.5f)) {
+               (ahrs.pitch_sensor < 0 || inertial_nav.get_velocity_z() < -50.0f)) {
         // After 2 seconds which is long enough for the nose up pitch to take effect,
         // start checking to see if we are descending or pitched down which indicates stall onset.
         return true;
