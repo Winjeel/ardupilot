@@ -181,8 +181,9 @@ private:
     AC_WPNav *wp_nav;
     AC_Loiter *loiter_nav;
     
-    // maximum vertical velocity the pilot may request
-    AP_Int16 pilot_velocity_z_max;
+    // maximum vertical velocity the pilot may request in cm/s
+    AP_Int16 pilot_velocity_z_max_up;
+    AP_Int16 pilot_velocity_z_max_dn;
 
     // vertical acceleration the pilot may request
     AP_Int16 pilot_accel_z;
@@ -209,7 +210,7 @@ private:
     float get_desired_yaw_rate_cds(void);
     
     // get desired climb rate in cm/s
-    float get_pilot_desired_climb_rate_cms(void) const;
+    float get_pilot_desired_climb_rate_cms(float dt_sec);
 
     // initialise throttle_wait when entering mode
     void init_throttle_wait();
@@ -555,6 +556,8 @@ private:
     Vector2f _land_point_offset_NE = {};        // NE offset of the landing waypoint as last adjusted by the pilot stick inputs
     uint32_t _pitch_stick_moved_ms = 0;         // Last time in msec that the pitch axis stick was moved.
     uint32_t _pos_ctrl_not_is_landed_ms = 0;    // Last time in msec the position controller _is_landed flag was false
+
+    float climb_rate_cms = 0.0f;                // climb rate filter state used to smooth pilot inputs to position controller (cm/s)
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;
