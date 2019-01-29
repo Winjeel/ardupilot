@@ -1670,7 +1670,7 @@ void QuadPlane::update_transition_to_fw(void)
         // do not allow a climb on the quad motors during transition
         // a climb would add load to the airframe, and prolongs the
         // transition
-        float climb_rate_cms = assist_climb_rate_cms();
+        climb_rate_cms = assist_climb_rate_cms();
         if (options & OPTION_LEVEL_TRANSITION) {
             climb_rate_cms = MIN(climb_rate_cms, 0.0f);
         }
