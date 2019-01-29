@@ -996,6 +996,7 @@ private:
     void startup_ground(void);
     enum FlightMode get_previous_mode();
     void set_mode(enum FlightMode mode, mode_reason_t reason);
+    bool create_default_mission(void);
     void exit_mode(enum FlightMode mode);
     void check_long_failsafe();
     void check_short_failsafe();
