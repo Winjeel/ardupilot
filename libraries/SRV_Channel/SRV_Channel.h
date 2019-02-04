@@ -23,6 +23,11 @@
 
 #define NUM_SERVO_CHANNELS 16
 
+// Define the min, mid and max equivalent PWM values used when a digital communication protocol to a servo or ESC is being used
+#define DIG_PWM_MAX 2000
+#define DIG_PWM_MID 1500
+#define DIG_PWM_MIN 1000
+
 class SRV_Channels;
 
 /*

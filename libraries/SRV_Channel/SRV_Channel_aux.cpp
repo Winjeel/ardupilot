@@ -180,14 +180,14 @@ void SRV_Channels::enable_aux_servos()
           output for setups where supply voltage exceeds motor limits.
         */
         if (digital_mask & (1U<<i)) {
-            c.servo_min.set(1000);
+            c.servo_min.set(DIG_PWM_MIN);
             if (reversible_mask & (1U<<i)) {
-                c.servo_max.set(2000);
-                c.servo_trim.set(1500);
+                c.servo_max.set(DIG_PWM_MAX);
+                c.servo_trim.set(DIG_PWM_MID);
             } else {
-                c.servo_trim.set(1000);
-                if (c.servo_max.get() > 2000) {
-                    c.servo_max.set(2000);
+                c.servo_trim.set(DIG_PWM_MIN);
+                if (c.servo_max.get() > DIG_PWM_MAX) {
+                    c.servo_max.set(DIG_PWM_MAX);
                 }
             }
         }
