@@ -6,6 +6,7 @@
 #include <AP_Param/AP_Param.h>
 
 #define NUM_RC_CHANNELS 16
+#define OVERRIDE_INHIBIT_CH_INDEX 6 // index of channel used to inhibit RC overrides
 
 /// @class	RC_Channel
 /// @brief	Object managing one RC channel

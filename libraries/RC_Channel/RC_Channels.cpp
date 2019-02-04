@@ -119,12 +119,12 @@ void RC_Channels::set_override(const uint8_t chan, const int16_t value, const ui
 
 bool RC_Channels::has_active_overrides()
 {
-    // If pilot has RC 7 set high, cancel all overrides
-   if (get_radio_in(6) > 1500) {
-       return false;
-   }
-
     RC_Channels &_rc = rc();
+    // Allow pilot to cancel all overrides using RC handset
+    if (get_radio_in(OVERRIDE_INHIBIT_CH_INDEX) > _rc.channel(OVERRIDE_INHIBIT_CH_INDEX)->get_radio_trim()) {
+        return false;
+    }
+
     for (uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
         if (_rc.channel(i)->has_override()) {
             return true;
