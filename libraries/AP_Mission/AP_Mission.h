@@ -36,8 +36,8 @@
 
 #define AP_MISSION_RESTART_DEFAULT          0       // resume the mission from the last command run by default
 
-#define AP_MISSION_OPTIONS_DEFAULT          (1<<0)  // Clear the mission when rebooting
 #define AP_MISSION_MASK_MISSION_CLEAR       (1<<0)  // If set then Clear the mission on boot
+#define AP_MISSION_OPTIONS_DEFAULT          (AP_MISSION_MASK_MISSION_CLEAR)
 
 /// @class    AP_Mission
 /// @brief    Object managing Mission
