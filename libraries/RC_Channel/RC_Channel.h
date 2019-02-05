@@ -342,6 +342,9 @@ public:
         }
     }
 
+    // returns true if MAVLink RC override commands should be ignored
+    static bool gcs_rc_override_inhibit();
+
 private:
     static RC_Channels *_singleton;
     // this static arrangement is to avoid static pointers in AP_Param tables

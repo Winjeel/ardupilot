@@ -121,16 +121,25 @@ bool RC_Channels::has_active_overrides()
 {
     RC_Channels &_rc = rc();
     // Allow pilot to cancel all overrides using RC handset
-    if (get_radio_in(OVERRIDE_INHIBIT_CH_INDEX) > _rc.channel(OVERRIDE_INHIBIT_CH_INDEX)->get_radio_trim()) {
+    if (_rc.gcs_rc_override_inhibit()) {
         return false;
     }
-
     for (uint8_t i = 0; i < NUM_RC_CHANNELS; i++) {
         if (_rc.channel(i)->has_override()) {
             return true;
         }
     }
 
+    return false;
+}
+
+bool RC_Channels::gcs_rc_override_inhibit()
+{
+    RC_Channels &_rc = rc();
+    // Allow pilot to cancel all overrides using RC handset
+    if (get_radio_in(OVERRIDE_INHIBIT_CH_INDEX) > _rc.channel(OVERRIDE_INHIBIT_CH_INDEX)->get_radio_trim()) {
+        return true;
+    }
     return false;
 }
 
