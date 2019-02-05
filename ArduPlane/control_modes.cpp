@@ -5,7 +5,7 @@ void Plane::read_control_switch()
     // custom handling of switch inputs for corvo controller
     if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX)
             && RC_Channels::has_active_overrides()
-            && (RC_Channels::get_radio_in(6) < 1500)) {
+            && !RC_Channels::gcs_rc_override_inhibit()) {
         read_corvo_control_switch();
         return;
     }
