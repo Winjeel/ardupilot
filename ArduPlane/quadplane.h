@@ -212,7 +212,7 @@ private:
     float get_desired_yaw_rate_cds(void);
     
     // get desired climb rate in cm/s
-    float get_pilot_desired_climb_rate_cms(float dt_sec);
+    float get_pilot_desired_climb_rate_cms(const float dt_sec);
 
     // initialise throttle_wait when entering mode
     void init_throttle_wait();
