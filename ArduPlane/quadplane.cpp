@@ -1412,8 +1412,8 @@ float QuadPlane::get_desired_yaw_rate_cds(void)
 float QuadPlane::get_pilot_desired_climb_rate_cms(const float dt_sec)
 {
     if (plane.failsafe.rc_failsafe || plane.failsafe.throttle_counter > 0) {
-        // descend at 0.5m/s for now
-        climb_rate_cms = -50.0f;
+        // this could happen anywhere over unknown terrain height, so descend at final touchdown sink rate for now
+        climb_rate_cms = -0.7f * land_speed_cms;
         return climb_rate_cms;
     }
     uint16_t dead_zone = plane.channel_throttle->get_dead_zone();
