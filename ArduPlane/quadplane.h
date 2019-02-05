@@ -133,6 +133,8 @@ public:
     float get_fw_throttle_factor(void) { return _fw_throttle_factor; }
 
     bool attitude_control_lost(void) {return control_loss_declared; }
+
+    bool is_corvo_x_control_type(void) { return (tailsitter.input_type == TAILSITTER_CORVOX); }
     
     struct PACKED log_QControl_Tuning {
         LOG_PACKET_HEADER;

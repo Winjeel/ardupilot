@@ -485,6 +485,9 @@ void Plane::handle_auto_mode(void)
  */
 void Plane::update_flight_mode(void)
 {
+    // run shake to arm checks to place vehicle into required mode and arm motors
+    arming.check_shake_to_arm();
+
     enum FlightMode effective_mode = control_mode;
     if (control_mode == AUTO && g.auto_fbw_steer == 42) {
         effective_mode = FLY_BY_WIRE_A;
