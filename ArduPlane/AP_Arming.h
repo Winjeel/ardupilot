@@ -28,9 +28,6 @@ public:
 protected:
     bool ins_checks(bool report);
 
-    // the attitude view of the VTOL attitude controller
-    AP_AHRS_View *ahrs_view;
-
 private:
     /*
       Used by Corvo X shake to start auto mission functonality

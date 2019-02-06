@@ -164,9 +164,9 @@ void AP_Arming_Plane::check_shake_to_arm(void)
         const uint32_t shake_interval_ms = 500;
 
         // reset the detector if the rotors are not pointing up or the wing chord line is too far from vertical
-        bool oriented_for_flight = (fabsf(ahrs_view->roll) <= degrees(15.0f)) // vehicle is not excessively rolled
-                && (fabsf(ahrs_view->get_pitch_312_rotor()) <= degrees(10.0f)) // rotors are not excessively pitched
-                && fabsf(ahrs_view->get_pitch_312_wing()) < radians (10.0f); // wing chord line is close to vertical
+        bool oriented_for_flight = (fabsf(plane.quadplane.ahrs_view->roll) <= degrees(15.0f)) // vehicle is not excessively rolled
+                && (fabsf(plane.quadplane.ahrs_view->get_pitch_312_rotor()) <= degrees(10.0f)) // rotors are not excessively pitched
+                && fabsf(plane.quadplane.ahrs_view->get_pitch_312_wing()) < radians (10.0f); // wing chord line is close to vertical
         if ((shake_to_fly.first_shake_time_ms != 0) && !oriented_for_flight) {
             shake_to_fly = {};
         }
