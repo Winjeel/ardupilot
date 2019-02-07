@@ -395,6 +395,9 @@ private:
     // Also used for flap deployment criteria.  Centimeters per second.
     float target_airspeed_cm;
 
+    // last time target_airspeed_cm was set (msec)
+    uint32_t time_aspd_tgt_set_ms = 0;
+
     // The difference between current and desired airspeed.  Used in the pitch controller.  Meters per second.
     float airspeed_error;
 
@@ -717,7 +720,6 @@ private:
 
     } loiter;
 
-
     // Conditional command
     // A value used in condition commands (eg delay, change alt, etc.)
     // For example in a change altitude command, it is the altitude to change to.
@@ -973,6 +975,7 @@ private:
     void startup_ground(void);
     enum FlightMode get_previous_mode();
     void set_mode(enum FlightMode mode, mode_reason_t reason);
+    bool create_default_mission(void);
     void exit_mode(enum FlightMode mode);
     void check_long_failsafe();
     void check_short_failsafe();

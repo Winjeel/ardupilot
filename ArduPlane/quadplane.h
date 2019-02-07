@@ -21,6 +21,7 @@ public:
     friend class AP_Tuning_Plane;
     friend class GCS_MAVLINK_Plane;
     friend class AP_AdvancedFailsafe_Plane;
+    friend class AP_Arming_Plane;
     
     QuadPlane(AP_AHRS_NavEKF &_ahrs);
 
@@ -133,6 +134,8 @@ public:
     float get_fw_throttle_factor(void) { return _fw_throttle_factor; }
 
     bool attitude_control_lost(void) {return control_loss_declared; }
+
+    bool is_corvo_x_control_type(void) { return (tailsitter.input_type == TAILSITTER_CORVOX); }
     
     struct PACKED log_QControl_Tuning {
         LOG_PACKET_HEADER;
@@ -162,6 +165,8 @@ public:
 
     void Log_Write_MotBatt();
 
+    float rtl_alt_m() { return (float)qrtl_alt; }
+
 private:
     AP_AHRS_NavEKF &ahrs;
     AP_Vehicle::MultiCopter aparm;
@@ -179,8 +184,9 @@ private:
     AC_WPNav *wp_nav;
     AC_Loiter *loiter_nav;
     
-    // maximum vertical velocity the pilot may request
-    AP_Int16 pilot_velocity_z_max;
+    // maximum vertical velocity the pilot may request in cm/s
+    AP_Int16 pilot_velocity_z_max_up;
+    AP_Int16 pilot_velocity_z_max_dn;
 
     // vertical acceleration the pilot may request
     AP_Int16 pilot_accel_z;
@@ -207,7 +213,7 @@ private:
     float get_desired_yaw_rate_cds(void);
     
     // get desired climb rate in cm/s
-    float get_pilot_desired_climb_rate_cms(void) const;
+    float get_pilot_desired_climb_rate_cms(const float dt_sec);
 
     // initialise throttle_wait when entering mode
     void init_throttle_wait();
@@ -500,6 +506,7 @@ private:
         AP_Float tvbs_lat_gmax;             // Maximum lateral g before yaw to follow payload pointing is ignored.
         AP_Float tvbs_jmp_alt;              // Takeoff jump altitude used by Corvo X in QLOITER mode (m)
         AP_Int8 tvbs_jmp_radius;            // Radius of Corvo X controller launch/recovery zone (m)
+        AP_Float tvbs_jmp_spd;              // Takeoff jump climb rate used by Corvo X in QLOITER mode (m/s)
 
     } tailsitter;
 
@@ -531,6 +538,7 @@ private:
     float takeoff_alt_cm;
     Vector3f takeoff_pos_cm;
     bool init_takeoff_this_frame = false;
+    uint32_t _do_vtol_takeoff_ms = 0; // last time the do_vtol_takeoff() functionality was active (msec)
 
     // elevator channel gain limit cycle control
     float _last_elev_feedback = 0.0f;           // value of the filtered elevator channel feedback from the previous time step (deg)
@@ -551,6 +559,8 @@ private:
     Vector2f _land_point_offset_NE = {};        // NE offset of the landing waypoint as last adjusted by the pilot stick inputs
     uint32_t _pitch_stick_moved_ms = 0;         // Last time in msec that the pitch axis stick was moved.
     uint32_t _pos_ctrl_not_is_landed_ms = 0;    // Last time in msec the position controller _is_landed flag was false
+
+    float climb_rate_cms = 0.0f;                // climb rate filter state used to smooth pilot inputs to position controller (cm/s)
 
     // the attitude view of the VTOL attitude controller
     AP_AHRS_View *ahrs_view;

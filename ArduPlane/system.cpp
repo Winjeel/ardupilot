@@ -424,6 +424,18 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         break;
 
     case AUTO:
+    {
+        // Ensure we have a basic mission plan when selecting AUTO before flight
+        if ((quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS)
+                && !arming.is_armed()) {
+            if (create_default_mission()) {
+                // reset index to start
+                plane.mission.reset();
+            } else {
+                // can't use auto mode so switch to pilot controlled mode
+                control_mode = QLOITER;
+            }
+        }
         throttle_allows_nudging = true;
         auto_throttle_mode = true;
         auto_navigation_mode = true;
@@ -439,6 +451,7 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
 #if SOARING_ENABLED == ENABLED
         g2.soaring_controller.init_cruising();
 #endif
+    }
         break;
 
     case RTL:
@@ -541,6 +554,65 @@ void Plane::exit_mode(enum FlightMode mode)
         }
         auto_state.started_flying_in_auto_ms = 0;
     }
+}
+
+// returns true if a valid mission is already loaded or has been created
+// returns false if mission creation failed
+bool Plane::create_default_mission()
+{
+    // Basic check that the first waypoint is a VTOL takeoff and there is more than one waypoint
+    bool has_mission = false;
+    AP_Mission::Mission_Command cmd = {};
+    if (plane.mission.get_next_nav_cmd(1, cmd)) {
+        has_mission = (cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF) && (plane.mission.num_commands() > 1);
+    }
+
+    if (!has_mission && ahrs.home_is_set()) {
+        // clear mission
+        plane.mission.clear();
+
+        // Command #0 : home
+        cmd = {};
+        cmd.id = MAV_CMD_NAV_WAYPOINT;
+        cmd.content.location.alt = plane.home.alt;
+        cmd.content.location.lat = plane.home.lat;
+        cmd.content.location.lng = plane.home.lng;
+        if (plane.mission.add_cmd(cmd)) {
+            has_mission = true;
+        }
+
+        // Command #1 : VTOL take-off to Q_RTL_ALT
+        cmd.id = MAV_CMD_NAV_VTOL_TAKEOFF;
+        cmd.content.location.alt = (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
+        if (plane.mission.add_cmd(cmd)) {
+            has_mission = true;
+        }
+
+        // Command #2 : loiter at max of VTO_LOIT_ALT_M and Q_RTL_ALT for 2 minutes above home location
+        cmd.id = MAV_CMD_NAV_LOITER_TIME;
+        cmd.p1 = 120;
+        cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, 100 * (int32_t)plane.g.vto_loiter_alt_m);
+        if (plane.mission.add_cmd(cmd)) {
+            has_mission = true;
+        }
+
+        // Command #3 start of landing sequence - required to RTL to this point in the mission
+        cmd.p1 = 0;
+        cmd.id = MAV_CMD_DO_LAND_START;
+        cmd.content.location.alt = plane.home.alt;
+        if (plane.mission.add_cmd(cmd)) {
+            has_mission = true;
+        }
+
+        // Command #4 perform an into wind transition and VTOL landing at home location
+        cmd.id = MAV_CMD_NAV_LAND;
+        cmd.content.location.alt = plane.home.alt + (int32_t)(100.0f * plane.quadplane.rtl_alt_m());
+        if (plane.mission.add_cmd(cmd)) {
+            has_mission = true;
+        }
+    }
+
+    return has_mission;
 }
 
 void Plane::check_long_failsafe()

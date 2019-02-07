@@ -113,8 +113,14 @@ void Plane::calc_airspeed_errors()
             && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
         // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
         // allow the operator to adjust speed in all auto-throttle modes
-        const float control_in = get_throttle_input();
-        target_airspeed_cm += 10.0f * control_in;
+        if ((time_aspd_tgt_set_ms != 0)) {
+            float dt = 0.001f * (millis() - time_aspd_tgt_set_ms);
+            if (dt < 0.2f) {
+                // Change set point at up to 100 cm/s/s when stick is at full deflection - note throttle_input returns a integer value between +-100
+                target_airspeed_cm += dt * (float)get_throttle_input();
+            }
+        }
+        time_aspd_tgt_set_ms = millis();
         target_airspeed_cm = constrain_float(target_airspeed_cm, aparm.airspeed_min * 100.0f, aparm.airspeed_max * 100.0f);
     } else if (!failsafe.rc_failsafe && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE)) {
         if (g2.flight_options & FlightOptions::CRUISE_TRIM_THROTTLE) {

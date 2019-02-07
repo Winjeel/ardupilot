@@ -971,7 +971,11 @@ bool Plane::verify_command_callback(const AP_Mission::Mission_Command& cmd)
 void Plane::exit_mission_callback()
 {
     if (control_mode == AUTO) {
-        set_mode(RTL, MODE_REASON_MISSION_END);
+        if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && !arming.is_armed()) {
+            set_mode(QLOITER, MODE_REASON_MISSION_END);
+        } else {
+            set_mode(RTL, MODE_REASON_MISSION_END);
+        }
         gcs().send_text(MAV_SEVERITY_INFO, "Mission complete, changing mode to RTL");
     }
 }

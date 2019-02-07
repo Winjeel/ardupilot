@@ -436,7 +436,12 @@ void Plane::handle_auto_mode(void)
     if (mission.state() != AP_Mission::MISSION_RUNNING) {
         // this could happen if AP_Landing::restart_landing_sequence() returns false which would only happen if:
         // restart_landing_sequence() is called when not executing a NAV_LAND or there is no previous nav point
-        set_mode(RTL, MODE_REASON_MISSION_END);
+        if (arming.is_armed()) {
+            set_mode(RTL, MODE_REASON_MISSION_END);
+        } else if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
+            // When using a Corvo controller we default to QLOITER if unable to remain in AUTO and disarmed
+            set_mode(QLOITER, MODE_REASON_MISSION_END);
+        }
         gcs().send_text(MAV_SEVERITY_INFO, "Aircraft in auto without a running mission");
         return;
     }
@@ -480,6 +485,9 @@ void Plane::handle_auto_mode(void)
  */
 void Plane::update_flight_mode(void)
 {
+    // run shake to arm checks to place vehicle into required mode and arm motors
+    arming.check_shake_to_arm();
+
     enum FlightMode effective_mode = control_mode;
     if (control_mode == AUTO && g.auto_fbw_steer == 42) {
         effective_mode = FLY_BY_WIRE_A;
@@ -736,12 +744,20 @@ void Plane::update_navigation()
              location_passed_point(current_loc, prev_WP_loc, next_WP_loc) ||
              auto_state.wp_distance < MAX(qrtl_radius, quadplane.stopping_distance())) &&
             AP_HAL::millis() - last_mode_change_ms > 1000) {
-            /*
-              for a quadplane in RTL mode we switch to QRTL when we
-              are within the maximum of the stopping distance and the
-              RTL_RADIUS
-             */
+            if (!auto_state.checked_for_autoland && mission.jump_to_landing_sequence()) {
+                // switch from RTL -> AUTO
+                set_mode(AUTO, MODE_REASON_UNKNOWN);
+            } else {
+                /*
+                  for a quadplane in RTL mode we switch to QRTL when we
+                  are within the maximum of the stopping distance and the
+                  RTL_RADIUS
+                 */
             set_mode(QRTL, MODE_REASON_UNKNOWN);
+            }
+            // prevent running the expensive jump_to_landing_sequence
+            // on every loop
+            auto_state.checked_for_autoland = true;
             break;
         } else if (g.rtl_autoland == 1 &&
             !auto_state.checked_for_autoland &&

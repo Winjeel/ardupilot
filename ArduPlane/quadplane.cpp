@@ -31,20 +31,29 @@ const AP_Param::GroupInfo QuadPlane::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("TRANSITION_MS", 11, QuadPlane, transition_time_ms, 5000),
 
-    // 12 ~ 16 were used by position, velocity and acceleration PIDs
+    // @Param: VELZ_MAX_DN
+    // @DisplayName: Pilot maximum descent speed
+    // @Description: The maximum descent velocity the pilot may request in cm/s
+    // @Units: cm/s
+    // @Range: 50 500
+    // @Increment: 10
+    // @User: Standard
+    AP_GROUPINFO("VELZ_MAX_DN", 12, QuadPlane, pilot_velocity_z_max_dn, 150),
+
+    // 13 ~ 16 were used by position, velocity and acceleration PIDs
 
     // @Group: P_
     // @Path: ../libraries/AC_AttitudeControl/AC_PosControl.cpp
     AP_SUBGROUPPTR(pos_control, "P", 17, QuadPlane, AC_PosControl),
 
-    // @Param: VELZ_MAX
-    // @DisplayName: Pilot maximum vertical speed
-    // @Description: The maximum vertical velocity the pilot may request in cm/s
+    // @Param: VELZ_MAX_UP
+    // @DisplayName: Pilot maximum climb speed
+    // @Description: The maximum climb velocity the pilot may request in cm/s
     // @Units: cm/s
     // @Range: 50 500
     // @Increment: 10
     // @User: Standard
-    AP_GROUPINFO("VELZ_MAX", 18, QuadPlane, pilot_velocity_z_max, 250),
+    AP_GROUPINFO("VELZ_MAX_UP", 18, QuadPlane, pilot_velocity_z_max_up, 250),
 
     // @Param: ACCEL_Z
     // @DisplayName: Pilot vertical acceleration
@@ -648,7 +657,7 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Range: 1.0 5.0
     // @Increment: 0.1
     // @User: Standard
-    AP_GROUPINFO("TVBS_JMP_ALT", 44, QuadPlane, tailsitter.tvbs_jmp_alt, 2.5),
+    AP_GROUPINFO("TVBS_JMP_ALT", 44, QuadPlane, tailsitter.tvbs_jmp_alt, 4.5),
 
     // @Param: TVBS_JMP_RAD
     // @DisplayName: Takeoff jump radius
@@ -658,6 +667,16 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Increment: 1
     // @User: Standard
     AP_GROUPINFO("TVBS_JMP_RAD", 45, QuadPlane, tailsitter.tvbs_jmp_radius, 50),
+
+    // @Param: TVBS_JMP_SPD
+    // @DisplayName: Takeoff jump climb rate
+    // @Description: Sets the climb rate that the vehicle will use initially at when taking off in QLOITER when Q_TAILSIT_INPUT is set to 2 (using corvo X hand controller).
+    // @Units: m/s
+    // @Range: 0.5 3.0
+    // @Increment: 0.1
+    // @User: Standard
+    AP_GROUPINFO("TVBS_JMP_SPD", 46, QuadPlane, tailsitter.tvbs_jmp_spd, 1.5),
+
     AP_GROUPEND
 };
 
@@ -1037,7 +1056,7 @@ void QuadPlane::run_z_controller(void)
         pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
 
         // initialize vertical speeds and leash lengths
-        pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+        pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
         pos_control->set_max_accel_z(pilot_accel_z);
         
         // it has been two seconds since we last ran the Z
@@ -1078,7 +1097,7 @@ void QuadPlane::check_attitude_relax(void)
 void QuadPlane::init_hover(void)
 {
     // initialize vertical speeds and leash lengths
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
@@ -1111,7 +1130,7 @@ void QuadPlane::hold_hover(float target_climb_rate)
     motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
     // initialize vertical speeds and acceleration
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // call attitude controller
@@ -1132,7 +1151,7 @@ void QuadPlane::control_hover(void)
         attitude_control->set_throttle_out_unstabilized(0, true, 0);
         pos_control->relax_alt_hold_controllers(0);
     } else {
-        hold_hover(get_pilot_desired_climb_rate_cms());
+        hold_hover(get_pilot_desired_climb_rate_cms(plane.G_Dt));
     }
 }
 
@@ -1143,7 +1162,7 @@ void QuadPlane::init_loiter(void)
     loiter_nav->init_target();
 
     // initialize vertical speed and acceleration
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
@@ -1263,7 +1282,7 @@ void QuadPlane::control_loiter()
     motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
 
     // initialize vertical speed and acceleration
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // process pilot's roll and pitch input
@@ -1271,10 +1290,18 @@ void QuadPlane::control_loiter()
         // don't move vehicle because we are using sticks to control camera
         loiter_nav->set_pilot_desired_acceleration(0, 0, plane.G_Dt);
     } else {
-        loiter_nav->set_pilot_desired_acceleration(plane.channel_roll->get_control_in(),
-                                                   plane.channel_pitch->get_control_in(),
-                                                   plane.G_Dt);
+        // scale stick inputs to lean angles
+        // stick inputs are between +-4500
+        float stick_to_angle_cd = loiter_nav->get_angle_max_cd() / 4500.0f;
+        float angle_Y_cd = stick_to_angle_cd * plane.channel_roll->get_control_in();
+        float angle_X_cd = stick_to_angle_cd * plane.channel_pitch->get_control_in();
+        loiter_nav->set_pilot_desired_acceleration(angle_Y_cd, angle_X_cd, plane.G_Dt);
     }
+
+    // Prevent strong winds dragging the vehicle due to the pos control internally calculated
+    // leash length being too small.
+    pos_control->set_max_accel_xy(1000.0f);
+    pos_control->set_max_speed_xy(100.0f * pos_control->get_max_fwd_airspd());
 
     // run loiter controller
     loiter_nav->update();
@@ -1325,11 +1352,11 @@ void QuadPlane::control_loiter()
         pos_control->set_alt_target_from_climb_rate_ff(0, plane.G_Dt, false);
     } else {
         if (_doing_takeoff_jump) {
-            // during takeoff jump, climb at max climb rate allowed during pilot controlled operation
-            pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
+            // during takeoff jump, climb at specified rate
+            pos_control->add_takeoff_climb_rate(100.0f * tailsitter.tvbs_jmp_spd, plane.G_Dt);
         } else {
             // update altitude target using pilot demanded climb rate
-            pos_control->set_alt_target_from_climb_rate_ff(get_pilot_desired_climb_rate_cms(), plane.G_Dt, false);
+            pos_control->set_alt_target_from_climb_rate_ff(get_pilot_desired_climb_rate_cms(plane.G_Dt), plane.G_Dt, false);
         }
     }
 
@@ -1382,15 +1409,27 @@ float QuadPlane::get_desired_yaw_rate_cds(void)
 }
 
 // get pilot desired climb rate in cm/s
-float QuadPlane::get_pilot_desired_climb_rate_cms(void) const
+float QuadPlane::get_pilot_desired_climb_rate_cms(const float dt_sec)
 {
     if (plane.failsafe.rc_failsafe || plane.failsafe.throttle_counter > 0) {
-        // descend at 0.5m/s for now
-        return -50;
+        // this could happen anywhere over unknown terrain height, so descend at final touchdown sink rate for now
+        climb_rate_cms = -0.7f * land_speed_cms;
+        return climb_rate_cms;
     }
     uint16_t dead_zone = plane.channel_throttle->get_dead_zone();
     uint16_t trim = (plane.channel_throttle->get_radio_max() + plane.channel_throttle->get_radio_min())/2;
-    float climb_rate_cms = pilot_velocity_z_max * plane.channel_throttle->pwm_to_angle_dz_trim(dead_zone, trim) / 100.0f;
+    float throttle_normalised = 0.01f * (float)plane.channel_throttle->pwm_to_angle_dz_trim(dead_zone, trim);
+    if (throttle_normalised >= 0.0f) {
+        climb_rate_cms = throttle_normalised * (float)pilot_velocity_z_max_up;
+    } else {
+        float pilot_climb_rate_cms = pilot_velocity_z_max_dn * throttle_normalised;
+        float vel_z_delta_lim = - dt_sec * (float)(pilot_velocity_z_max_dn / 3);
+        if ((pilot_climb_rate_cms - climb_rate_cms) < vel_z_delta_lim) {
+            climb_rate_cms += vel_z_delta_lim;
+        } else {
+            climb_rate_cms = (float)pilot_climb_rate_cms;
+        }
+    }
     // enable limiting of sink rate close to ground
     climb_rate_cms = MAX(climb_rate_cms, -_pilot_sink_rate_limit_cms);
     return climb_rate_cms;
@@ -1631,7 +1670,7 @@ void QuadPlane::update_transition_to_fw(void)
         // do not allow a climb on the quad motors during transition
         // a climb would add load to the airframe, and prolongs the
         // transition
-        float climb_rate_cms = assist_climb_rate_cms();
+        climb_rate_cms = assist_climb_rate_cms();
         if (options & OPTION_LEVEL_TRANSITION) {
             climb_rate_cms = MIN(climb_rate_cms, 0.0f);
         }
@@ -2007,18 +2046,34 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
         } else {
+            //detect up or down button press
+            uint16_t up_threshold = (3*plane.channel_throttle->get_radio_max() + plane.channel_throttle->get_radio_min())/4;
+            uint16_t down_threshold = (plane.channel_throttle->get_radio_max() + 3*plane.channel_throttle->get_radio_min())/4;
+            bool up_cmd = false;
+            bool down_cmd = false;
+            if (plane.channel_throttle->get_radio_in() < down_threshold) {
+                down_cmd = true;
+            } else if (plane.channel_throttle->get_radio_in() > up_threshold) {
+                up_cmd = true;
+            }
+
             // corvo X uses up button press to arm and start a takeoff, followed by automatic climb to height set by Q_TVBS_JMP_ALT
             if ((plane.control_mode == QLOITER) && motors->armed() && !_prev_arm_status) {
                 // start the jump to Q_RTL_ALT height
                 init_loiter();
                 _doing_takeoff_jump = true;
-            } else if (_doing_takeoff_jump &&
-                       ((plane.control_mode != QLOITER)
-                        || (plane.relative_altitude > (float)tailsitter.tvbs_jmp_alt)
-                        || (get_pilot_desired_climb_rate_cms() < -50))) {
-                // jump stops when height is reached, the mode changes or the pilot commands a descent
-                set_alt_target_current();
-                _doing_takeoff_jump = false;
+            } else if (_doing_takeoff_jump) {
+                // Allow for delay in height loop response - note inertial_nav.get_velocity_z() returns a climb rate in cm/s that is positive up
+                bool reached_alt = plane.relative_altitude > ((float)tailsitter.tvbs_jmp_alt - 0.01f * inertial_nav.get_velocity_z());
+                if ((plane.control_mode != QLOITER) || reached_alt || down_cmd) {
+                    // jump stops when height is reached, the mode changes or the pilot commands a descent
+                    if (reached_alt) {
+                        pos_control->set_alt_target(100.0f * tailsitter.tvbs_jmp_alt);
+                    } else {
+                        set_alt_target_current();
+                    }
+                    _doing_takeoff_jump = false;
+                }
             }
 
             // check takeoff height clearance - used to prevent early transition into FW flight modes
@@ -2027,10 +2082,10 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             }
 
             // toggle auto land arrest using climb/descend buttons
-            if (plane.channel_throttle->norm_input() < 0.5f) {
+            if (!up_cmd) {
                 _no_climb_demand_ms = AP_HAL::millis();
             }
-            if (plane.channel_throttle->norm_input() > -0.5f) {
+            if (!down_cmd) {
                 _no_descent_demand_ms = AP_HAL::millis();
             }
             if (!_auto_land_arrested && ((AP_HAL::millis() - _no_climb_demand_ms) > 1000)) {
@@ -2053,9 +2108,9 @@ void QuadPlane::launch_recovery_zone_logic(void) {
             // generate descent rate to be used when descend button is pressed
             bool prepare_for_touchdown = false;
             if (_outside_takeoff_zone) {
-                _pilot_sink_rate_limit_cms = pilot_velocity_z_max;
+                _pilot_sink_rate_limit_cms = pilot_velocity_z_max_dn;
             } else if (_height_above_ground_m > land_final_alt) {
-                _pilot_sink_rate_limit_cms = linear_interpolate(land_speed_cms, pilot_velocity_z_max,
+                _pilot_sink_rate_limit_cms = linear_interpolate(land_speed_cms, pilot_velocity_z_max_dn,
                                                                plane.relative_altitude,
                                                                land_final_alt, land_final_alt+6);
             } else {
@@ -2109,13 +2164,36 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                     }
                 }
             }
+
+            // Prepare the EKF for ground effect if either takeoff or touchdown is expected.
+            bool starting_vtol_auto_takeoff = motors->armed()
+                    && (plane.relative_altitude < 2.0f)
+                    && ((AP_HAL::millis() - _do_vtol_takeoff_ms) < 100);
+            ahrs.setTakeoffExpected(_doing_takeoff_jump || starting_vtol_auto_takeoff);
+            ahrs.setTouchdownExpected(prepare_for_touchdown);
+
+            // Logging for debug and tuning of land detection and disarm logic
+            static uint32_t _last_log_time_ms = 0;
+            if (AP_HAL::millis() - _last_log_time_ms >= 50) {
+                _last_log_time_ms = AP_HAL::millis();
+
+                DataFlash_Class::instance()->Log_Write("TVB3", "TimeUS,UP,DOWN,OTZ,PFT,PCNL,NDD,PSM", "QbbbbIII",
+                                                       AP_HAL::micros64(),
+                                                       (bool)up_cmd,
+                                                       (bool)down_cmd,
+                                                       (bool)_outside_takeoff_zone,
+                                                       (bool)prepare_for_touchdown,
+                                                       (uint32_t)_pos_ctrl_not_is_landed_ms,
+                                                       (uint32_t)_no_descent_demand_ms,
+                                                       (uint32_t)_pitch_stick_moved_ms);
+            }
         }
     } else {
         // defaults when operating with normal RC handset removes restrictions and disables takeoff jump
         _doing_takeoff_jump = false;
         _reached_rtl_alt = true;
         _outside_takeoff_zone = true;
-        _pilot_sink_rate_limit_cms = pilot_velocity_z_max;
+        _pilot_sink_rate_limit_cms = pilot_velocity_z_max_dn;
     }
 
     // record value for next frame
@@ -2264,7 +2342,7 @@ bool QuadPlane::in_vtol_mode(void) const
 // not in a mode suitable for corvo X to takeoff
 bool QuadPlane::corvo_takeoff_inhibit(void) const
 {
-    if (tailsitter.input_type != TAILSITTER_CORVOX) {
+    if ((tailsitter.input_type != TAILSITTER_CORVOX) || !RC_Channels::has_active_overrides()) {
         return false;
     }
 
@@ -2563,7 +2641,7 @@ void QuadPlane::vtol_position_controller(void)
                         // handle special case of RTL where we want to climb to the RTL height if outside the landing cone
                         if (0.01f * (target_altitude_cm - plane.home.alt) > _height_above_ground_m) {
                             // climb up to RTL altitude
-                            pos_control->set_alt_target_from_climb_rate(pilot_velocity_z_max, plane.G_Dt, false);
+                            pos_control->set_alt_target_from_climb_rate(pilot_velocity_z_max_up, plane.G_Dt, false);
                         } else {
                             // stay above RTL altitude until inside cone
                             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
@@ -2582,7 +2660,7 @@ void QuadPlane::vtol_position_controller(void)
     case QPOS_LAND_DESCEND: {
         if (_auto_land_arrested) {
             // allow pilot to raise alt during repositioning
-            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms()), plane.G_Dt, false);
+            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms(plane.G_Dt)), plane.G_Dt, false);
         } else if (poscontrol.outside_cone && (descent_delay_time_sec < 30.0f)) {
             // don't allow descent if outside the landing cone
             pos_control->set_alt_target_from_climb_rate(0, plane.G_Dt, false);
@@ -2596,7 +2674,7 @@ void QuadPlane::vtol_position_controller(void)
     case QPOS_LAND_FINAL: {
         if (_auto_land_arrested) {
             // allow pilot to raise alt during repositioning
-            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms()), plane.G_Dt, false);
+            pos_control->set_alt_target_from_climb_rate(MAX(0, get_pilot_desired_climb_rate_cms(plane.G_Dt)), plane.G_Dt, false);
         } else if ((!weathervane.tip_warning && !poscontrol.outside_cone) || descent_delay_time_sec > 30.0f) {
             // complete descent if landing conditions are met or we have delayed the descent for more than 30 seconds in total
             // slow further to half the kinetic energy at the expected touchdown point allowing for expected 2m height error
@@ -2672,7 +2750,7 @@ void QuadPlane::setup_target_position(void)
     poscontrol.radial_error = pos_error_NE.length();
     
     // setup vertical speed and acceleration
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 }
 
@@ -2719,7 +2797,7 @@ void QuadPlane::takeoff_controller(void)
                                                                       get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
     }
 
-    pos_control->add_takeoff_climb_rate(pilot_velocity_z_max, plane.G_Dt);
+    pos_control->add_takeoff_climb_rate(pilot_velocity_z_max_up, plane.G_Dt);
     run_z_controller();
 
     // trigger a position controller wind drift state reset if vehicle drits outside a +- 45 degree cone centred on the takeoff location.
@@ -2890,7 +2968,7 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
     loiter_nav->init_target();
 
     // initialize vertical speed and acceleration
-    pos_control->set_max_speed_z(-pilot_velocity_z_max, pilot_velocity_z_max);
+    pos_control->set_max_speed_z(-pilot_velocity_z_max_dn, pilot_velocity_z_max_up);
     pos_control->set_max_accel_z(pilot_accel_z);
 
     // initialise position and desired velocity
@@ -2904,6 +2982,9 @@ bool QuadPlane::do_vtol_takeoff(const AP_Mission::Mission_Command& cmd)
 
     // tell position controller to prepare for takeoff
     pos_control->init_takeoff();
+
+    // let other functions know how long since we were doing a takeoff
+    _do_vtol_takeoff_ms = AP_HAL::millis();
 
     // also update nav_controller for status output
     plane.nav_controller->update_waypoint(plane.prev_WP_loc, plane.next_WP_loc);

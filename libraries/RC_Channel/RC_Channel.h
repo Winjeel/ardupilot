@@ -6,6 +6,7 @@
 #include <AP_Param/AP_Param.h>
 
 #define NUM_RC_CHANNELS 16
+#define OVERRIDE_INHIBIT_CH_INDEX 6 // index of channel used to inhibit RC overrides
 
 /// @class	RC_Channel
 /// @brief	Object managing one RC channel
@@ -340,6 +341,9 @@ public:
             clear_overrides();
         }
     }
+
+    // returns true if MAVLink RC override commands should be ignored
+    static bool gcs_rc_override_inhibit();
 
 private:
     static RC_Channels *_singleton;

@@ -404,6 +404,7 @@ protected:
     AP_Float    _landed_pitch;          // Landed detector wing pitch angle threshold (rad)
     AP_Float    _landed_accel;          // Landed detector accceleration threshold
     AP_Float    _drag_brake_g_thrhld;   // Rotor drag brake threshold (g)
+   AP_Float     _vz_to_thr_gain;        // Gain from climb rate demand to normalised throttle 1/(m/s)
 
 
     // internal variables

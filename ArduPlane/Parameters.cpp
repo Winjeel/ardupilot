@@ -133,7 +133,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Range: 0 30
     // @Increment: 0.1
     // @User: User
-    GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
+    GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  7.0f),
 
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay
@@ -142,7 +142,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Range: 0 127
     // @Increment: 1
     // @User: User
-    GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  2),
+    GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  10),
 
     // @Param: TKOFF_TDRAG_ELEV
     // @DisplayName: Takeoff tail dragger elevator
@@ -763,6 +763,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     ASCALAR(min_gndspeed_cm,      "MIN_GNDSPD_CM",  MIN_GNDSPEED_CM),
 
+    // @Param: VTO_LOIT_ALT_M
+    // @DisplayName: Post launch loiter altitude
+    // @Description: This is the relative altitude the plane will aim for and loiter at after performing a VTOL takeoff with the internally generated mission plan. If lower than Q_RTL_ALT, then Q_RTL_ALT will be used instead.
+    // @Units: m
+    // @User: Advanced
+    GSCALAR(vto_loiter_alt_m,        "VTO_LOIT_ALT_M",  50),
+
     // @Param: TRIM_PITCH_CD
     // @DisplayName: Pitch angle offset
     // @Description: offset to add to pitch - used for in-flight pitch trimming. It is recommended that instead of using this parameter you level your plane correctly on the ground for good flight attitude.
@@ -1211,7 +1218,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Description: This is the number of acceleration events to require for arming with TKOFF_THR_MINACC. The default is 1, which means a single forward acceleration above TKOFF_THR_MINACC will arm. By setting this higher than 1 you can require more forward/backward movements to arm.
     // @Range: 1 10
     // @User: User
-    AP_GROUPINFO("TKOFF_ACCEL_CNT", 15, ParametersG2, takeoff_throttle_accel_count, 1),
+    AP_GROUPINFO("TKOFF_ACCEL_CNT", 15, ParametersG2, takeoff_throttle_accel_count, 3),
 
 #if LANDING_GEAR_ENABLED == ENABLED
     // @Group: LGR_
@@ -1245,7 +1252,6 @@ ParametersG2::ParametersG2(void) :
   old object. This should be zero for top level parameters.
  */
 const AP_Param::ConversionInfo conversion_table[] = {
-    { Parameters::k_param_log_bitmask_old,    0,      AP_PARAM_INT16, "LOG_BITMASK" },
     { Parameters::k_param_rally_limit_km_old, 0,      AP_PARAM_FLOAT, "RALLY_LIMIT_KM" },
     { Parameters::k_param_rally_total_old,    0,      AP_PARAM_INT8, "RALLY_TOTAL" },
     { Parameters::k_param_serial0_baud,       0,      AP_PARAM_INT16, "SERIAL0_BAUD" },

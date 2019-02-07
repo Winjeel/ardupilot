@@ -39,6 +39,7 @@ public:
         MAVLINK,
         AUXSWITCH,
         MOTORTEST,
+        SHAKE,
     };
 
     enum ArmingRequired {

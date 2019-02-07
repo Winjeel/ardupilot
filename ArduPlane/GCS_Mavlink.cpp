@@ -628,7 +628,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Description: Specify CORVO Controller Type which affects how MANUAL_CONTROL messages are interpreted
     // @Values: 0: No CORVO Controller, 1: CORVO X Controller
     // @User: Advanced
-    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 0),
+    AP_GROUPINFO("CORVO_Ctrlr", 32, GCS_MAVLINK, _corvoControllerType, 1),
 
     AP_GROUPEND
 };
@@ -1195,6 +1195,11 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
             break; // only accept control from our gcs
         }
 
+        // Corvo flight test safety customisation to ignore mavlink overide if demanded by RC handset
+        if (RC_Channels::gcs_rc_override_inhibit()) {
+            break;
+        }
+
         mavlink_manual_control_t packet;
         mavlink_msg_manual_control_decode(msg, &packet);
 
@@ -1204,15 +1209,17 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
 
         uint32_t tnow = AP_HAL::millis();
 
-        int16_t roll = (packet.y == INT16_MAX) ? 0 : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + 1000) / 2000.0f;
-        int16_t pitch = (packet.x == INT16_MAX) ? 0 : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + 1000) / 2000.0f;
-        int16_t throttle = (packet.z == INT16_MAX) ? 0 : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / 1000.0f;
+        const int16_t RC_OVERRIDE_RANGE = 2*RC_OVERRIDE_MAX;
+        int16_t roll = (packet.y == INT16_MAX) ? plane.channel_roll->get_radio_trim() : plane.channel_roll->get_radio_min() + (plane.channel_roll->get_radio_max() - plane.channel_roll->get_radio_min()) * (packet.y + RC_OVERRIDE_MAX) / (float)RC_OVERRIDE_RANGE;
+        // Note pitch input sign reversal. Forward stick is positive x but commands a negative (nose down) pitch.
+        int16_t pitch = (packet.x == INT16_MAX) ? plane.channel_pitch->get_radio_trim() : plane.channel_pitch->get_radio_min() + (plane.channel_pitch->get_radio_max() - plane.channel_pitch->get_radio_min()) * (-packet.x + RC_OVERRIDE_MAX) / (float)RC_OVERRIDE_RANGE;
+        int16_t throttle = (packet.z == INT16_MAX) ? plane.channel_throttle->get_radio_min() : plane.channel_throttle->get_radio_min() + (plane.channel_throttle->get_radio_max() - plane.channel_throttle->get_radio_min()) * (packet.z) / (float)RC_OVERRIDE_MAX;
         int16_t yaw;
-        if ((plane.quadplane.tailsitter.input_type == plane.quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
-            // set to zero to prevent inadvertent operation
-            yaw = 0;
+        if (_corvoControllerType.get() == CORVO_ControllerType::CORVO_ControllerX) {
+            // set to trim value to prevent inadvertent operation - corvo controller does not have yaw
+            yaw = plane.channel_rudder->get_radio_trim();
         } else {
-            yaw = (packet.r == INT16_MAX) ? 0 : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + 1000) / 2000.0f;
+            yaw = (packet.r == INT16_MAX) ? plane.channel_rudder->get_radio_trim() : plane.channel_rudder->get_radio_min() + (plane.channel_rudder->get_radio_max() - plane.channel_rudder->get_radio_min()) * (packet.r + RC_OVERRIDE_MAX) / (float)RC_OVERRIDE_RANGE;
         }
 
         RC_Channels::set_override(uint8_t(plane.rcmap.roll() - 1), roll, tnow);

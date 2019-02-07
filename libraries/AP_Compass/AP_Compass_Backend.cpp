@@ -82,7 +82,7 @@ void AP_Compass_Backend::correct_field(Vector3f &mag, uint8_t i)
         state.motor_offset = mot * _compass._thr;
     } else if (_compass._motor_comp_type == AP_COMPASS_MOT_COMP_CURRENT) {
         AP_BattMonitor &battery = AP::battery();
-        if (battery.has_current()) {
+        if (battery.has_current() && (battery.current_amps() > 0.0f)) {
             state.motor_offset = mot * battery.current_amps();
         }
     }
