@@ -975,6 +975,7 @@ private:
     Vector3f posOffsetNED;          // This adds to the earth frame position estimate at the IMU to give the position at the body origin (m)
     uint32_t firstInitTime_ms;      // First time the initialise function was called (msec)
     uint32_t lastInitFailReport_ms; // Last time the buffer initialisation failure report was sent (msec)
+    uint32_t lastAlignMoveFail_ms;  // Last time the alignment movement checks failed (msec)
 
     // Specify source of data to be used for a partial state reset
     // Checking the availability and quality of the data source specified is the responsibility of the caller
