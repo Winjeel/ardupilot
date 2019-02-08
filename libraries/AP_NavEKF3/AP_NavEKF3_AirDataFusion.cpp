@@ -227,11 +227,6 @@ void NavEKF3_core::SelectTasFusion()
     // get true airspeed measurement
     readAirSpdData();
 
-    // If we haven't received airspeed data for a while, then declare the airspeed data as being timed out
-    if (imuSampleTime_ms - tasDataNew.time_ms > frontend->tasRetryTime_ms) {
-        tasTimeout = true;
-    }
-
     // if the filter is initialised, wind states are not inhibited and we have data to fuse, then perform TAS fusion
     if (tasDataToFuse && statesInitialised && !inhibitWindStates) {
         FuseAirspeed();
@@ -257,19 +252,21 @@ void NavEKF3_core::SelectBetaFusion()
 
     // set true when the fusion time interval has triggered
     bool f_timeTrigger = ((imuSampleTime_ms - prevBetaStep_ms) >= frontend->betaAvg_ms);
-    // set true when use of synthetic sideslip fusion is necessary because we have limited sensor data or are dead reckoning position
-    bool f_required = !(use_compass() && useAirspeed() && ((imuSampleTime_ms - lastPosPassTime_ms) < frontend->posRetryTimeNoVel_ms));
+    // set true when use of air data to constrain drift is necessary because we have limited sensor data or are doing inertial dead reckoning
+    bool is_dead_reckoning = ((imuSampleTime_ms - lastPosPassTime_ms) > frontend->deadReckonDeclare_ms) && ((imuSampleTime_ms - lastVelPassTime_ms) > frontend->deadReckonDeclare_ms);
+    bool f_required = !use_compass() || is_dead_reckoning;
     // set true when sideslip fusion is feasible (requires zero sideslip assumption to be valid and use of wind states)
     bool f_feasible = (assume_zero_sideslip() && !inhibitWindStates);
-    if (f_feasible && !f_required) {
-        // we are only required to correct wind states
-        airDataFusionWindOnly = true;
-    } else {
-        // we are required to corrrect all states
-        airDataFusionWindOnly = false;
-    }
     // use synthetic sideslip fusion if feasible, required and enough time has lapsed since the last fusion
     if (f_feasible && f_timeTrigger) {
+        // unless air data is required to constrain drift, it is only used to update wind state estimates
+        if (f_required) {
+            // we are required to correct all states
+            airDataFusionWindOnly = false;
+        } else {
+            // we are required to corrrect only wind states
+            airDataFusionWindOnly = true;
+        }
         // Fuse estimated airspeed to aid wind estimation
         if (frontend->_easDefault >= 5.0f) {
             frontend->_easNoise = 0.33f * frontend->_easDefault;
