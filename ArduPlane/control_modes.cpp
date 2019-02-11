@@ -163,7 +163,7 @@ void Plane::read_corvo_control_switch()
                     // resets the mount EF roll demand to zero and reverts the mount to default targeting mode
                     camera_mount.set_elev_park(false);
                 } else {
-                    // We are in VTOL vehicle ocntrol mode so switch to the default FW vehicle control mode
+                    // We are in VTOL vehicle control mode so switch to the default FW vehicle control mode
                     set_mode(CRUISE, MODE_REASON_TX_COMMAND);
 
                     // Mount is placed into a mode where gimbal is held at last demanded earth frame elevation angle,
@@ -248,6 +248,7 @@ void Plane::read_corvo_control_switch()
     }
 
     // set camera mount mode control when entering QLOITER or switching between vehicle and camera control whilst in QLOITER
+    if (quadplane.in_vtol_mode() || plane.auto_state.vtol_mode)
     if (resetVtolCameraControl) {
         if (vtolCameraControlMode) {
             // camera yaw/elevation pointing is controlled by the roll/pitch stick and vehicle holds at previous horizontal position
@@ -256,6 +257,12 @@ void Plane::read_corvo_control_switch()
         } else  {
             // yaw moves with vehicle
             camera_mount.set_elev_park(true);
+
+            // reset the earth frame elevation demand to MNT_INIT_ELEV when disarmed so that the vehicle will
+            // takeoff with the mount pointing in a useful orientation
+            if (!hal.util->get_soft_armed()) {
+                camera_mount.reset_elev();
+            }
         }
     }
 
@@ -318,11 +325,11 @@ void Plane::reset_control_switch()
     changeModeCount = 0;
     read_change_mode_select_switch();
 
-    if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
+    if (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) {
         // start corvo in QLOITER mode
         previous_mode = control_mode = QLOITER;
 
-        // Run payload pointing in park mode where yaw follows vehicle and elevation is set to value set by MNT_INIT_ELEV parmeter
+        // Start with payload pointing in park mode where yaw follows vehicle and elevation is set to value set by MNT_INIT_ELEV parmeter
         camera_mount.set_elev_park(true);
         camera_mount.reset_elev();
     }
