@@ -3,15 +3,12 @@
 
 extern const AP_HAL::HAL& hal;
 
-#define LOITER_SPEED_DEFAULT                1250.0f // default loiter speed in cm/s
+#define LOITER_SPEED_DEFAULT                500.0f // default loiter speed in cm/s
 #define LOITER_SPEED_MIN                    20.0f   // minimum loiter speed in cm/s
-#define LOITER_ACCEL_MAX_DEFAULT            500.0f  // default acceleration in loiter mode
-#define LOITER_BRAKE_ACCEL_DEFAULT          250.0f  // minimum acceleration in loiter mode
-#define LOITER_BRAKE_JERK_DEFAULT           500.0f  // maximum jerk in cm/s/s/s in loiter mode
+#define LOITER_ACCEL_MAX_DEFAULT            250.0f  // default acceleration in loiter mode
+#define LOITER_BRAKE_ACCEL_DEFAULT          100.0f  // minimum acceleration in loiter mode
+#define LOITER_BRAKE_JERK_DEFAULT           250.0f  // maximum jerk in cm/s/s/s in loiter mode
 #define LOITER_BRAKE_START_DELAY_DEFAULT    1.0f    // delay (in seconds) before loiter braking begins after sticks are released
-#define LOITER_VEL_CORRECTION_MAX           200.0f  // max speed used to correct position errors in loiter
-#define LOITER_POS_CORRECTION_MAX           200.0f  // max position error in loiter
-#define LOITER_ACTIVE_TIMEOUT_MS            200     // loiter controller is considered active if it has been called within the past 200ms (0.2 seconds)
 
 const AP_Param::GroupInfo AC_Loiter::var_info[] = {
 
@@ -24,23 +21,9 @@ const AP_Param::GroupInfo AC_Loiter::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("ANG_MAX",  1, AC_Loiter, _angle_max, 0.0f),
 
-    // @Param: SPEED
-    // @DisplayName: Loiter Horizontal Maximum Speed
-    // @Description: Defines the maximum speed in cm/s which the aircraft will travel horizontally while in loiter mode
-    // @Units: cm/s
-    // @Range: 20 2000
-    // @Increment: 50
-    // @User: Standard
-    AP_GROUPINFO("SPEED", 2, AC_Loiter, _speed_cms, LOITER_SPEED_DEFAULT),
+    // Slot 2 previously used for SPEED.
 
-    // @Param: ACC_MAX
-    // @DisplayName: Loiter maximum correction acceleration
-    // @Description: Loiter maximum correction acceleration in cm/s/s.  Higher values cause the copter to correct position errors more aggressively.
-    // @Units: cm/s/s
-    // @Range: 100 981
-    // @Increment: 1
-    // @User: Advanced
-    AP_GROUPINFO("ACC_MAX", 3, AC_Loiter, _accel_cmss, LOITER_ACCEL_MAX_DEFAULT),
+    // Slot 3 previously used for ACC_MAX.
 
     // @Param: BRK_ACCEL
     // @DisplayName: Loiter braking acceleration
@@ -55,7 +38,7 @@ const AP_Param::GroupInfo AC_Loiter::var_info[] = {
     // @DisplayName: Loiter braking jerk
     // @Description: Loiter braking jerk in cm/s/s/s. Higher values will remove braking faster if the pilot moves the sticks during a braking maneuver.
     // @Units: cm/s/s/s
-    // @Range: 500 5000
+    // @Range: 50 5000
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("BRK_JERK", 5, AC_Loiter, _brake_jerk_max_cmsss, LOITER_BRAKE_JERK_DEFAULT),
@@ -68,6 +51,24 @@ const AP_Param::GroupInfo AC_Loiter::var_info[] = {
     // @Increment: 0.1
     // @User: Advanced
     AP_GROUPINFO("BRK_DELAY",  6, AC_Loiter, _brake_delay, LOITER_BRAKE_START_DELAY_DEFAULT),
+
+    // @Param: SPD_MAX
+    // @DisplayName: Loiter Horizontal Maximum Speed
+    // @Description: Defines the maximum speed in cm/s which the aircraft will travel horizontally while in loiter mode
+    // @Units: cm/s
+    // @Range: 20 2000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("SPEED", 7, AC_Loiter, _speed_cms, LOITER_SPEED_DEFAULT),
+
+    // @Param: ACC_MAX
+    // @DisplayName: Loiter maximum correction acceleration
+    // @Description: Loiter maximum correction acceleration in cm/s/s.  Higher values cause the copter to correct position errors more aggressively.
+    // @Units: cm/s/s
+    // @Range: 100 981
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("ACC_MAX", 8, AC_Loiter, _accel_cmss, LOITER_ACCEL_MAX_DEFAULT),
 
     AP_GROUPEND
 };
@@ -89,10 +90,6 @@ AC_Loiter::AC_Loiter(const AP_InertialNav& inav, const AP_AHRS_View& ahrs, AC_Po
 void AC_Loiter::init_target(const Vector3f& position)
 {
     sanity_check_params();
-
-    // initialise pos controller speed, acceleration
-    _pos_control.set_max_speed_xy(LOITER_VEL_CORRECTION_MAX);
-    _pos_control.set_max_accel_xy(_accel_cmss);
 
     // initialise desired acceleration and angles to zero to remain on station
     _predicted_accel.zero();
@@ -119,11 +116,6 @@ void AC_Loiter::init_target()
     const Vector3f& curr_vel = _inav.get_velocity();
 
     sanity_check_params();
-
-    // initialise pos controller speed and acceleration
-    _pos_control.set_max_speed_xy(LOITER_VEL_CORRECTION_MAX);
-    _pos_control.set_max_accel_xy(_accel_cmss);
-    _pos_control.set_leash_length_xy(LOITER_POS_CORRECTION_MAX);
 
     _predicted_accel = _desired_accel;
     // update angle targets that will be passed to stabilize controller
@@ -211,10 +203,6 @@ void AC_Loiter::update()
         dt = 0.0f;
     }
 
-    // initialise pos controller speed and acceleration
-    _pos_control.set_max_speed_xy(_speed_cms);
-    _pos_control.set_max_accel_xy(_accel_cmss);
-
     calc_desired_velocity(dt);
     _pos_control.update_xy_controller();
 }
@@ -244,10 +232,6 @@ void AC_Loiter::calc_desired_velocity(float nav_dt)
     if (nav_dt < 0) {
         return;
     }
-
-    _pos_control.set_max_speed_xy(gnd_speed_limit_cms);
-    _pos_control.set_max_accel_xy(_accel_cmss);
-    _pos_control.set_leash_length_xy(LOITER_POS_CORRECTION_MAX);
 
     // get loiters desired velocity from the position controller where it is being stored.
     const Vector3f &desired_vel_3d = _pos_control.get_desired_velocity();
