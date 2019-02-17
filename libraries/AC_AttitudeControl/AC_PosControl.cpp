@@ -276,6 +276,23 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_VELZ_FF",  24, AC_PosControl, _vz_to_thr_gain, 0.0f),
 
+    // @Param: _SPEED
+    // @DisplayName: Horizontal Maximum Speed
+    // @Description: Defines the maximum speed in cm/s which the controller will demand
+    // @Units: cm/s
+    // @Range: 20 2000
+    // @Increment: 50
+    // @User: Standard
+    AP_GROUPINFO("_SPEED", 25, AC_PosControl, _max_speed_xy_cms, 1500.0f),
+
+    // @Param: _ACC_MAX
+    // @DisplayName: Horizontal maximum acceleration
+    // @Description: Maximum correction acceleration in cm/s/s which the controller will demand.
+    // @Units: cm/s/s
+    // @Range: 100 1000
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("_ACC_MAX", 26, AC_PosControl, _max_accel_xy_cmss, 1000.0f),
 
     AP_GROUPEND
 };
@@ -1291,7 +1308,7 @@ void AC_PosControl::calc_leash_length_xy()
 {
     // todo: remove _flags.recalc_leash_xy or don't call this function after each variable change.
     if (_flags.recalc_leash_xy) {
-        _leash = calc_leash_length(_speed_cms, _accel_cms, _p_pos_xy.kP());
+        _leash = calc_leash_length(_max_speed_xy_cms, _max_accel_xy_cmss, _p_pos_xy.kP());
         _flags.recalc_leash_xy = false;
     }
 }
@@ -1361,7 +1378,7 @@ void AC_PosControl::run_xy_controller(float dt)
             _pos_target.y = curr_pos.y + _pos_error.y;
         }
 
-        _vel_target = sqrt_controller(_pos_error, kP, _accel_cms);
+        _vel_target = sqrt_controller(_pos_error, kP, _max_accel_xy_cmss);
     }
 
     // add velocity feed-forward

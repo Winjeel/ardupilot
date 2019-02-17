@@ -404,8 +404,9 @@ protected:
     AP_Float    _landed_pitch;          // Landed detector wing pitch angle threshold (rad)
     AP_Float    _landed_accel;          // Landed detector accceleration threshold
     AP_Float    _drag_brake_g_thrhld;   // Rotor drag brake threshold (g)
-   AP_Float     _vz_to_thr_gain;        // Gain from climb rate demand to normalised throttle 1/(m/s)
-
+    AP_Float    _vz_to_thr_gain;        // Gain from climb rate demand to normalised throttle 1/(m/s)
+    AP_Float    _max_speed_xy_cms;      // Horizontal speed demand limit used by control loop (cm/s) 
+    AP_Float    _max_accel_xy_cmss;     // Horizontal acceleration demand limit used by control loop (cm/s/s)
 
     // internal variables
     float       _dt;                    // time difference (in seconds) between calls from the main program
@@ -413,10 +414,10 @@ protected:
     uint32_t    _last_update_z_ms;      // system time of last update_z_controller call
     float       _speed_down_cms;        // max descent rate in cm/s
     float       _speed_up_cms;          // max climb rate in cm/s
-    float       _speed_cms;             // max horizontal speed in cm/s
+    float       _speed_cms;             // max horizontal speed in cm/s used to set controller demands
     float       _accel_z_cms;           // max vertical acceleration in cm/s/s
     float       _accel_last_z_cms;      // max vertical acceleration in cm/s/s
-    float       _accel_cms;             // max horizontal acceleration in cm/s/s
+    float       _accel_cms;             // max horizontal acceleration in cm/s/s used to set controller demands
     float       _leash;                 // horizontal leash length in cm.  target will never be further than this distance from the vehicle
     float       _leash_down_z;          // vertical leash down in cm.  target will never be further than this distance below the vehicle
     float       _leash_up_z;            // vertical leash up in cm.  target will never be further than this distance above the vehicle
