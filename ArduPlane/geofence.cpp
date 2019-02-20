@@ -302,9 +302,9 @@ void Plane::geofence_check(bool altitude_check_only)
             sink_high = (hagl_m / MAX(velned.z, 0.001f)) < 3.0f;
         }
 
-        // switch to QHOVER and indicate control lost so that switchover is immediate
+        // switch to QLOITER and indicate control lost so that switchover is immediate
         if (hgt_low || sink_high) {
-            set_mode(QHOVER, MODE_REASON_FENCE_BREACH);
+            set_mode(QLOITER, MODE_REASON_FENCE_BREACH);
             // declare loss of control to force immediate transition into VTOL and use of the attitude recovery gains and throttle
             quadplane.control_loss_declared = true;
             quadplane.time_control_lost_ms = AP_HAL::millis();
