@@ -117,7 +117,15 @@ void Plane::calc_airspeed_errors()
             float dt = 0.001f * (millis() - time_aspd_tgt_set_ms);
             if (dt < 0.2f) {
                 // Change set point at up to 100 cm/s/s when stick is at full deflection - note throttle_input returns a integer value between +-100
-                target_airspeed_cm += dt * (float)get_throttle_input();
+                // Use a large dead-zone to avoid responding to inadvertent fore/aft stick movements when lateral stick inputs are being used to turn.
+                float stick_pcnt = (float)get_throttle_input();
+                float fwd_accel_dem_cmss = 0.0f;
+                if (stick_pcnt > 50.0f) {
+                    fwd_accel_dem_cmss = 2.0f * (stick_pcnt - 50.0f);
+                } else if (stick_pcnt < -50.0f) {
+                    fwd_accel_dem_cmss = 2.0f * (stick_pcnt + 50.0f);
+                }
+                target_airspeed_cm += dt * fwd_accel_dem_cmss;
             }
         }
         time_aspd_tgt_set_ms = millis();
