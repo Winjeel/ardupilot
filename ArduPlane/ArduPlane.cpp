@@ -808,6 +808,9 @@ void Plane::update_navigation()
                 float time_delta = constrain_float(0.001f * (float)(millis() - loiter.last_update_ms), 0.0f, 0.1f);
                 location_offset(next_WP_loc, time_delta * plane.loiter.velNE.x, time_delta * plane.loiter.velNE.y);
 
+                // Enable terrain following
+                next_WP_loc.flags.terrain_alt = true;
+
                 // The up/down buttons are mapped to throttle channel and used to make the target location move up or down
                 float control_min = 0.0f;
                 float control_mid = 0.0f;
