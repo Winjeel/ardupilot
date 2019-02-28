@@ -142,6 +142,25 @@ void Quaternion::from_euler(float roll, float pitch, float yaw)
     q4 = cr2*cp2*sy2 - sr2*sp2*cy2;
 }
 
+/*
+Create a quaternion from Euler angles using a 312 Tait-Bryan convention where the 
+rotation order is yaw->roll->pitch instead of the usual yaw->pitch->roll.
+*/
+void Quaternion::from_euler_312(float roll, float pitch, float yaw)
+{
+    float cr2 = cosf(roll*0.5f);
+    float cp2 = cosf(pitch*0.5f);
+    float cy2 = cosf(yaw*0.5f);
+    float sr2 = sinf(roll*0.5f);
+    float sp2 = sinf(pitch*0.5f);
+    float sy2 = sinf(yaw*0.5f);
+
+    q1 = cp2*cr2*cy2 - sp2*sr2*sy2;
+    q2 = cp2*cy2*sr2 - cr2*sp2*sy2;
+    q3 = cr2*cy2*sp2 + cp2*sr2*sy2;
+    q4 = cp2*cr2*sy2 + cy2*sp2*sr2;
+}
+
 // create a quaternion from Euler angles
 void Quaternion::from_vector312(float roll ,float pitch, float yaw)
 {
@@ -276,12 +295,18 @@ void Quaternion::to_euler(float &roll, float &pitch, float &yaw) const
     yaw = get_euler_yaw();
 }
 
-// create eulers from a quaternion
+// create eulers for a 312 (z,x,y) intrinisic rotation sequence from the quaternion
 Vector3f Quaternion::to_vector312(void) const
 {
-    Matrix3f m;
-    rotation_matrix(m);
-    return m.to_euler312();
+    float q1_sq = sq(q1);
+    float q2_sq = sq(q2);
+    float q3_sq = sq(q3);
+    float q4_sq = sq(q4);
+    Vector3f ret;
+    ret.x = asinf(2.0f * (q1*q2 + q3*q4));
+    ret.y = atan2f(2.0f * (q1*q3 - q2*q4) , (q1_sq - q2_sq - q3_sq + q4_sq));
+    ret.z = atan2f(2.0f * (q1*q4 - q2*q3) , (q1_sq - q2_sq + q3_sq - q4_sq));
+    return ret;
 }
 
 float Quaternion::length(void) const

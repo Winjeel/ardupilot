@@ -76,6 +76,12 @@ public:
     // create a quaternion from Euler angles
     void        from_euler(float roll, float pitch, float yaw);
 
+    /*
+    Create a quaternion from Euler angles using a 312 Tait-Bryan convention where the 
+    rotation order is yaw->roll->pitch instead of the usual yaw->pitch->roll.
+    */
+    void from_euler_312(float roll, float pitch, float yaw);
+
     void        from_vector312(float roll ,float pitch, float yaw);
 
     void to_axis_angle(Vector3f &v);
