@@ -998,7 +998,7 @@ void QuadPlane::multicopter_attitude_rate_update(float yaw_rate_cds)
              attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
         } else {
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      ahrs_view->pitch_sensor,
+                                                                      ahrs_view->get_pitch_312_rotor(),
                                                                       yaw_rate_cds);
         }
     } else {
@@ -1327,7 +1327,7 @@ void QuadPlane::control_loiter()
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
     } else {
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                  ahrs_view->pitch_sensor,
+                                                                  ahrs_view->get_pitch_312_rotor(),
                                                                   get_desired_yaw_rate_cds());
     }
 
@@ -1730,7 +1730,7 @@ void QuadPlane::update_transition_to_fw(void)
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
         } else {
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      ahrs_view->pitch_sensor,
+                                                                      ahrs_view->get_pitch_312_rotor(),
                                                                       0);}
         attitude_control->set_throttle_out((motors->get_throttle_hover() + 0.1f), true, 0);
         break;
@@ -2528,7 +2528,7 @@ void QuadPlane::vtol_position_controller(void)
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
         } else {
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                             ahrs_view->pitch_sensor,
+                                                                             ahrs_view->get_pitch_312_rotor(),
                                                                              desired_auto_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
         }
         if (plane.auto_state.wp_proportion >= 1 ||
@@ -2579,7 +2579,7 @@ void QuadPlane::vtol_position_controller(void)
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
         } else {
             attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                          ahrs_view->pitch_sensor,
+                                                                          ahrs_view->get_pitch_312_rotor(),
                                                                           get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
         }
         break;
@@ -2788,7 +2788,7 @@ void QuadPlane::takeoff_controller(void)
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(0,0,0.0f);
     } else {
         attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                      ahrs_view->pitch_sensor,
+                                                                      ahrs_view->get_pitch_312_rotor(),
                                                                       get_pilot_input_yaw_rate_cds() + get_weathervane_yaw_rate_cds());
     }
 
@@ -2831,7 +2831,7 @@ void QuadPlane::waypoint_controller(void)
     
     // call attitude controller
     attitude_control->input_euler_angle_roll_pitch_yaw(wp_nav->get_roll(),
-                                                       wp_nav->get_pitch(),
+                                                       ahrs_view->get_pitch_312_rotor(),
                                                        wp_nav->get_yaw(),
                                                        true);
     // nav roll and pitch are controller by loiter controller
