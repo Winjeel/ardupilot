@@ -407,6 +407,7 @@ protected:
     AP_Float    _vz_to_thr_gain;        // Gain from climb rate demand to normalised throttle 1/(m/s)
     AP_Float    _max_speed_xy_cms;      // Horizontal speed demand limit used by control loop (cm/s) 
     AP_Float    _max_accel_xy_cmss;     // Horizontal acceleration demand limit used by control loop (cm/s/s)
+    AP_Float    _landed_hspd;           // Landed detector horizontal speed threshold (m/s).
 
     // internal variables
     float       _dt;                    // time difference (in seconds) between calls from the main program

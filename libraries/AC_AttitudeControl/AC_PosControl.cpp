@@ -294,6 +294,15 @@ const AP_Param::GroupInfo AC_PosControl::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("_ACC_MAX", 26, AC_PosControl, _max_accel_xy_cmss, 1000.0f),
 
+    // @Param: _LAND_HSPD
+    // @DisplayName: Landed detector horizontal speed threshold.
+    // @Description: Defines the maximum horizontal speed in m/s, above which the landed detector is disabled.
+    // @Range: 0.3 1.5
+    // @Units: m/s
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("_LAND_HSPD",  27, AC_PosControl, _landed_hspd, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -840,7 +849,10 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
 
         // Check if a touchdown is expected and if detected, set fwd and lateral g demands to zero
-        if ((now - _land_expect_time_ms) < 1000) {
+        // Don't run test if horizontal velocity exceeds limits to prevent false triggering causing 
+        // loss of position hold during descent in high wind turbulent conditions
+        float hspd_sq = sq(curr_vel.x) + sq(curr_vel.y);
+        if (((now - _land_expect_time_ms) < 1000) && (hspd_sq < sq(100.0f * _landed_hspd))) {
 
             // wing pitch rate on touchdown
             float pitch_rate_mag = fabsf(_ahrs_wing.get_gyro_latest().y);
