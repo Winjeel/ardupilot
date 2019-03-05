@@ -696,11 +696,11 @@ static const struct defaults_struct defaults_table[] = {
     { "Q_A_RAT_PIT_I",    0.25 },
     { "Q_A_RAT_PIT_FILT", 10.0 },
     { "Q_M_SPOOL_TIME",   0.25 },
-    { "Q_LOIT_ANG_MAX",   15.0 },
+    { "Q_LOIT_ANG_MAX",   0.0 },
     { "Q_LOIT_ACC_MAX",   250.0 },
-    { "Q_LOIT_BRK_ACCEL", 50.0 },
+    { "Q_LOIT_BRK_ACCEL", 100.0 },
     { "Q_LOIT_BRK_JERK",  250 },
-    { "Q_LOIT_SPEED",     500 },
+    { "Q_LOIT_SPEED",    500 },
 };
 
 /*
