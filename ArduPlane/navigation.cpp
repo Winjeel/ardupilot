@@ -110,7 +110,7 @@ void Plane::calc_airspeed_errors()
     // airspeed target
     if (!failsafe.rc_failsafe
             && (quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()
-            && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == AUTO || control_mode == RTL || control_mode == LOITER)) {
+            && (control_mode == FLY_BY_WIRE_B || control_mode == CRUISE || control_mode == RTL || control_mode == LOITER)) {
         // corvo controller requires throttle stick deflection to be integrated so that speed is held when stick is centered
         // allow the operator to adjust speed in all auto-throttle modes
         if ((time_aspd_tgt_set_ms != 0)) {
