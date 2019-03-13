@@ -448,6 +448,7 @@ void Plane::do_loiter_unlimited(const AP_Mission::Mission_Command& cmd)
     location_sanitize(current_loc, cmdloc);
     set_next_WP(cmdloc);
     loiter_set_direction_wp(cmd);
+    loiter.override_radius = cmd.p1;
 }
 
 void Plane::do_loiter_turns(const AP_Mission::Mission_Command& cmd)
