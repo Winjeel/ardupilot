@@ -428,7 +428,7 @@ void Plane::set_mode(enum FlightMode mode, mode_reason_t reason)
         // Ensure we have a basic mission plan when selecting AUTO before flight
         if ((quadplane.frame_class == AP_Motors::MOTOR_FRAME_TVBS)
                 && !arming.is_armed()) {
-            if (create_default_mission()) {
+            if (create_default_mission(false)) {
                 // reset index to start
                 plane.mission.reset();
             } else {
@@ -557,8 +557,9 @@ void Plane::exit_mode(enum FlightMode mode)
 }
 
 // returns true if a valid mission is already loaded or has been created
+// overwrite argument forces any pre-existing mission plan to be overwritten
 // returns false if mission creation failed
-bool Plane::create_default_mission()
+bool Plane::create_default_mission(bool overwrite)
 {
     // Basic check that the first waypoint is a VTOL takeoff and there is more than one waypoint
     bool has_mission = false;
@@ -567,7 +568,7 @@ bool Plane::create_default_mission()
         has_mission = (cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF) && (plane.mission.num_commands() > 1);
     }
 
-    if (!has_mission && ahrs.home_is_set()) {
+    if ((!has_mission || overwrite) && ahrs.home_is_set()) {
         // clear mission
         plane.mission.clear();
 

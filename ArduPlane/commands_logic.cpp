@@ -128,7 +128,13 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
     case MAV_CMD_DO_SET_HOME:
-        do_set_home(cmd);
+        {
+            do_set_home(cmd);
+            if (is_flying() && !quadplane.is_flying_vtol()) {
+                // create minimum mission plan required to land at home position
+                plane.create_default_mission(true);
+            }
+        }
         break;
 
     case MAV_CMD_DO_INVERTED_FLIGHT:

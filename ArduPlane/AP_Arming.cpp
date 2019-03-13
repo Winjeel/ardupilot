@@ -63,7 +63,7 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
         ret = false;
     }
 
-    if (!plane.create_default_mission()) {
+    if (!plane.create_default_mission(false)) {
         check_failed(ARMING_CHECK_NONE, display_failure, "Mission Creation Failed");
         ret = false;
     }
