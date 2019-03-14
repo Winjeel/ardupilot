@@ -117,7 +117,7 @@ void AP_Arming_Plane::check_shake_to_arm(void)
         /*
      Special case handling of Corvo X - shake up and down TKOFF_ACCEL_CNT times to place into AUTO mode and arm
     */
-    if (plane.quadplane.is_corvo_x_control_type() && RC_Channels::has_active_overrides() && !plane.arming.is_armed()) {
+    if (plane.quadplane.is_corvo_x_control_type() && !plane.arming.is_armed()) {
         /*
         This section of code enables the vehicle to be placed into AUTO, armed and flow with a default mission plan without
         requiring any operator interaction with the hand controller or GCS. To do this the operator needs to follow a sequence:
