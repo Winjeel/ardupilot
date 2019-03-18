@@ -173,7 +173,7 @@ const AP_Param::GroupInfo AC_AttitudeControl::var_info[] = {
     // @Values: 0:Use 321, 1:Use 312
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("USE_EUL_312",  24, AC_AttitudeControl, _use_eul_312, 0),
+    AP_GROUPINFO("USE_EUL_312",  24, AC_AttitudeControl, _use_eul_312, 1),
 
     AP_GROUPEND
 };
@@ -298,6 +298,9 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
     float euler_pitch_angle = radians(euler_pitch_angle_cd*0.01f);
     float euler_yaw_rate = radians(euler_yaw_rate_cds*0.01f);
 
+    // TVBS customisation - ensure target quaternion is always consistent with demand which is slaved to estimated rotor tilt.
+    _attitude_target_euler_angle.y = euler_pitch_angle;
+
     // calculate the attitude target state euler angles
     if (_use_eul_312 == 1) {
         _attitude_target_euler_angle = _attitude_target_quat.to_vector312();
@@ -331,6 +334,9 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_euler_rate_yaw(float euler
         // Convert body-frame angular velocity into euler angle derivative of desired attitude
         ang_vel_to_euler_rate(_attitude_target_euler_angle, _attitude_target_ang_vel, _attitude_target_euler_rate);
 
+        // TVBS customisation - ensure target quaternion is always consistent with demand which is slaved to estimated rotor tilt.
+        _attitude_target_euler_angle.y = euler_pitch_angle;
+
     } else {
         // When feedforward is not enabled, the target euler angle is input into the target and the feedforward rate is zeroed.
         _attitude_target_euler_angle.x = euler_roll_angle;
@@ -356,8 +362,8 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_yaw(float euler_roll_angle
     float euler_pitch_angle = radians(euler_pitch_angle_cd*0.01f);
     float euler_yaw_angle = radians(euler_yaw_angle_cd*0.01f);
 
-    // calculate the attitude target euler angles
-    _attitude_target_quat.to_euler(_attitude_target_euler_angle.x, _attitude_target_euler_angle.y, _attitude_target_euler_angle.z);
+    // TVBS customisation - ensure target quaternion is always consistent with demand which is slaved to estimated rotor tilt.
+    _attitude_target_euler_angle.y = euler_pitch_angle;
 
     // Add roll trim to compensate tail rotor thrust in heli (will return zero on multirotors)
     euler_roll_angle += get_roll_trim_rad();
@@ -384,6 +390,10 @@ void AC_AttitudeControl::input_euler_angle_roll_pitch_yaw(float euler_roll_angle
 
         // Convert body-frame angular velocity into euler angle derivative of desired attitude
         ang_vel_to_euler_rate(_attitude_target_euler_angle, _attitude_target_ang_vel, _attitude_target_euler_rate);
+
+        // TVBS customisation - ensure target quaternion is always consistent with demand which is slaved to estimated rotor tilt.
+        _attitude_target_euler_angle.y = euler_pitch_angle;
+
     } else {
         // When feedforward is not enabled, the target euler angle is input into the target and the feedforward rate is zeroed.
         _attitude_target_euler_angle.x = euler_roll_angle;
@@ -975,7 +985,10 @@ float AC_AttitudeControl::rate_target_to_motor_yaw(float rate_actual_rads, float
     float rate_error_rads = rate_target_rads - rate_actual_rads;
 
     // pass error to PID controller
-    get_rate_yaw_pid().set_input_filter_all(rate_error_rads);
+    // TVBS customisation - don't apply LPF to P and I terms
+    get_rate_yaw_pid().set_input_filter_d(rate_error_rads);
+
+    // pass demanded rate to PID controller for use by FF term.
     get_rate_yaw_pid().set_desired_rate(rate_target_rads);
 
     float integrator = get_rate_yaw_pid().get_integrator();
