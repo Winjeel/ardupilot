@@ -368,6 +368,7 @@ protected:
     AP_Float    _fwd_lean_angle_max;    // maximum forward tilt in deg
     AP_Float    _aft_lean_angle_max;    // maximum rearwards tilt in deg
     AP_Float    _lat_lean_angle_max;    // maximum lateral tilt in deg
+    AP_Int8     _use_eul_312;           // Set to 1 when inputs are using a Euler angle 312 rotation order
 
     // Angle limit time constant (to maintain altitude)
     AP_Float            _angle_limit_tc;
