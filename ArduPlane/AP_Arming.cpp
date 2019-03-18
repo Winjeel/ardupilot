@@ -147,7 +147,7 @@ void AP_Arming_Plane::check_shake_to_arm(void)
         // integrate the X gyro and washout resulting angle to that it decays to zero over a 1 second time constant
         Vector3f gyro_rate = plane.ahrs.get_gyro();
         shake_to_fly.ang_rot_x_hpf += gyro_rate.x * dt;
-        const float ang_lim_rad = radians(45.0f);
+        const float ang_lim_rad = radians(30.0f);
         shake_to_fly.ang_rot_x_hpf = constrain_float(shake_to_fly.ang_rot_x_hpf, -ang_lim_rad, ang_lim_rad);
         const float hpf_tconst = 1.0f;
         float hpf_coef = 1.0f - (dt / hpf_tconst);
