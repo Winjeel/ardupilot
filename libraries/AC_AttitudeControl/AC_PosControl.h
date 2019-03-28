@@ -458,6 +458,7 @@ protected:
     uint32_t _land_pitch_ang_time_ms;   // last time a landed wing pitch angle was detected (msec)
     uint32_t _land_accz_time_ms;        // last time a landed accel shock was detected (msec)
     bool _is_landed;                    // true when landed detection has activated and rotors are being held vertical
+    LowPassFilterFloat _vel_dem_deriv_filter; // low-pass-filter on z-axis velocity demand derivative
 
     LowPassFilterVector2f _accel_target_filter; // acceleration target filter
 
