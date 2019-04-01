@@ -942,9 +942,8 @@ void AC_PosControl::calc_roll_pitch_throttle()
 
         // rotate the thrust vector and adjust the magnitude to maintain lift and achieve the required forward acceleration
         // calculate the roll assuming only rotor  provides significant force in that direction
-        float cos_pitch_target = cosf(pitch_target_rad);
         _pitch_target_cd = 100.0f *  degrees(pitch_target_rad);
-        _roll_target_cd = degrees(atanf(right_g_posctl * cos_pitch_target)) ;
+        _roll_target_cd = degrees(right_g_posctl) ;
         _roll_target_cd = 100.0f * constrain_float(_roll_target_cd, -_attitude_control.lean_angle_max_lat(), _attitude_control.lean_angle_max_lat());
 
 
