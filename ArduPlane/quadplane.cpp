@@ -3278,35 +3278,40 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
         is_flying_backwards = (plane.channel_pitch->get_control_in() < 0) && (AP::ins().get_accel().z < -1.0f);
 
     }
-    // determine if the pilot has input a yaw or roll input in the last 3 seconds
-    // also check if the pilot is flying backwards relative to the desired wind relative yaw
-    if (plane.channel_rudder->get_control_in() != 0
-            || plane.channel_roll->get_control_in() != 0
-            || is_flying_backwards) {
-        weathervane.last_pilot_input_ms = AP_HAL::millis();
-        weathervane.last_output = 0.0f;
-    }
 
-    // reduce the gain when the pilot is attempting to yaw, move sideways or move backwards
-    float gain_modifier_input = 1.0f - constrain_float(fabsf(plane.channel_roll->get_control_in() / 4500.0f),0.0f,1.0f);
-    gain_modifier_input *= 1.0f - constrain_float(fabsf(plane.channel_rudder->get_control_in() / 4500.0f),0.0f,1.0f);
-    gain_modifier_input *= 1.0f - constrain_float((plane.channel_pitch->get_control_in() / 4500.0f),0.0f,1.0f);
-
-    const float recovery_rate = 0.25f;
-    if (AP_HAL::millis() - weathervane.last_pilot_input_ms > 3000) {
-        float max_increment = delta_time * recovery_rate;
-        gain_modifier_input = 1.0f;
-        if (gain_modifier_input - weathervane.gain_modifier > max_increment) {
-            weathervane.gain_modifier += max_increment;
-        } else {
-            weathervane.gain_modifier = gain_modifier_input;
-        }
+    if (in_vtol_auto()) {
+        // when operating under automatic position control, it is better to always yaw into wind 
+        weathervane.gain_modifier = 1.0f;
     } else {
-        float max_increment = delta_time * recovery_rate * 0.1f;
-        if (gain_modifier_input - weathervane.gain_modifier > max_increment) {
-            weathervane.gain_modifier += max_increment;
+        // determine if the pilot has input a yaw or roll input in the last 3 seconds
+        // also check if the pilot is flying backwards relative to the desired wind relative yaw
+        if (plane.channel_rudder->get_control_in() != 0
+                || plane.channel_roll->get_control_in() != 0
+                || is_flying_backwards) {
+            weathervane.last_pilot_input_ms = AP_HAL::millis();
+            weathervane.last_output = 0.0f;
+        }
+        // reduce the gain when the pilot is attempting to yaw, move sideways or move backwards
+        float gain_modifier_input = 1.0f - constrain_float(fabsf(plane.channel_roll->get_control_in() / 4500.0f),0.0f,1.0f);
+        gain_modifier_input *= 1.0f - constrain_float(fabsf(plane.channel_rudder->get_control_in() / 4500.0f),0.0f,1.0f);
+        gain_modifier_input *= 1.0f - constrain_float((plane.channel_pitch->get_control_in() / 4500.0f),0.0f,1.0f);
+
+        const float recovery_rate = 0.25f;
+        if (AP_HAL::millis() - weathervane.last_pilot_input_ms > 3000) {
+            float max_increment = delta_time * recovery_rate;
+            gain_modifier_input = 1.0f;
+            if (gain_modifier_input - weathervane.gain_modifier > max_increment) {
+                weathervane.gain_modifier += max_increment;
+            } else {
+                weathervane.gain_modifier = gain_modifier_input;
+            }
         } else {
-            weathervane.gain_modifier = gain_modifier_input;
+            float max_increment = delta_time * recovery_rate * 0.1f;
+            if (gain_modifier_input - weathervane.gain_modifier > max_increment) {
+                weathervane.gain_modifier += max_increment;
+            } else {
+                weathervane.gain_modifier = gain_modifier_input;
+            }
         }
     }
 
@@ -3389,7 +3394,7 @@ float QuadPlane::get_weathervane_yaw_rate_cds(void)
     if (plane.vtolCameraControlMode
             && (tailsitter.tvbs_yaw_gain > 0.1f)
             && !weathervane.payload_yaw_lockout) {
-        // When flying in a VTOL mode where the operator is panning the payload mount, yaw the vehicle to driv misalignment between
+        // When flying in a VTOL mode where the operator is panning the payload mount, yaw the vehicle to drive misalignment between
         // payload and vehicle to zero which enables yaw pointing of payloads with limited angular motion, eg roll tilt gimbals
         yaw_rate_dem_cd = 100.0f * constrain_float(tailsitter.tvbs_yaw_gain * degrees(wrap_PI(plane.camera_mount.get_ef_yaw() - ahrs_view->yaw)), -yaw_rate_max, yaw_rate_max);
     } else {
