@@ -215,8 +215,9 @@ void AP_Arming_Plane::check_shake_to_arm(void)
         } else if ((shake_to_fly.shake_pass_time_ms == 0)
                    && (shake_to_fly.up_shake_count >= plane.g2.takeoff_throttle_accel_count)
                    && (shake_to_fly.down_shake_count >= plane.g2.takeoff_throttle_accel_count)) {
-            // if completed enough shakes, then record test completion time and place vehicle into AUTO mode
+            // if completed enough shakes, then record test completion time, create default mission and place vehicle into AUTO mode
             shake_to_fly.shake_pass_time_ms = now_ms;
+            plane.create_default_mission(true);
             plane.set_mode(AUTO, MODE_REASON_SHAKE_TO_LAUNCH);
         }
 
