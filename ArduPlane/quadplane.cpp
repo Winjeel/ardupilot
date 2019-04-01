@@ -2143,12 +2143,12 @@ void QuadPlane::launch_recovery_zone_logic(void) {
                     // position controller has detected a touchdown condition
                     land_criteria_count++;
                 }
-                if ((AP_HAL::millis() - _no_descent_demand_ms) > 4000) {
-                    // descend button held for more than than 3 seconds
+                if (((AP_HAL::millis() - _no_descent_demand_ms) > 4000) || !in_vtol_auto()) {
+                    // descend button held for more than than 3 seconds or in AUTO
                     land_criteria_count++;
                 }
-                if ((AP_HAL::millis() - _pitch_stick_moved_ms) > 4000) {
-                    // no pilot stick input
+                if (((AP_HAL::millis() - _pitch_stick_moved_ms) > 4000) || !in_vtol_auto()) {
+                    // no pilot stick movement or in AUTO
                     land_criteria_count++;
                 }
                 if (land_criteria_count == 3) {
