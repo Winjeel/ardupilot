@@ -571,6 +571,7 @@ bool Plane::create_default_mission(bool overwrite)
     if ((!has_mission || overwrite) && ahrs.home_is_set()) {
         // clear mission
         plane.mission.clear();
+        plane.mission.set_is_mavlink_mission(false);
 
         // Command #0 : home
         cmd = {};

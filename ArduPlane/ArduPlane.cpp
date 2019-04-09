@@ -309,6 +309,9 @@ void Plane::one_second_loop()
         gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
             last_home_update_ms = gps.last_message_time_ms();
             update_home();
+
+            // update default mission if  nothing loaded from GCS
+            create_default_mission(!mission.get_is_mavlink_mission());
             
             // reset the landing altitude correction
             landing.alt_offset = 0;
