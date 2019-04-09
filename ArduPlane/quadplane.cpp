@@ -2359,7 +2359,7 @@ bool QuadPlane::corvo_takeoff_inhibit(void) const
  */
 void QuadPlane::vtol_position_controller(void)
 {
-    if (!setup()) {
+    if (!setup() || reverse_transition_active) {
         return;
     }
 
