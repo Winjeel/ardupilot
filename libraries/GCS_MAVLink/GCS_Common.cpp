@@ -713,6 +713,10 @@ bool GCS_MAVLINK::handle_mission_item(mavlink_message_t *msg, AP_Mission &missio
         
         seq = packet.seq;
         current = packet.current;
+
+        // Record that we have accepted a mission item from the GCS
+        mission.set_is_mavlink_mission(true);
+
     } else {
         mavlink_mission_item_int_t packet;
         mavlink_msg_mission_item_int_decode(msg, &packet);
