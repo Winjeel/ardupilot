@@ -87,6 +87,9 @@ void AP_Landing_VTOL::do_land(const AP_Mission::Mission_Command& cmd, const floa
     float vec_arg = atan2f(-wind.y, -wind.x);
     Vector2f decel_offset_vec = {-_predicted_decel_distance * cosf(vec_arg) , -_predicted_decel_distance * sinf(vec_arg)};
 
+    // Set initial target landing direction to reciprocal of wind vector
+    _target_heading_deg = degrees(vec_arg);
+
     // Increase the loiter radius if necessary to prevent bank angle saturating
     _loiter_radius = landing.nav_controller->loiter_radius(fabsf(landing.aparm.loiter_radius));
 
@@ -140,7 +143,6 @@ void AP_Landing_VTOL::do_land(const AP_Mission::Mission_Command& cmd, const floa
     _timeout_count = 0;
 
     // Iniitalise VTOL entry variables
-    _target_heading_deg = degrees(vec_arg);
     _entry_point = current_loc;
     _approach_vec_unit = location_diff(_entry_point,_landing_point);
     _approach_vec_unit.normalize();
