@@ -590,9 +590,9 @@ bool Plane::create_default_mission(bool overwrite)
             has_mission = true;
         }
 
-        // Command #2 : loiter at max of VTO_LOIT_ALT_M and Q_RTL_ALT for 2 minutes above home location
+        // Command #2 : loiter at max of VTO_LOIT_ALT_M and Q_RTL_ALT for 5 minutes above home location
         cmd.id = MAV_CMD_NAV_LOITER_TIME;
-        cmd.p1 = 120;
+        cmd.p1 = 300; // loiter duration in seconds
         cmd.content.location.alt = plane.home.alt + MAX(cmd.content.location.alt, 100 * (int32_t)plane.g.vto_loiter_alt_m);
         if (plane.mission.add_cmd(cmd)) {
             has_mission = true;
