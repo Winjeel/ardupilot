@@ -284,7 +284,7 @@ public:
         k_param_scaling_speed,
         k_param_quadplane,
         k_param_rtl_radius,
-        k_param_land_then_servos_neutral,   // unused - moved to AP_Landing
+        k_param_roi_guided_radius,
         k_param_rc_15_old,
         k_param_rc_16_old,
 
@@ -390,6 +390,7 @@ public:
     AP_Int16 waypoint_radius;
     AP_Int16 waypoint_max_radius;
     AP_Int16 rtl_radius;
+    AP_Int16 roi_guided_radius;
 
 #if GEOFENCE_ENABLED == ENABLED
     AP_Int8 fence_action;

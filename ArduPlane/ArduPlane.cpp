@@ -799,6 +799,12 @@ void Plane::update_navigation()
     case AVOID_ADSB:
     case GUIDED:
         {
+            // in guided mode mode we use a different radius if specified
+            if (g.roi_guided_radius != 0) {
+                radius = abs(g.roi_guided_radius);
+                loiter.direction = (g.roi_guided_radius < 0) ? -1 : 1;
+            }
+
             // Special case using corvo hand controller where 2-axis stick is used to move ROI NE position and up/down
             // buttons adjust ROI height.
             if ((quadplane.tailsitter.input_type == quadplane.TAILSITTER_CORVOX) && RC_Channels::has_active_overrides()) {
