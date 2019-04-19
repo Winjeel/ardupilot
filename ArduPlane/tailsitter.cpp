@@ -456,16 +456,21 @@ void QuadPlane::tvbs_output(void)
 
     // rate limit the demanded rotor pitch angle
     if (!control_loss_declared) {
-        // keep rotors pointing up during VTOL control of back transition
         float rotor_pitch_demand_input;
+        float delta_limit;
         if (!reverse_transition_active) {
+            // rotor tilt demand is set by pilot or outer control loops during normal operation
             rotor_pitch_demand_input = (float)plane.nav_pitch_cd;
+            delta_limit = 100.0f * (float)tailsitter.tvbs_slew_lim_dps * tvbs_dt_avg;
         } else {
+            // slew rotors to vertical during VTOL control of back transition but use a slew 
+            // rate that can be tuned to avoid rapid rise in rotor drag pitching wing into an 
+            // inverted orientation
             rotor_pitch_demand_input = 0.0f;
+            delta_limit = 100.0f * (float)tailsitter.tvbs_bt_slew_lim_dps * tvbs_dt_avg;
             float recovery_throttle = constrain_float(motors->get_throttle_hover(), 0.5f, 0.9f);
             attitude_control->set_throttle_out(recovery_throttle, true, 0);
         }
-        float delta_limit = 100.0f * (float)tailsitter.tvbs_slew_lim_dps * tvbs_dt_avg;
         if ((rotor_pitch_demand_input - tvbs_pitch_dem_cd) > delta_limit) {
             tvbs_pitch_dem_cd += delta_limit;
         } else if ((rotor_pitch_demand_input - tvbs_pitch_dem_cd) < -delta_limit) {

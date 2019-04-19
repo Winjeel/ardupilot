@@ -677,6 +677,15 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @User: Standard
     AP_GROUPINFO("TVBS_JMP_SPD", 46, QuadPlane, tailsitter.tvbs_jmp_spd, 1.5),
 
+    // @Param: TVBS_BT_SLEW
+    // @DisplayName: Rotor pitch rate limit used during FW to VTOL transition.
+    // @Description: Sets the maximum allowed rate of change of the demanded rotor pitch angle used to rotate the rotor to vertical during transition from FW to VTOL flight. TVBS frame class only.
+    // @Units: deg/sec
+    // @Range: 30 - 240
+    // @Increment: 10
+    // @User: Advanced
+    AP_GROUPINFO("TVBS_BT_SLEW", 47, QuadPlane, tailsitter.tvbs_bt_slew_lim_dps, 40),
+
     AP_GROUPEND
 };
 
