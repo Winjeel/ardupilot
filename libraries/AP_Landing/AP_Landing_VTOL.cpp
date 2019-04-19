@@ -63,12 +63,10 @@ void AP_Landing_VTOL::do_land(const AP_Mission::Mission_Command& cmd, const floa
     // load the landing point in, the rest of path building is deferred for a better wind estimate
     memcpy(&_landing_point, &cmd.content.location, sizeof(Location));
 
-    if (!_landing_point.flags.relative_alt && !_landing_point.flags.terrain_alt) {
-        _approach_alt_offset = cmd.p1;
-        _landing_point.alt += _approach_alt_offset * 100;
-    } else {
-        _approach_alt_offset = 0.0f;
-    }
+    // Use the abort altitude parameter to specity the height offset above landing point that we 
+    // perform the loiter and FW->VTOL transition
+    _approach_alt_offset = cmd.p1;
+    _landing_point.alt += _approach_alt_offset * 100;
 
     // specify the loiter centre which is offset at 90 degrees to the wind by the loiter radius and
     // in the direction of wind by the decel distance.
