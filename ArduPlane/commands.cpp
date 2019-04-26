@@ -51,7 +51,7 @@ void Plane::set_next_WP(const struct Location &loc)
     // location as the previous waypoint, to prevent immediately
     // considering the waypoint complete
     if (location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) {
-        gcs().send_text(MAV_SEVERITY_NOTICE, "Resetting previous waypoint");
+        gcs().send_text(MAV_SEVERITY_INFO, "Resetting previous waypoint");
         prev_WP_loc = current_loc;
     }
 
