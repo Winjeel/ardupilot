@@ -841,9 +841,20 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
                     // cannot use relative altitude if home is not set
                     return MAV_RESULT_FAILED;
                 }
-                new_home_loc.alt += plane.ahrs.get_home().alt;
             }
+
+            // Corvo demo customisation - preserve original home altitude because
+            // we do not yet have GCS that can provide an accurate enough altitude
+            new_home_loc.alt = plane.ahrs.get_home().alt;
+
             plane.set_home(new_home_loc);
+
+            // Corvo customisation
+            if (plane.is_flying() && !plane.quadplane.is_flying_vtol()) {
+                // create minimum mission plan required to land at home position
+                plane.create_default_mission(true);
+            }
+
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
         }
@@ -1051,8 +1062,19 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
             Location new_home_loc {};
             new_home_loc.lat = (int32_t)(packet.param5 * 1.0e7f);
             new_home_loc.lng = (int32_t)(packet.param6 * 1.0e7f);
-            new_home_loc.alt = (int32_t)(packet.param7 * 100.0f);
+
+            // Corvo demo customisation - preserve original home altitude because
+            // we do not yet have GCS that can provide an accurate enough altitude
+            new_home_loc.alt = plane.ahrs.get_home().alt;
+
             plane.set_home(new_home_loc);
+
+            // Corvo customisation
+            if (plane.is_flying() && !plane.quadplane.is_flying_vtol()) {
+                // create minimum mission plan required to land at home position
+                plane.create_default_mission(true);
+            }
+
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
         }
@@ -1418,8 +1440,19 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         Location new_home_loc {};
         new_home_loc.lat = packet.latitude;
         new_home_loc.lng = packet.longitude;
-        new_home_loc.alt = packet.altitude / 10;
+
+        // Corvo demo customisation - preserve original home altitude because
+        // we do not yet have GCS that can provide an accurate enough altitude
+        new_home_loc.alt = plane.ahrs.get_home().alt;
+
         plane.set_home(new_home_loc);
+
+        // Corvo customisation
+        if (plane.is_flying() && !plane.quadplane.is_flying_vtol()) {
+            // create minimum mission plan required to land at home position
+            plane.create_default_mission(true);
+        }
+
         break;
     }
 

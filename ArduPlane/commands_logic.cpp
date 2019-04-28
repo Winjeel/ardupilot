@@ -129,7 +129,14 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
 
     case MAV_CMD_DO_SET_HOME:
         {
-            do_set_home(cmd);
+            // Corvo demo customisation - preserve original home altitude because
+            // we do not yet have GCS that can provide an accurate enough altitude
+            AP_Mission::Mission_Command modified_cmd = cmd;
+            modified_cmd.content.location.alt = ahrs.get_home().alt;
+
+            do_set_home(modified_cmd);
+
+            // Corvo customisation
             if (is_flying() && !quadplane.is_flying_vtol()) {
                 // create minimum mission plan required to land at home position
                 plane.create_default_mission(true);
