@@ -856,11 +856,8 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
             plane.set_home(new_home_loc);
 
             // Corvo customisation
-            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-            if (plane.is_flying() && is_hand_controlled) {
-                // create minimum mission plan required to land at home position
-                plane.create_default_mission(true);
-            }
+            // create minimum mission plan required to land at home position
+            plane.create_default_mission(true);
 
             AP::ahrs().lock_home();
             gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2g");
@@ -1083,11 +1080,8 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
             plane.set_home(new_home_loc);
 
             // Corvo customisation
-            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-            if (plane.is_flying() && is_hand_controlled) {
-                // create minimum mission plan required to land at home position
-                plane.create_default_mission(true);
-            }
+            // create minimum mission plan required to land at home position
+            plane.create_default_mission(true);
 
             AP::ahrs().lock_home();
             gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3e");
@@ -1465,11 +1459,8 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         plane.set_home(new_home_loc);
 
         // Corvo customisation
-        bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-        if (plane.is_flying() && is_hand_controlled) {
-            // create minimum mission plan required to land at home position
-            plane.create_default_mission(true);
-        }
+        // create minimum mission plan required to land at home position
+        plane.create_default_mission(true);
 
         gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 4c");
         break;
