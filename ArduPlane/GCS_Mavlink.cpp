@@ -810,14 +810,17 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
         if (is_equal(packet.param1, 1.0f)) {
             plane.set_home_persistently(AP::gps().location());
             AP::ahrs().lock_home();
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2a");
             return MAV_RESULT_ACCEPTED;
         } else {
             // ensure param1 is zero
             if (!is_zero(packet.param1)) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2ab");
                 return MAV_RESULT_FAILED;
             }
             if ((packet.x == 0) && (packet.y == 0) && is_zero(packet.z)) {
                 // don't allow the 0,0 position
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2c");
                 return MAV_RESULT_FAILED;
             }
             // check frame type is supported
@@ -825,10 +828,12 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
                 packet.frame != MAV_FRAME_GLOBAL_INT &&
                 packet.frame != MAV_FRAME_GLOBAL_RELATIVE_ALT &&
                 packet.frame != MAV_FRAME_GLOBAL_RELATIVE_ALT_INT) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2d");
                 return MAV_RESULT_FAILED;
             }
             // sanity check location
             if (!check_latlng(packet.x, packet.y)) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2e");
                 return MAV_RESULT_FAILED;
             }
             Location new_home_loc {};
@@ -839,6 +844,7 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
             if (packet.frame == MAV_FRAME_GLOBAL_RELATIVE_ALT || packet.frame == MAV_FRAME_GLOBAL_RELATIVE_ALT_INT) {
                 if (!AP::ahrs().home_is_set()) {
                     // cannot use relative altitude if home is not set
+                    gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2f");
                     return MAV_RESULT_FAILED;
                 }
             }
@@ -856,8 +862,10 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
             }
 
             AP::ahrs().lock_home();
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2g");
             return MAV_RESULT_ACCEPTED;
         }
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 2h");
         return MAV_RESULT_FAILED;
 
     case MAV_CMD_DO_REPOSITION: {
@@ -1045,18 +1053,22 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
         if (is_equal(packet.param1,1.0f)) {
             plane.set_home_persistently(AP::gps().location());
             AP::ahrs().lock_home();
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3a");
             return MAV_RESULT_ACCEPTED;
         } else {
             // ensure param1 is zero
             if (!is_zero(packet.param1)) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3b");
                 return MAV_RESULT_FAILED;
             }
             if (is_zero(packet.param5) && is_zero(packet.param6) && is_zero(packet.param7)) {
                 // don't allow the 0,0 position
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3c");
                 return MAV_RESULT_FAILED;
             }
             // sanity check location
             if (!check_latlng(packet.param5,packet.param6)) {
+                gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3d");
                 return MAV_RESULT_FAILED;
             }
             Location new_home_loc {};
@@ -1076,6 +1088,7 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
             }
 
             AP::ahrs().lock_home();
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 3e");
             return MAV_RESULT_ACCEPTED;
         }
         break;
@@ -1431,10 +1444,12 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
         mavlink_msg_set_home_position_decode(msg, &packet);
         if((packet.latitude == 0) && (packet.longitude == 0) && (packet.altitude == 0)) {
             // don't allow the 0,0 position
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 4a");
             break;
         }
         // sanity check location
         if (!check_latlng(packet.latitude,packet.longitude)) {
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 4b");
             break;
         }
         Location new_home_loc {};
@@ -1453,6 +1468,7 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
             plane.create_default_mission(true);
         }
 
+        gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 4c");
         break;
     }
 

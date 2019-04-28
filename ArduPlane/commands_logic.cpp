@@ -133,6 +133,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
             // we do not yet have GCS that can provide an accurate enough altitude
             AP_Mission::Mission_Command modified_cmd = cmd;
             modified_cmd.content.location.alt = ahrs.get_home().alt;
+            gcs().send_text(MAV_SEVERITY_NOTICE, "Setting Home 1");
 
             do_set_home(modified_cmd);
 
