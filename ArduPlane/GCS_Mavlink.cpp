@@ -812,6 +812,12 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
         } else {
+            // Corvo customisation
+            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
+            if (!plane.is_flying() || !is_hand_controlled) {
+                return MAV_RESULT_FAILED;
+            }
+
             // ensure param1 is zero
             if (!is_zero(packet.param1)) {
                 return MAV_RESULT_FAILED;
@@ -849,12 +855,8 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_int_packet(const mavlink_command_in
 
             plane.set_home(new_home_loc);
 
-            // Corvo customisation
-            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-            if (plane.is_flying() && is_hand_controlled) {
-                // create minimum mission plan required to land at home position
-                plane.create_default_mission(true);
-            }
+            // Corvo customisation - create minimum mission plan required to land at home location
+            plane.create_default_mission(true);
 
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
@@ -1048,6 +1050,12 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
         } else {
+            // Corvo customisation
+            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
+            if (!plane.is_flying() || !is_hand_controlled) {
+                return MAV_RESULT_FAILED;
+            }
+
             // ensure param1 is zero
             if (!is_zero(packet.param1)) {
                 return MAV_RESULT_FAILED;
@@ -1070,12 +1078,8 @@ MAV_RESULT GCS_MAVLINK_Plane::handle_command_long_packet(const mavlink_command_l
 
             plane.set_home(new_home_loc);
 
-            // Corvo customisation
-            bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-            if (plane.is_flying() && is_hand_controlled) {
-                // create minimum mission plan required to land at home position
-                plane.create_default_mission(true);
-            }
+            // Corvo customisation - create minimum mission plan required to land at home location
+            plane.create_default_mission(true);
 
             AP::ahrs().lock_home();
             return MAV_RESULT_ACCEPTED;
@@ -1429,6 +1433,12 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
 
     case MAVLINK_MSG_ID_SET_HOME_POSITION:
     {
+        // Corvo customisation
+        bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
+        if (!plane.is_flying() || !is_hand_controlled) {
+            break;
+        }
+
         mavlink_set_home_position_t packet;
         mavlink_msg_set_home_position_decode(msg, &packet);
         if((packet.latitude == 0) && (packet.longitude == 0) && (packet.altitude == 0)) {
@@ -1449,12 +1459,8 @@ void GCS_MAVLINK_Plane::handleMessage(mavlink_message_t* msg)
 
         plane.set_home(new_home_loc);
 
-        // Corvo customisation
-        bool is_hand_controlled = (plane.control_mode == QLOITER) || (plane.control_mode == CRUISE) || (plane.control_mode == GUIDED);
-        if (plane.is_flying() && is_hand_controlled) {
-            // create minimum mission plan required to land at home position
-            plane.create_default_mission(true);
-        }
+        // Corvo customisation - create minimum mission plan required to land at home location
+        plane.create_default_mission(true);
 
         break;
     }
