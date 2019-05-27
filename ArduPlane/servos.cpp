@@ -408,9 +408,13 @@ void Plane::set_servos_controlled(void)
         min_throttle = 0;
     }
     
+    // scale throttle for density and voltage variations
+    float throttle_scaler = Plane::calc_fwd_compensation_gain();
+    float throttle_rescaled = throttle_scaler * (float)SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
+    SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, (int16_t)throttle_rescaled);
+
     // apply watt limiter
     throttle_watt_limiter(min_throttle, max_throttle);
-    
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle,
                                     constrain_int16(SRV_Channels::get_output_scaled(SRV_Channel::k_throttle), min_throttle, max_throttle));
     
@@ -905,4 +909,40 @@ void Plane::servos_auto_trim(void)
         g2.servo_channels.save_trim();
     }
     
+}
+
+// return scale factor for forward thrust motor ESC demands
+float Plane::calc_fwd_compensation_gain()
+{
+    // sanity check battery_voltage_min is not too small
+    // if disabled or misconfigured exit immediately
+    float batt_voltage_resting_estimate = AP::battery().voltage_resting_estimate(g2.batt_idx);
+    if((g2.batt_voltage_max <= 0) || (g2.batt_voltage_min >= g2.batt_voltage_max) || (batt_voltage_resting_estimate < 0.25f*g2.batt_voltage_min)) {
+        _batt_voltage_filt.reset(1.0f);
+        return 1.0f;
+    }
+
+    g2.batt_voltage_min = MAX(g2.batt_voltage_min, g2.batt_voltage_max * 0.6f);
+
+    // contrain resting voltage estimate (resting voltage is actual voltage with sag removed based on current draw and resistance)
+    batt_voltage_resting_estimate = constrain_float(batt_voltage_resting_estimate, g2.batt_voltage_min, g2.batt_voltage_max);
+
+    // filter at 0.5 Hz
+    float rpm_max_ratio = _batt_voltage_filt.apply(batt_voltage_resting_estimate/g2.batt_voltage_max, scheduler.get_loop_period_s());
+
+    // avoid divide by zero
+    if (rpm_max_ratio <= 0.0f) {
+        return 1.0f;
+    }
+
+    // Assume ESC regulates motor voltagE as a fraction of supply voltge so we adjust ESC to maintain the same voltge at the motor
+    float ret = 1.0f / rpm_max_ratio;
+
+    // air density ratio is increasing in density / decreasing in altitude
+    // fixed pitch prop RPM needs to scale with TAS and therefore 1 / sqrt(density)
+    float air_density_ratio = barometer.get_air_density_ratio();
+    if (air_density_ratio > 0.3f && air_density_ratio < 1.5f) {
+        ret *= 1.0f / sqrtf(constrain_float(air_density_ratio,0.5f,1.25f));
+    }
+    return ret;
 }

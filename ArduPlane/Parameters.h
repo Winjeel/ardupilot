@@ -564,6 +564,11 @@ public:
     AP_Int8 crow_flap_weight_inner;
     AP_Int8 crow_flap_options;
     AP_Int8 crow_flap_aileron_matching;
+
+    // thrust motor voltage and altitude scaling
+    AP_Int8 batt_idx;              // battery index used for compensation
+    AP_Float batt_voltage_max;     // maximum voltage used to scale thrust
+    AP_Float batt_voltage_min;     // minimum voltage used to scale thrust
 };
 
 extern const AP_Param::Info var_info[];
