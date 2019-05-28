@@ -409,7 +409,7 @@ void Plane::set_servos_controlled(void)
     }
     
     // scale throttle for density and voltage variations
-    float throttle_scaler = Plane::calc_fwd_compensation_gain();
+    throttle_scaler = Plane::calc_fwd_compensation_gain();
     float throttle_rescaled = throttle_scaler * (float)SRV_Channels::get_output_scaled(SRV_Channel::k_throttle);
     SRV_Channels::set_output_scaled(SRV_Channel::k_throttle, (int16_t)throttle_rescaled);
 

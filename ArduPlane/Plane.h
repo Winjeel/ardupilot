@@ -1068,6 +1068,7 @@ private:
 
     // battery voltage, current and air pressure compensation variables
     LowPassFilterFloat  _batt_voltage_filt; // filtered battery voltage expressed as a percentage (0 ~ 1.0) of batt_voltage_max
+    float throttle_scaler;
 
     // support for AP_Avoidance custom flight mode, AVOID_ADSB
     bool avoid_adsb_init(bool ignore_checks);
