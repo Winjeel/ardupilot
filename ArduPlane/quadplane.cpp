@@ -1207,7 +1207,7 @@ void QuadPlane::control_loiter()
                 plane.g2.ice_control.engine_control(0, 0, 0);
             }
         }
-        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing == 1);
         float descent_rate = (poscontrol.state == QPOS_LAND_FINAL)? land_speed_cms:landing_descent_rate_cms(height_above_ground);
         pos_control->set_alt_target_from_climb_rate(-descent_rate, plane.G_Dt, true);
         check_land_complete();
@@ -1760,7 +1760,7 @@ void QuadPlane::update_throttle_suppression(void)
     }
 
     // if we are more than 5m from home altitude then allow motors to run
-    if (plane.relative_ground_altitude(plane.g.rangefinder_landing) > 5) {
+    if (plane.relative_ground_altitude(plane.g.rangefinder_landing == 1) > 5) {
         return;
     }
 
@@ -2228,7 +2228,7 @@ void QuadPlane::vtol_position_controller(void)
     }
 
     case QPOS_LAND_DESCEND: {
-        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing == 1);
         pos_control->set_alt_target_from_climb_rate(-landing_descent_rate_cms(height_above_ground),
                                                     plane.G_Dt, true);
         break;
@@ -2557,7 +2557,7 @@ void QuadPlane::check_land_complete(void)
  */
 bool QuadPlane::check_land_final(void)
 {
-    float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+    float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing == 1);
     if (height_above_ground < land_final_alt) {
         return true;
     }
@@ -2718,7 +2718,7 @@ int8_t QuadPlane::forward_throttle_pct(void)
         // If we are below alt_cutoff then scale down the effect until
         // it turns off at alt_cutoff and decay the integrator
         float alt_cutoff = MAX(0,vel_forward_alt_cutoff);
-        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing);
+        float height_above_ground = plane.relative_ground_altitude(plane.g.rangefinder_landing == 1);
 
         vel_forward.last_pct = linear_interpolate(0, vel_forward.integrator,
                                                   height_above_ground, alt_cutoff, alt_cutoff+2);

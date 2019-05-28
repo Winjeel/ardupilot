@@ -556,24 +556,22 @@ float Plane::lookahead_adjustment(void)
 
 
 /*
-  correct target altitude using rangefinder data. Returns offset in
+  correct target altitude using rangefinder or terrain estimator data. Returns offset in
   meters to correct target altitude. A positive number means we need
   to ask the speed/height controller to fly higher
  */
 float Plane::rangefinder_correction(void)
 {
-    if (millis() - rangefinder_state.last_correction_time_ms > 5000) {
-        // we haven't had any rangefinder data for 5s - don't use it
-        return 0;
-    }
-
     // for now we only support the rangefinder for landing 
-    bool using_rangefinder = (g.rangefinder_landing && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND);
-    if (!using_rangefinder) {
-        return 0;
+    bool using_rangefinder = (g.rangefinder_landing == 1 && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < 5000));
+    float hagl;
+    bool using_estimator = g.rangefinder_landing == 2 && ahrs.get_hagl(hagl);
+    if (using_rangefinder) {
+        return rangefinder_state.correction;
+    } else if (using_estimator) {
+        return relative_altitude - hagl;
     }
-
-    return rangefinder_state.correction;
+    return 0;
 }
 
 /*
@@ -613,7 +611,7 @@ void Plane::rangefinder_height_update(void)
                  control_mode == &mode_qland ||
                  control_mode == &mode_qrtl ||
                  (control_mode == &mode_auto && quadplane.is_vtol_land(plane.mission.get_current_nav_cmd().id))) &&
-                g.rangefinder_landing) {
+                g.rangefinder_landing == 1) {
                 rangefinder_state.in_use = true;
                 gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder engaged at %.2fm", (double)rangefinder_state.height_estimate);
             }
