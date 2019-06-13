@@ -54,9 +54,15 @@ void NavEKF3_core::getFlowDebug(float &varFlow, float &gndOffset, float &flowInn
 {
     varFlow = MAX(flowTestRatio[0],flowTestRatio[1]);
     gndOffset = terrainState;
-    flowInnovX = innovOptFlow[0];
-    flowInnovY = innovOptFlow[1];
-    auxInnov = norm(auxFlowObsInnov.x,auxFlowObsInnov.y);
+    if (frontend->_flowUse == FLOW_USE_TERRAIN) {
+        flowInnovX = auxFlowObsInnov.x;
+        flowInnovY = auxFlowObsInnov.y;
+        auxInnov = norm(innovOptFlow[0],innovOptFlow[1]);
+    } else {
+        flowInnovX = innovOptFlow[0];
+        flowInnovY = innovOptFlow[1];
+        auxInnov = norm(auxFlowObsInnov.x,auxFlowObsInnov.y);
+    }
     HAGL = terrainState - stateStruct.position.z;
     rngInnov = innovRng;
     range = rangeDataDelayed.rng;
