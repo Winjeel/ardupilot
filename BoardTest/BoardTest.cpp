@@ -2,8 +2,8 @@
   BoardTest
  */
 
-// for std::move
-#include <utility>
+#include <utility> // for std::move
+#include <ctype.h>
 
 #include <AP_HAL/AP_HAL.h>
 
@@ -14,8 +14,9 @@
 // sensor includes
 #include "AP_Baro/AP_Baro.h"
 #include "AP_Baro/AP_Baro_MS5611.h"
+#include "AP_InertialSensor/AP_InertialSensor.h"
+#include "AP_InertialSensor/AP_InertialSensor_Invensense.h"
 
-#include <ctype.h>
 
 void setup();
 void loop();
@@ -23,8 +24,11 @@ void loop();
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
 static AP_BoardConfig boardConfig;
-static AP_SerialManager serial_manager;
+static AP_SerialManager serialManager;
 
+// dummy sensor managers for probe functions.
+static AP_Baro kDummyBaro;
+static AP_InertialSensor kDummyIMU;
 
 typedef bool (*TestFn)(void);
 
@@ -70,6 +74,11 @@ static void _printHeader(void) {
 }
 
 
+static bool _testNotImplemented(void) {
+    hal.console->printf("    [%s] Not Implemented!\n", _getResultStr(false));
+    return false;
+}
+
 
 static bool _executeTest(Test const * const test) {
     bool result = true;
@@ -78,6 +87,8 @@ static bool _executeTest(Test const * const test) {
 
     if (test->function) {
         result = test->function();
+    } else {
+        result = _testNotImplemented();
     }
 
     hal.console->printf("[%s] %s\n", _getResultStr(result), test->name ? test->name : "???");
@@ -86,41 +97,56 @@ static bool _executeTest(Test const * const test) {
 }
 
 
-static bool _testBaro(void) {
+static bool _testMS5611(void) {
     bool result = false;
 
-    AP_Baro dummy_baro;
-    AP_Baro_Backend * backend = AP_Baro_MS56XX::probe(dummy_baro,
-                          std::move(hal.spi->get_device(HAL_BARO_MS5611_NAME)),
-                          AP_Baro_MS56XX::BARO_MS5611);
-    // AP_Baro_MS56XX * ms5611 = static_cast<AP_Baro_MS56XX *>(backend);
+    AP_Baro_Backend * backend =
+        AP_Baro_MS56XX::probe(kDummyBaro,
+                              std::move(hal.spi->get_device(HAL_BARO_MS5611_NAME)),
+                              AP_Baro_MS56XX::BARO_MS5611);
+    AP_Baro_MS56XX * ms5611 = static_cast<AP_Baro_MS56XX *>(backend);
 
     // Backends are painful. The probe function runs the init, and if
     // successful, returns a pointer.
-    result = (backend != nullptr);
+    result = (ms5611 != nullptr);
 
     return result;
 }
 
+static bool _testICM20602(void) {
+    bool result = false;
 
-static bool _testNotImplemented(void) {
-    hal.console->printf("    [%s] Not Implemented!\n", _getResultStr(false));
-    return false;
+    AP_InertialSensor_Backend * backend =
+        AP_InertialSensor_Invensense::probe(kDummyIMU,
+                                            hal.spi->get_device("icm20602"),
+                                            ROTATION_NONE);
+    AP_InertialSensor_Invensense * icm20602 = static_cast<AP_InertialSensor_Invensense *>(backend);
+
+    // Backends are painful. The probe function runs the init, and if
+    // successful, returns a pointer.
+    result = (icm20602 != nullptr);
+
+    return result;
+}
+
+static bool _testICM20948(void) {
+    return _testNotImplemented();
+}
+
+static bool _testIST8308(void) {
+    return _testNotImplemented();
 }
 
 
 static bool _printInstructions(void);
 static bool _runAll(void);
 const Test kTestItem[] = {
-    { '?', nullptr,            _printInstructions,     "Print these instructions." },
-    { 'a', nullptr,            _runAll,                "Run all tests." },
-    { '1', "MS5611 (Baro)",    _testBaro,              "Test the MS-5611 Barometer."},
-    { '2', "ICM20602 (Gyro)",  _testNotImplemented,    "Test the ICM20602 Gyro."},
-    { '3', "ICM20602 (Accel)", _testNotImplemented,    "Test the ICM20602 Accel."},
-    { '4', "ICM20948 (Gyro)",  _testNotImplemented,    "Test the ICM20948 Gyro."},
-    { '5', "ICM20948 (Accel)", _testNotImplemented,    "Test the ICM20948 Accel."},
-    { '6', "ICM20948 (Mag)",   _testNotImplemented,    "Test the ICM20948 Mag."},
-    { '7', "IST8308 (Mag)",    _testNotImplemented,    "Test the IST8308 Mag."},
+    { '?', nullptr,                     _printInstructions, "Print these instructions.", },
+    { 'a', nullptr,                     _runAll,            "Run all tests.", },
+    { '1', "MS5611 (Baro)",             _testMS5611,        "Test the MS-5611 Barometer.", },
+    { '2', "ICM20602 (Gyro+Accel)",     _testICM20602,      "Test the ICM20602 Gyro+Accel.", },
+    { '3', "ICM20948 (Gyro+Accel+Mag)", _testICM20948,      "Test the ICM20948 Gyro+Accel+Mag.", },
+    { '4', "IST8308 (Mag)",             _testIST8308,       "Test the IST8308 Mag.", },
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
 
@@ -153,7 +179,7 @@ static bool _runAll(void) {
 
 static void _driverInit(void) {
     // initialise serial port
-    serial_manager.init_console();
+    serialManager.init_console();
 
     hal.console->printf("\n\nInit %s"
                         "\n\nFree RAM: %u\n",
@@ -161,7 +187,7 @@ static void _driverInit(void) {
                         (unsigned)hal.util->available_memory());
 
     // initialise serial ports
-    serial_manager.init();
+    serialManager.init();
 
     // setup any board specific drivers
     // boardConfig.init();
