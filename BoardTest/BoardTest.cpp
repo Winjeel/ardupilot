@@ -2,15 +2,18 @@
   BoardTest
  */
 
+// for std::move
+#include <utility>
+
 #include <AP_HAL/AP_HAL.h>
 
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_Common/AP_FWVersion.h>
-
-#include <AP_Baro/AP_Baro.h>
-#include <AP_Compass/AP_Compass.h>
-#include <AP_InertialSensor/AP_InertialSensor.h>
 #include <AP_SerialManager/AP_SerialManager.h>
+
+// sensor includes
+#include "AP_Baro/AP_Baro.h"
+#include "AP_Baro/AP_Baro_MS5611.h"
 
 #include <ctype.h>
 
@@ -20,11 +23,6 @@ void loop();
 const AP_HAL::HAL& hal = AP_HAL::get_HAL();
 
 static AP_BoardConfig boardConfig;
-
-// sensor declaration
-static AP_Baro baro;
-static Compass compass;
-static AP_InertialSensor ins;
 static AP_SerialManager serial_manager;
 
 
@@ -36,6 +34,16 @@ typedef struct {
     TestFn function;
     char const * const description;
 } Test;
+
+
+static char const * _getResultStr(bool result) {
+    char const * kResultStr[]  = {
+        "PASS",
+        "FAIL",
+    };
+
+    return kResultStr[!!result];
+}
 
 
 static void _printHeader(void) {
@@ -61,33 +69,42 @@ static void _printHeader(void) {
     }
 }
 
+
+
 static bool _executeTest(Test const * const test) {
-    bool result = false;
+    bool result = true;
 
-    char const * const kPass  = "PASS";
-    char const * const kFail  = "FAIL";
-    char const * const kError = "ERR ";
-
-    char const * resultStr = kError;
+    hal.console->printf("Running test %s:\n", test->name ? test->name : "???");
 
     if (test->function) {
         result = test->function();
-        resultStr = result ? kPass : kFail;
     }
 
-    hal.console->printf("[%s] %s\n", resultStr, test->name ? test->name : "???");
+    hal.console->printf("[%s] %s\n", _getResultStr(result), test->name ? test->name : "???");
 
     return result;
 }
 
 
 static bool _testBaro(void) {
-    return baro.healthy();
+    bool result = false;
+
+    AP_Baro dummy_baro;
+    AP_Baro_Backend * backend = AP_Baro_MS56XX::probe(dummy_baro,
+                          std::move(hal.spi->get_device(HAL_BARO_MS5611_NAME)),
+                          AP_Baro_MS56XX::BARO_MS5611);
+    // AP_Baro_MS56XX * ms5611 = static_cast<AP_Baro_MS56XX *>(backend);
+
+    // Backends are painful. The probe function runs the init, and if
+    // successful, returns a pointer.
+    result = (backend != nullptr);
+
+    return result;
 }
 
 
 static bool _testNotImplemented(void) {
-    hal.console->printf("    Not Implemented!\n");
+    hal.console->printf("    [%s] Not Implemented!\n", _getResultStr(false));
     return false;
 }
 
@@ -95,11 +112,15 @@ static bool _testNotImplemented(void) {
 static bool _printInstructions(void);
 static bool _runAll(void);
 const Test kTestItem[] = {
-    { '?', nullptr,        _printInstructions,     "Print these instructions." },
-    { 'a', nullptr,        _runAll,                "Run all tests." },
-    { '1', "Barometer",    _testBaro,              "Test the Barometer."},
-    { '2', "GPS",          _testNotImplemented,    "Test the GPS."},
-    { '3', "IMU",          _testNotImplemented,    "Test the IMU."},
+    { '?', nullptr,            _printInstructions,     "Print these instructions." },
+    { 'a', nullptr,            _runAll,                "Run all tests." },
+    { '1', "MS5611 (Baro)",    _testBaro,              "Test the MS-5611 Barometer."},
+    { '2', "ICM20602 (Gyro)",  _testNotImplemented,    "Test the ICM20602 Gyro."},
+    { '3', "ICM20602 (Accel)", _testNotImplemented,    "Test the ICM20602 Accel."},
+    { '4', "ICM20948 (Gyro)",  _testNotImplemented,    "Test the ICM20948 Gyro."},
+    { '5', "ICM20948 (Accel)", _testNotImplemented,    "Test the ICM20948 Accel."},
+    { '6', "ICM20948 (Mag)",   _testNotImplemented,    "Test the ICM20948 Mag."},
+    { '7', "IST8308 (Mag)",    _testNotImplemented,    "Test the IST8308 Mag."},
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
 
@@ -123,7 +144,7 @@ static bool _runAll(void) {
             continue;
         }
 
-        result |= _executeTest(test);
+        result =_executeTest(test) && result;
     }
 
     return result;
@@ -139,53 +160,11 @@ static void _driverInit(void) {
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
-// TODO: move into defines.h?
-#define MASK_LOG_IMU_RAW (1UL<<19)
-    ins.set_log_raw_bit(MASK_LOG_IMU_RAW);
-
     // initialise serial ports
     serial_manager.init();
-    // gcs().chan(0).setup_uart(serial_manager, AP_SerialManager::SerialProtocol_MAVLink, 0);
-
-
-    // Register mavlink_delay_cb, which will run anytime you have
-    // more than 5ms remaining in your call to hal.scheduler->delay
-    // hal.scheduler->register_delay_callback(mavlink_delay_cb_static, 5);
 
     // setup any board specific drivers
-    boardConfig.init();
-
-    // init baro
-    baro.init();
-
-    // initialise rangefinder
-    // rangefinder.init();
-
-    // initialise battery monitoring
-    // battery.init();
-
-    // rpm_sensor.init();
-
-    // setup telem slots with serial ports
-    // gcs().setup_uarts(serial_manager);
-
-    // initialise airspeed sensor
-    // airspeed.init();
-
-    bool compass_ok = compass.init() && compass.read();
-    if (!compass_ok) {
-        hal.console->printf("Compass initialisation failed!\n");
-    } else {
-        // ahrs.set_compass(&compass);
-    }
-
-    // GPS Initialization
-    // #define MASK_LOG_GPS                    (1<<2)
-    // gps.set_log_gps_bit(MASK_LOG_GPS);
-    // gps.init(serial_manager);
-
-    // disable safety if requested
-    boardConfig.init_safety();
+    // boardConfig.init();
 }
 
 static void _consoleInit(void) {
