@@ -102,7 +102,7 @@ static bool _testMS5611(void) {
 
     AP_Baro_Backend * backend =
         AP_Baro_MS56XX::probe(kDummyBaro,
-                              std::move(hal.spi->get_device(HAL_BARO_MS5611_NAME)),
+                              std::move(hal.spi->get_device("ms5611")),
                               AP_Baro_MS56XX::BARO_MS5611);
     AP_Baro_MS56XX * ms5611 = static_cast<AP_Baro_MS56XX *>(backend);
 
@@ -118,8 +118,8 @@ static bool _testICM20602(void) {
 
     AP_InertialSensor_Backend * backend =
         AP_InertialSensor_Invensense::probe(kDummyIMU,
-                                            hal.spi->get_device("icm20602"),
-                                            ROTATION_NONE);
+                                            hal.spi->get_device(HAL_INS_SPI_1_NAME),
+                                            HAL_INS_SPI_1_ROTATION); // TODO: Get the rotation from the board def
     AP_InertialSensor_Invensense * icm20602 = static_cast<AP_InertialSensor_Invensense *>(backend);
 
     // Backends are painful. The probe function runs the init, and if
@@ -130,10 +130,12 @@ static bool _testICM20602(void) {
 }
 
 static bool _testICM20948(void) {
+    // SPI
     return _testNotImplemented();
 }
 
 static bool _testIST8308(void) {
+    // I2C
     return _testNotImplemented();
 }
 
