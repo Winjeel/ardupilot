@@ -1,5 +1,4 @@
 # hw definition file for processing by chibios_hwdef.py
-# for FMUv4 bootloader
 
 # MCU class and specific type
 MCU STM32F4xx STM32F427xx
