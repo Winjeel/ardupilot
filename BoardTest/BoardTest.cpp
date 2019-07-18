@@ -182,12 +182,19 @@ static bool _testIST8308(void) {
     return result;
 }
 
+static bool _reboot(void) {
+    bool hold_in_bootloader = false;
+    hal.scheduler->reboot(hold_in_bootloader);
+    return true;
+}
 
 static bool _printInstructions(void);
 static bool _runAll(void);
 const Test kTestItem[] = {
     { '?', nullptr,              _printInstructions, "Print these instructions.", },
+    { '!', nullptr,              _reboot,            "Reboot.", },
     { 'a', nullptr,              _runAll,            "Run all tests.", },
+
     { '1', "MS5611 (Baro)",      _testMS5611,        "Test the MS-5611 Barometer.", },
     { '2', "ICM20602 (IMU)",     _testICM20602,      "Test the ICM20602 IMU.", },
     { '3', "ICM20948 (IMU)",     _testICM20948_imu,  "Test the ICM20948 IMU.", },
