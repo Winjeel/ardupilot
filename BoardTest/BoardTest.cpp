@@ -5,6 +5,8 @@
 #include <utility> // for std::move
 #include <ctype.h>
 
+#include "hwdef.h"
+
 #include <AP_HAL/AP_HAL.h>
 
 
@@ -56,8 +58,8 @@ typedef struct {
 
 static char const * _getResultStr(bool result) {
     char const * kResultStr[]  = {
-        "PASS",
         "FAIL",
+        "PASS",
     };
 
     return kResultStr[!!result];
@@ -225,16 +227,22 @@ static void _driverInit(void) {
     // initialise serial port
     serialManager.init_console();
 
-    hal.console->printf("\n\nInit %s"
-                        "\n\nFree RAM: %u\n",
+    while (!hal.console->is_initialized()) {
+        hal.scheduler->delay(100);
+    }
+
+    hal.console->printf("\nInit %s"
+                        "\nFree RAM: %lu\n",
                         AP::fwversion().fw_string,
                         (unsigned)hal.util->available_memory());
 
     // initialise serial ports
     serialManager.init();
 
+    serialManager.set_blocking_writes_all(false);
+
     // setup any board specific drivers
-    // boardConfig.init();
+    boardConfig.init();
 }
 
 static void _consoleInit(void) {
@@ -263,8 +271,14 @@ void setup(void)
 
 void loop(void)
 {
+    EXPECT_DELAY_MS(1000);
+
     while (hal.console->available()) {
         char key = hal.console->read();
+        if (key == '\n' || key == '\r') {
+            // ignore enter key
+            continue;
+        }
         hal.console->write(key);
 
         Test const * test = nullptr;
