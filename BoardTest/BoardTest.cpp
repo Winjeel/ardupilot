@@ -262,16 +262,65 @@ static void _consoleInit(void) {
 }
 
 
+static void _led_init(void) {
+    // when HAL_GPIO_LED_ON is 0 then we must not use pinMode()
+    // as it could remove the OPENDRAIN attribute on the pin
+#if HAL_GPIO_LED_ON != 0
+    hal.gpio->pinMode(HAL_GPIO_A_LED_PIN, HAL_GPIO_OUTPUT);
+    hal.gpio->pinMode(HAL_GPIO_B_LED_PIN, HAL_GPIO_OUTPUT);
+    hal.gpio->pinMode(HAL_GPIO_C_LED_PIN, HAL_GPIO_OUTPUT);
+#endif
+    hal.gpio->write(HAL_GPIO_A_LED_PIN, HAL_GPIO_LED_OFF);
+    hal.gpio->write(HAL_GPIO_B_LED_PIN, HAL_GPIO_LED_OFF);
+    hal.gpio->write(HAL_GPIO_C_LED_PIN, HAL_GPIO_LED_OFF);
+}
+
+struct RGB {
+    uint8_t r;
+    uint8_t g;
+    uint8_t b;
+};
+
+static void _led_set_rgb(struct RGB rgb) {
+    hal.gpio->write(HAL_GPIO_A_LED_PIN, (rgb.r > 0) ? HAL_GPIO_LED_ON : HAL_GPIO_LED_OFF);
+    hal.gpio->write(HAL_GPIO_B_LED_PIN, (rgb.g > 0) ? HAL_GPIO_LED_ON : HAL_GPIO_LED_OFF);
+    hal.gpio->write(HAL_GPIO_C_LED_PIN, (rgb.b > 0) ? HAL_GPIO_LED_ON : HAL_GPIO_LED_OFF);
+}
+
+
 void setup(void)
 {
+    _led_init();
     _driverInit();
     _consoleInit();
 }
 
-
+static uint32_t sNow_ms = 0;
 void loop(void)
 {
     EXPECT_DELAY_MS(1000);
+
+    struct RGB rgb[] = {
+        { 0, 0, 0, }, // black
+        { 1, 0, 0, }, // red
+        { 1, 1, 0, }, // yellow
+        { 0, 1, 0, }, // green
+        { 0, 1, 1, }, // cyan
+        { 0, 0, 1, }, // blue
+        { 1, 0, 1, }, // purple
+        { 1, 1, 1, }, // white
+    };
+    const size_t kNumColours = sizeof(rgb) / sizeof(rgb[0]);
+
+    uint32_t now_ms = AP_HAL::millis();
+    const uint32_t kLED_delta_ms = 512;
+    if ((now_ms - sNow_ms) > kLED_delta_ms) {
+        static uint8_t j = 0;
+        _led_set_rgb(rgb[j]);
+        j = (j + 1) % kNumColours;
+
+        sNow_ms += kLED_delta_ms;
+    }
 
     while (hal.console->available()) {
         char key = hal.console->read();
