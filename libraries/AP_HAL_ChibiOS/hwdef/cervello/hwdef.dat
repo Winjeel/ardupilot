@@ -1,13 +1,10 @@
 # hw definition file for processing by chibios_hwdef.py
-# for FMUv4 hardware
-
-define CONFIG_HAL_BOARD_SUBTYPE HAL_BOARD_SUBTYPE_CHIBIOS_FMUV4
 
 # MCU class and specific type
 MCU STM32F4xx STM32F427xx
 
 # board ID for firmware load
-APJ_BOARD_ID 11
+APJ_BOARD_ID 1688
 
 # crystal frequency
 OSCILLATOR_HZ 24000000
@@ -15,24 +12,33 @@ OSCILLATOR_HZ 24000000
 # board voltage
 STM32_VDD 330U
 
+# Flash size
+FLASH_SIZE_KB 2048
+
+# with 2M flash we can afford to optimize for speed
+env OPTIMIZE -O3
+
+# fallback to flash is no FRAM fitted
+define STORAGE_FLASH_PAGE 22
+
+# This is the STM32 timer that ChibiOS will use for the low level
+# driver. This must be a 32 bit timer, see hal_st_lld.c in ChibiOS for details.
+
 # ChibiOS system timer
 STM32_ST_USE_TIMER 5
 
-# flash size
-FLASH_SIZE_KB 2048
+define HAL_STORAGE_SIZE 16384
 
-env OPTIMIZE -O3
+# USB setup
+USB_VENDOR 0x0483 # ST Microelectronics
+USB_PRODUCT 0x5740 # Virtual COM Port
+USB_STRING_MANUFACTURER "SYPAQ"
 
-# serial port for stdout disabled, use USB console
-# STDOUT_SERIAL SD7
-# STDOUT_BAUDRATE 57600
-
-# 2 I2C buses
+# I2C Bus Configuration
 I2C_ORDER I2C1 I2C2
-
-# to match px4 we make the first bus number 1
 define HAL_I2C_BUS_BASE 1
-define HAL_I2C_INTERNAL_MASK 0
+# The first bus is internal
+define HAL_I2C_INTERNAL_MASK 1
 
 # order of UARTs (and USB)
 UART_ORDER OTG1 USART2 USART3 UART7 UART8 UART4 USART1
@@ -40,8 +46,8 @@ UART_ORDER OTG1 USART2 USART3 UART7 UART8 UART4 USART1
 ## PORT A
 #########
 # UART4 is GPS
-PA0 UART4_TX UART4
-PA1 UART4_RX UART4
+PA0 UART4_TX UART4 NODMA
+PA1 UART4_RX UART4 NODMA
 PA2 BATT_VOLTAGE_SENS ADC1 SCALE(1)
 PA3 BATT_CURRENT_SENS ADC1 SCALE(1)
 PA4 VDD_5V_SENS ADC1 SCALE(2)
@@ -66,12 +72,12 @@ PA14 JTCK-SWCLK SWD
 # PWM output for buzzer
 PA15 TIM2_CH1 TIM2 GPIO(77) ALARM
 
+## PORT B
+#########
 # spektrum RC input pin, used as GPIO for bind for satellite receivers
 PB0 SPEKTRUM_RC INPUT PULLUP GPIO(71)
 define HAL_GPIO_SPEKTRUM_RC 71
 
-## PORT B
-#########
 #PB1 - See PWM(8)
 PB2 BOOT1 INPUT
 PB3 LED_BLUE OUTPUT GPIO(2)
@@ -164,41 +170,50 @@ PB9 TIM4_CH4 TIM4 PWM(7) GPIO(56)
 PB1 TIM3_CH4 TIM3 PWM(8) GPIO(57)
 PB4 TIM3_CH1 TIM3 PWM(9) GPIO(58)
 
+# 9 PWM available by default
+define BOARD_PWM_COUNT_DEFAULT 9
+
 # SPI device table. The DEVID values are chosen to match the PX4 port
 # of ArduPilot so users don't need to re-do their accel and compass calibrations
 # when moving to ChibiOS
-SPIDEV ms5611           SPI1 DEVID4  BARO_MS5611_CS  MODE3  20*MHZ  20*MHZ
-SPIDEV icm20948         SPI1 DEVID1  IMU_ICM20948_CS MODE3  2*MHZ   4*MHZ
-SPIDEV icm20602         SPI1 DEVID3  IMU_ICM20602_CS MODE3  2*MHZ   8*MHZ
+SPIDEV ms5611           SPI1 DEVID3  BARO_MS5611_CS  MODE3  10*MHZ  10*MHZ
+SPIDEV icm20948         SPI1 DEVID1  IMU_ICM20948_CS MODE3  4*MHZ   8*MHZ
+SPIDEV icm20602         SPI1 DEVID2  IMU_ICM20602_CS MODE3  4*MHZ   8*MHZ
 SPIDEV ramtron          SPI2 DEVID10 FRAM_CS         MODE3  8*MHZ   8*MHZ
-SPIDEV pixartPC15       SPI4 DEVID13 EXT_SPI4_1_CS   MODE3  2*MHZ   2*MHZ
-SPIDEV ATAES132A_ext    SPI4 DEVID13 EXT_CRYPTO_CS   MODE3  2*MHZ   2*MHZ
-SPIDEV external0m0      SPI4 DEVID5  EXT_SPI4_1_CS   MODE0  2*MHZ   2*MHZ
-SPIDEV external0m1      SPI4 DEVID5  EXT_SPI4_1_CS   MODE1  2*MHZ   2*MHZ
-SPIDEV external0m2      SPI4 DEVID5  EXT_SPI4_1_CS   MODE2  2*MHZ   2*MHZ
-SPIDEV external0m3      SPI4 DEVID5  EXT_SPI4_1_CS   MODE3  2*MHZ   2*MHZ
-SPIDEV external1m0      SPI4 DEVID5  EXT_SPI4_2_CS   MODE0  2*MHZ   2*MHZ
-SPIDEV external1m1      SPI4 DEVID5  EXT_SPI4_2_CS   MODE1  2*MHZ   2*MHZ
-SPIDEV external1m2      SPI4 DEVID5  EXT_SPI4_2_CS   MODE2  2*MHZ   2*MHZ
-SPIDEV external1m3      SPI4 DEVID5  EXT_SPI4_2_CS   MODE3  2*MHZ   2*MHZ
-
-define HAL_CHIBIOS_ARCH_FMUV4 1
+SPIDEV pixartflow       SPI4 DEVID13 EXT_SPI4_1_CS   MODE3  2*MHZ   2*MHZ
+SPIDEV ATAES132A_ext    SPI4 DEVID12 EXT_CRYPTO_CS   MODE3  2*MHZ   2*MHZ
+SPIDEV external0m0      SPI4 DEVID1  EXT_SPI4_1_CS   MODE0  2*MHZ   2*MHZ
+SPIDEV external0m1      SPI4 DEVID1  EXT_SPI4_1_CS   MODE1  2*MHZ   2*MHZ
+SPIDEV external0m2      SPI4 DEVID1  EXT_SPI4_1_CS   MODE2  2*MHZ   2*MHZ
+SPIDEV external0m3      SPI4 DEVID1  EXT_SPI4_1_CS   MODE3  2*MHZ   2*MHZ
+SPIDEV external1m0      SPI4 DEVID2  EXT_SPI4_2_CS   MODE0  2*MHZ   2*MHZ
+SPIDEV external1m1      SPI4 DEVID2  EXT_SPI4_2_CS   MODE1  2*MHZ   2*MHZ
+SPIDEV external1m2      SPI4 DEVID2  EXT_SPI4_2_CS   MODE2  2*MHZ   2*MHZ
+SPIDEV external1m3      SPI4 DEVID2  EXT_SPI4_2_CS   MODE3  2*MHZ   2*MHZ
 
 define HAL_BOARD_LOG_DIRECTORY "/APM/LOGS"
 define HAL_BOARD_TERRAIN_DIRECTORY "/APM/TERRAIN"
 
-define HAL_STORAGE_SIZE 16384
+# allow to have have a dedicated safety switch pin
+define HAL_HAVE_SAFETY_SWITCH 1
 
-# enable RAMTROM parameter storage
+# Enable RAMTROM parameter storage.
 define HAL_WITH_RAMTRON 1
 
-# fallback to flash is no FRAM fitted
-define STORAGE_FLASH_PAGE 22
-
-# enable FAT filesystem
+# Enable FAT filesystem support (needs a microSD defined via SDMMC).
 define HAL_OS_FATFS_IO 1
 
-# pixracer has 3 LEDs, Red, Green, Blue
+# Enable RTSCTS support. You should define this if you have any UARTs with RTS/CTS pins.
+define AP_FEATURE_RTSCTS 1
+
+# Now setup the default battery pins driver analog pins and default
+# scaling for the power brick.
+define HAL_BATT_VOLT_PIN 2
+define HAL_BATT_CURR_PIN 3
+define HAL_BATT_VOLT_SCALE 10.1
+define HAL_BATT_CURR_SCALE 17.0
+
+# Board has a TriColor LED, Red, Green, Blue
 define HAL_HAVE_PIXRACER_LED
 
 define HAL_GPIO_LED_ON  0
@@ -209,21 +224,7 @@ define HAL_GPIO_A_LED_PIN 0
 define HAL_GPIO_B_LED_PIN 1
 define HAL_GPIO_C_LED_PIN 2
 
-# enable RTSCTS
-define AP_FEATURE_RTSCTS 1
-
-# battery setup
-define HAL_BATT_VOLT_PIN 2
-define HAL_BATT_CURR_PIN 3
-define HAL_BATT_VOLT_SCALE 10.1
-define HAL_BATT_CURR_SCALE 17.0
-
-# setup serial port defaults for ESP8266
-#define HAL_SERIAL5_PROTOCOL SerialProtocol_MAVLink
-#define HAL_SERIAL5_BAUD 921600
-
-# 9 PWM available by default
-define BOARD_PWM_COUNT_DEFAULT 9
+DMA_PRIORITY SDMMC*
 
 # Generate driver #defines for board testing. This requires that specific I2C
 # buses are used in devices (i.e. can't use ALL_INTERNAL)
@@ -232,15 +233,11 @@ DEVICE_TEST_CODE 1
 # 2 IMUs
 IMU Invensense SPI:icm20602 ROTATION_YAW_90
 IMU Invensensev2 SPI:icm20948 ROTATION_YAW_180
-define HAL_DEFAULT_INS_FAST_SAMPLE 1
+define HAL_DEFAULT_INS_FAST_SAMPLE 3
 
 # 2 Compasses, compass as part of ICM20948, I2C compass
-COMPASS AK09916:probe_ICM20948 0 ROTATION_YAW_180
-# COMPASS IST8308 I2C:ALL_INTERNAL:0x0C true ROTATION_PITCH_180
-COMPASS IST8308 I2C:0:0x0C false ROTATION_PITCH_180
-
-# Probe I2C Compasses
-define HAL_PROBE_EXTERNAL_I2C_COMPASSES
+COMPASS AK09916:probe_ICM20948 0 ROTATION_YAW_270
+COMPASS IST8308 I2C:1:0x0C false ROTATION_YAW_180
 
 # 1 Barometer
 BARO MS56XX SPI:ms5611
