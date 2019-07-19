@@ -68,8 +68,9 @@ static char const * _getResultStr(bool result) {
 
 static void _printHeader(void) {
     char const * const kHeader[] = {
+        "\n",
         "------------------------------------------------------------------------------\n",
-        "                                                                              \n",
+        "\n",
         "           .g8\"\"\"bgd   .g8\"\"8q. `7MM\"\"\"Mq.`7MMF'   `7MF' .g8\"\"8q.             \n",
         "         .dP'     `M .dP'    `YM. MM   `MM. `MA     ,V .dP'    `YM.           \n",
         "         dM'       ` dM'      `MM MM   ,M9   VM:   ,V  dM'      `MM           \n",
@@ -77,16 +78,15 @@ static void _printHeader(void) {
         "         MM.         MM.      ,MP MM  YM.     `MM A'   MM.      ,MP           \n",
         "         `Mb.     ,' `Mb.    ,dP' MM   `Mb.    :MM;    `Mb.    ,dP'           \n",
         "           `\"bmmmd'    `\"bmmd\"' .JMML. .JMM.    VF       `\"bmmd\"'             \n",
-        "                                                                              \n",
-        "                                                BoardTest v0.0.1              \n",
-        "                                                                              \n",
-        "------------------------------------------------------------------------------\n",
-        "\n",
+        "\n\n",
     };
     const size_t kNumLines = sizeof(kHeader) / sizeof(kHeader[0]);
     for (int i = 0; i < kNumLines; i++) {
         hal.console->printf(kHeader[i]);
     }
+
+    hal.console->printf("%65s\n", AP::fwversion().fw_string);
+    hal.console->printf("\n------------------------------------------------------------------------------\n\n");
 }
 
 
@@ -238,15 +238,10 @@ static void _driverInit(void) {
         hal.scheduler->delay(100);
     }
 
-    hal.console->printf("\nInit %s"
-                        "\nFree RAM: %lu\n",
-                        AP::fwversion().fw_string,
-                        (unsigned)hal.util->available_memory());
-
     // initialise serial ports
     serialManager.init();
 
-    serialManager.set_blocking_writes_all(false);
+    // serialManager.set_blocking_writes_all(false);
 
     // setup any board specific drivers
     boardConfig.init();
