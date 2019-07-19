@@ -115,13 +115,20 @@ static bool _executeTest(Test const * const test) {
 // Baro 1, SPI
 static bool _testMS5611(void) {
     bool result = false;
+    static AP_Baro_Backend *sMS5611_backend = nullptr;
 
-    AP_Baro_Backend * backend = HAL_BARO_1_PROBE(kDummyBaro);
-    HAL_BARO_1_DRIVER * ms5611 = static_cast<AP_Baro_MS56XX *>(backend);
+    if (!sMS5611_backend) {
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
+        sMS5611_backend = HAL_BARO_1_PROBE(kDummyBaro);
+    }
 
-    // Backends are painful. The probe function runs the init, and if
-    // successful, returns a pointer.
-    result = (ms5611 != nullptr);
+    if (sMS5611_backend) {
+        HAL_BARO_1_DRIVER &ms5611 = static_cast<HAL_BARO_1_DRIVER&>(*sMS5611_backend); // MS5611 doesn't have a from() function
+        // TODO: what can we run here to check the status?
+        (void)ms5611;
+        result = true;
+    }
 
     return result;
 }
@@ -129,13 +136,19 @@ static bool _testMS5611(void) {
 // IMU 1, SPI
 static bool _testICM20602(void) {
     bool result = false;
+    static AP_InertialSensor_Backend *sICM20602_backend = nullptr;
 
-    AP_InertialSensor_Backend * backend = HAL_INS_1_PROBE(kDummyIMU);
-    HAL_INS_1_DRIVER * icm20602 = static_cast<HAL_INS_1_DRIVER *>(backend);
+    if (!sICM20602_backend) {
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
+        sICM20602_backend = HAL_INS_1_PROBE(kDummyIMU);
+    }
 
-    // Backends are painful. The probe function runs the init, and if
-    // successful, returns a pointer.
-    result = (icm20602 != nullptr);
+    if (sICM20602_backend) {
+        HAL_INS_1_DRIVER &icm20602 = HAL_INS_1_DRIVER::from(*sICM20602_backend);
+        icm20602.start(); // TODO: Any issues if we repeatedly call this?
+        result = icm20602.update();
+    }
 
     return result;
 }
@@ -143,13 +156,20 @@ static bool _testICM20602(void) {
 // IMU 2, SPI
 static bool _testICM20948_imu(void) {
     bool result = false;
+    static AP_InertialSensor_Backend *sICM20948_imu_backend = nullptr;
 
-    AP_InertialSensor_Backend * backend = HAL_INS_2_PROBE(kDummyIMU);
-    HAL_INS_2_DRIVER * icm20948_imu = static_cast<HAL_INS_2_DRIVER *>(backend);
+    if (!sICM20948_imu_backend) {
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
+        sICM20948_imu_backend = HAL_INS_2_PROBE(kDummyIMU);
+    }
 
-    // Backends are painful. The probe function runs the init, and if
-    // successful, returns a pointer.
-    result = (icm20948_imu != nullptr);
+    if (sICM20948_imu_backend) {
+        HAL_INS_2_DRIVER &icm20948 = HAL_INS_2_DRIVER::from(*sICM20948_imu_backend);
+        icm20948.start();
+        result = icm20948.update();
+    }
+
 
     return result;
 }
@@ -157,13 +177,20 @@ static bool _testICM20948_imu(void) {
 // Compass 1, SPI
 static bool _testICM20948_mag(void) {
     bool result = false;
+    static AP_Compass_Backend *sICM20948_mag_backend = nullptr;
 
-    AP_Compass_Backend * backend = HAL_MAG_1_PROBE;
-    HAL_MAG_1_DRIVER * icm20948_mag = static_cast<HAL_MAG_1_DRIVER *>(backend);
+    if (!sICM20948_mag_backend) {
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
+        sICM20948_mag_backend = HAL_MAG_1_PROBE;
+    }
 
-    // Backends are painful. The probe function runs the init, and if
-    // successful, returns a pointer.
-    result = (icm20948_mag != nullptr);
+    if (sICM20948_mag_backend) {
+        HAL_MAG_1_DRIVER &icm20948_mag = static_cast<HAL_MAG_1_DRIVER&>(*sICM20948_mag_backend);
+        // TODO: what can we run here to check the status?
+        (void)icm20948_mag;
+        result = true;
+    }
 
     return result;
 }
@@ -171,19 +198,25 @@ static bool _testICM20948_mag(void) {
 // Compass 2, I2C
 static bool _testIST8308(void) {
     bool result = false;
+    static AP_Compass_Backend * sIST8308_backend = nullptr;
 
-    AP_Compass_Backend * backend = HAL_MAG_2_PROBE;
-    HAL_MAG_2_DRIVER * ist8308 = static_cast<HAL_MAG_2_DRIVER *>(backend);
+    if (!sIST8308_backend) {
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
+        sIST8308_backend = HAL_MAG_2_PROBE;
+    }
 
-    // Backends are painful. The probe function runs the init, and if
-    // successful, returns a pointer.
-    result = (ist8308 != nullptr);
+    if (sIST8308_backend) {
+        HAL_MAG_2_DRIVER &ist8308 = static_cast<HAL_MAG_2_DRIVER&>(*sIST8308_backend);
+        (void)ist8308;
+        result = true;
+    }
 
     return result;
 }
 
 static bool _reboot(void) {
-    bool hold_in_bootloader = false;
+    const bool hold_in_bootloader = false;
     hal.scheduler->reboot(hold_in_bootloader);
     return true;
 }
