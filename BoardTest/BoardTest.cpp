@@ -25,7 +25,7 @@
 #include "AP_Compass/AP_Compass_IST8308.h"
 
 
-#if APJ_BOARD_ID != 11
+#if APJ_BOARD_ID != 1688
     // TODO: Fix the board ID (currently 11=FMUv4).
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
