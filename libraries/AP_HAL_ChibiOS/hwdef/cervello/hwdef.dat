@@ -41,7 +41,7 @@ define HAL_I2C_BUS_BASE 1
 define HAL_I2C_INTERNAL_MASK 1
 
 # order of UARTs (and USB)
-UART_ORDER OTG1 USART2 USART3 UART7 UART8 UART4 USART1
+UART_ORDER OTG1 UART4 USART2 USART3 UART7 UART8 USART1
 
 ## PORT A
 #########
@@ -200,7 +200,7 @@ define HAL_HAVE_SAFETY_SWITCH 1
 # Enable RAMTROM parameter storage.
 define HAL_WITH_RAMTRON 1
 
-# Enable FAT filesystem support (needs a microSD defined via SDMMC).
+# Enable FAT filesystem support (needs a microSD defined via SDIO).
 define HAL_OS_FATFS_IO 1
 
 # Enable RTSCTS support. You should define this if you have any UARTs with RTS/CTS pins.
@@ -223,8 +223,6 @@ define HAL_GPIO_LED_OFF 1
 define HAL_GPIO_A_LED_PIN 0
 define HAL_GPIO_B_LED_PIN 1
 define HAL_GPIO_C_LED_PIN 2
-
-DMA_PRIORITY SDMMC*
 
 # Generate driver #defines for board testing. This requires that specific I2C
 # buses are used in devices (i.e. can't use ALL_INTERNAL)
