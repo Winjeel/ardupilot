@@ -48,16 +48,16 @@ protected:
     struct {
         // from last_letter skywalker_2013/aerodynamics.yaml
         // thanks to Georacer!
-        float s = 0.45;
-        float b = 1.88;
-        float c = 0.24;
-        float c_lift_0 = 0.56;
-        float c_lift_deltae = 0;
-        float c_lift_a = 6.9;
+        float s = 0.8;
+        float b = 1.95;
+        float c = 0.42;
+        float c_lift_0 = 0.20;
+        float c_lift_deltae = -1.0;
+        float c_lift_a = 4.5;
         float c_lift_q = 0;
-        float mcoeff = 50;
-        float oswald = 0.9;
-        float alpha_stall = 0.4712;
+        float mcoeff = 15;
+        float oswald = 0.85;
+        float alpha_stall = 0.37;
         float c_drag_q = 0;
         float c_drag_deltae = 0.0;
         float c_drag_p = 0.1;
