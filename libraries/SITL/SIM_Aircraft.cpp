@@ -131,11 +131,11 @@ bool Aircraft::parse_home(const char *home_str, Location &loc, float &yaw_degree
     loc.alt = static_cast<int32_t>(strtod(alt_s, nullptr) * 1.0e2);
 
     if (loc.lat == 0 && loc.lng == 0) {
-        // default to CMAC instead of middle of the ocean. This makes
+        // default to Bolinda Station  instead of middle of the ocean. This makes
         // SITL in MissionPlanner a bit more useful
-        loc.lat = -35.363261*1e7;
-        loc.lng = 149.165230*1e7;
-        loc.alt = 584*100;
+        loc.lat = -37.4300449702799*1e7;
+        loc.lng = 144.808650612831*1e7;
+        loc.alt = 363.5*100;
     }
 
     yaw_degrees = strtof(yaw_s, nullptr);
