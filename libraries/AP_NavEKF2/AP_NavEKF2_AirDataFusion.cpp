@@ -119,7 +119,7 @@ void NavEKF2_core::FuseAirspeed()
         varInnovVtas = 1.0f/SK_TAS;
 
         // calculate measurement innovation
-        if ((externalEasDefault >= 5.0f) && (externalEasDefault >= 0.0f)) {
+        if (externalEasDefault >= 5.0f) {
             innovVtas = VtasPred - externalEasDefault;
         } else {
             innovVtas = VtasPred - tasDataDelayed.tas;
