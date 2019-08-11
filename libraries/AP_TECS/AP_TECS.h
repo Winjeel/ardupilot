@@ -73,9 +73,9 @@ public:
         return _vel_dot;
     }
 
-    // return current target airspeed
+    // return current target airspeed after application of TECS internal filtering and limiting and as used by TECS energy control loops. 
     float get_target_airspeed(void) const override {
-        return _TAS_dem / _ahrs.get_EAS2TAS();
+        return _TAS_dem_adj * _TAS2EAS;
     }
 
     // return maximum climb rate
@@ -228,6 +228,10 @@ private:
 
     // Equivalent airspeed demand
     float _EAS_dem;
+
+    // conversion factors used to go between  TAS and EAS
+    float _EAS2TAS;
+    float _TAS2EAS;
 
     // height demands
     float _hgt_dem;

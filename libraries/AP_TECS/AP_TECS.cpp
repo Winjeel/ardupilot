@@ -348,10 +348,11 @@ void AP_TECS::_update_speed(float load_factor)
 
     // Convert equivalent airspeeds to true airspeeds
 
-    float EAS2TAS = constrain_float(_ahrs.get_EAS2TAS(), 0.1f, 1.1f);
-    _TAS_dem = _EAS_dem * EAS2TAS;
-    _TASmax   = aparm.airspeed_max * EAS2TAS;
-    _TASmin   = aparm.airspeed_min * EAS2TAS;
+    _EAS2TAS = constrain_float(_ahrs.get_EAS2TAS(), 0.1f, 1.1f);
+    _TAS2EAS = 1.0f / _EAS2TAS;
+    _TAS_dem = _EAS_dem * _EAS2TAS;
+    _TASmax   = aparm.airspeed_max * _EAS2TAS;
+    _TASmin   = aparm.airspeed_min * _EAS2TAS;
 
     if (aparm.stall_prevention) {
         // when stall prevention is active we raise the mimimum
@@ -368,7 +369,7 @@ void AP_TECS::_update_speed(float load_factor)
 
     // Reset states of time since last update is too large
     if (DT > 1.0f) {
-        _TAS_state = (_EAS * EAS2TAS);
+        _TAS_state = (_EAS * _EAS2TAS);
         _integDTAS_state = 0.0f;
         DT            = 0.1f; // when first starting TECS, use a
         // small time constant
@@ -385,7 +386,7 @@ void AP_TECS::_update_speed(float load_factor)
     // Implement a second order complementary filter to obtain a
     // smoothed airspeed estimate
     // airspeed estimate is held in _TAS_state
-    float aspdErr = (_EAS * EAS2TAS) - _TAS_state;
+    float aspdErr = (_EAS * _EAS2TAS) - _TAS_state;
     float integDTAS_input = aspdErr * _spdCompFiltOmega * _spdCompFiltOmega;
     // Prevent state from winding up
     if (_TAS_state < 3.1f) {
@@ -938,6 +939,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _flags.reached_speed_takeoff = false;
         _DT                = 0.1f; // when first starting TECS, use a
         // small time constant
+        _EAS2TAS = _TAS2EAS = 1.0f;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
