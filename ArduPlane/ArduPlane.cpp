@@ -605,6 +605,11 @@ void Plane::update_alt()
                                                  aerodynamic_load_factor,
                                                  soaring_active);
     }
+
+    // set default value of airspeed to use when not using an airspeed sensor
+    if (!airspeed.use()) {
+        ahrs.set_default_airspeed(SpdHgt_Controller->get_target_airspeed());
+    }
 }
 
 /*
