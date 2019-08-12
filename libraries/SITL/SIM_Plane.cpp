@@ -32,7 +32,6 @@ Plane::Plane(const char *home_str, const char *frame_str) :
        scaling from motor power to Newtons. Allows the plane to hold
        vertically against gravity when the motor is at hover_throttle
     */
-    thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
     frame_height = 0.1f;
 
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
@@ -71,7 +70,6 @@ Plane::Plane(const char *home_str, const char *frame_str) :
    if (strstr(frame_str, "-tailsitter")) {
        tailsitter = true;
        ground_behavior = GROUND_BEHAVIOR_TAILSITTER;
-       thrust_scale *= 1.5;
    }
 
     if (strstr(frame_str, "-ice")) {
@@ -295,10 +293,8 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         throttle = filtered_servo_range(input, 2);
     }
     
-    float thrust     = throttle;
-
     if (ice_engine) {
-        thrust = icengine.update(input);
+        throttle = icengine.update(input);
     }
 
     // calculate angle of attack
@@ -315,7 +311,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     }
     
     Vector3f force = getForce(aileron, elevator, rudder);
-    rot_accel = getTorque(aileron, elevator, rudder, thrust, force);
+    rot_accel = getTorque(aileron, elevator, rudder, throttle, force);
 
     if (have_launcher) {
         /*
@@ -335,19 +331,27 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
             launch_start_ms = 0;
         }
     }
-    
+
+    // calculate thrust from RPM
+    const float pitch = 8.5f * 0.3048f;
+    const float static_thrust_max = 40.0f;
+    const float rpm1_max = 7000;
+
     // simulate engine RPM
-    rpm1 = thrust * 7000;
-    
+    rpm1 = throttle * rpm1_max;
+
+    float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
+    thrust_scale = rpm1 *  (rpm1 - rpm_inflow) / (rpm1_max * rpm1_max);
+
     // scale thrust to newtons
-    thrust *= thrust_scale;
+    float thrust = thrust_scale * static_thrust_max;
 
     accel_body = Vector3f(thrust, 0, 0) + force;
     accel_body /= mass;
 
     // add some noise
     if (thrust_scale > 0) {
-        add_noise(fabsf(thrust) / thrust_scale);
+        add_noise(fabsf(throttle));
     }
 
     if (on_ground() && !tailsitter) {
