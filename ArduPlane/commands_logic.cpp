@@ -1070,21 +1070,26 @@ bool Plane::verify_loiter_heading(bool init)
         return true;
     }
 
-    if (next_WP_loc.get_distance(next_nav_cmd.content.location) < abs(aparm.loiter_radius)) {
-        /* Whenever next waypoint is within the loiter radius,
-           maintaining loiter would prevent us from ever pointing toward the next waypoint.
-           Hence break out of loiter immediately
-         */
-        return true;
-    }
-
     // Bearing in degrees
     int32_t bearing_cd = current_loc.get_bearing_to(next_nav_cmd.content.location);
 
     // get current heading.
     int32_t heading_cd = gps.ground_course_cd();
 
+    // positive error when target on right hand side
     int32_t heading_err_cd = wrap_180_cd(bearing_cd - heading_cd);
+
+    /*
+        Whenever next waypoint is inside the turn, we are flying past and should exit
+        to prevent us from never exiting. This is gtrue if both the following conditions are met:
+        a) The bearing to the next waypoint is on the same side of the ground track as the
+           direction of turn.
+        b) The distance to the next waypoint is less than the distance to the current waypoint.
+    */
+    if ((int32_t)loiter.direction * heading_err_cd > 0 &&
+        (current_loc.get_distance(next_nav_cmd.content.location) < current_loc.get_distance(next_WP_loc))) {
+        return true;
+    }
 
     if (init) {
         loiter.sum_cd = 0;
