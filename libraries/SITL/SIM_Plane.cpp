@@ -317,7 +317,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         /*
           simple simulation of a launcher
          */
-        if (launch_triggered) {
+        if (launch_triggered || throttle > 0.5f) {
             uint64_t now = AP_HAL::millis64();
             if (launch_start_ms == 0) {
                 launch_start_ms = now;
@@ -333,15 +333,19 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     }
 
     // calculate thrust from RPM
-    const float pitch = 8.5f * 0.3048f;
-    const float static_thrust_max = 40.0f;
-    const float rpm1_max = 7000;
+    const float pitch = 8.5f * 0.0254f; // assume 14x8.5" prop
+    const float static_thrust_max = 50.0f;
+    const float rpm1_max = 12000;
 
     // simulate engine RPM
     rpm1 = throttle * rpm1_max;
 
     float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
-    thrust_scale = rpm1 *  (rpm1 - rpm_inflow) / (rpm1_max * rpm1_max);
+    if (rpm1 - rpm_inflow >= 0.0f) {
+        thrust_scale = (rpm1 / rpm1_max) *  sqrtf((rpm1 - rpm_inflow) / rpm1_max);
+    } else {
+        thrust_scale = - (rpm1 / rpm1_max) * sqrtf((rpm_inflow - rpm1) / rpm1_max);
+    }
 
     // scale thrust to newtons
     float thrust = thrust_scale * static_thrust_max;
