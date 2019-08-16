@@ -80,7 +80,8 @@ public:
             // If airspeed demand is stale, use average of min and max
             ret = 0.5f * (aparm.airspeed_min.get() + (float)aparm.airspeed_max.get());
         } else {
-            ret = _TAS_dem_adj * _TAS2EAS;
+            ret = constrain_float(_TAS_dem_adj, aparm.airspeed_min.get(), aparm.airspeed_max.get());
+            ret *= _TAS2EAS;
         }
         return ret;
     }
