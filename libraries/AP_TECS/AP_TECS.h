@@ -75,7 +75,14 @@ public:
 
     // return current target airspeed after application of TECS internal filtering and limiting and as used by TECS energy control loops. 
     float get_target_airspeed(void) const override {
-        return _TAS_dem_adj * _TAS2EAS;
+        float ret;
+        if ((AP_HAL::micros64() - _update_speed_last_usec) > 200000) {
+            // If airspeed demand is stale, use average of min and max
+            ret = 0.5f * (aparm.airspeed_min.get() + (float)aparm.airspeed_max.get());
+        } else {
+            ret = _TAS_dem_adj * _TAS2EAS;
+        }
+        return ret;
     }
 
     // return maximum climb rate
