@@ -608,7 +608,7 @@ void Plane::update_alt()
 
     // set default value of airspeed to use when not using an airspeed sensor
     if (!airspeed.use()) {
-        ahrs.set_default_airspeed(SpdHgt_Controller->get_target_airspeed());
+        ahrs.set_default_airspeed(SpdHgt_Controller->get_target_airspeed_filt());
     }
 }
 
