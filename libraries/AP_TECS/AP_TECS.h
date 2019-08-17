@@ -73,17 +73,20 @@ public:
         return _vel_dot;
     }
 
-    // return current target airspeed after application of TECS internal filtering and limiting and as used by TECS energy control loops. 
-    float get_target_airspeed(void) const override {
-        float ret;
+    // return current target EAS demand in m/s as used by the TECS control loops which is after application of 
+    // internal filtering and limiting and as used by TECS energy control loops. 
+    float get_target_airspeed_filt(void) const override {
         if ((AP_HAL::micros64() - _update_speed_last_usec) > 200000) {
-            // If airspeed demand is stale, use average of min and max
-            ret = 0.5f * (aparm.airspeed_min.get() + (float)aparm.airspeed_max.get());
+            // If filtered value is stale, use raw input instead
+            return _EAS_dem;
         } else {
-            ret = constrain_float(_TAS_dem_adj, aparm.airspeed_min.get(), aparm.airspeed_max.get());
-            ret *= _TAS2EAS;
+            return _TAS2EAS * constrain_float(_TAS_dem_adj, aparm.airspeed_min.get(), aparm.airspeed_max.get());
         }
-        return ret;
+    }
+
+    // return current target EAS input demand in m/s
+    float get_target_airspeed(void) const override {
+        return _EAS_dem;
     }
 
     // return maximum climb rate
