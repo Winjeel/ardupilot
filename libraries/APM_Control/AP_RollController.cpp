@@ -88,16 +88,16 @@ const AP_Param::GroupInfo AP_RollController::var_info[] = {
     // @Range: 50 500
     // @Increment: 10.0
     // @User: Advanced
-    AP_GROUPINFO("SRMAX", 7, AP_RollController, _slew_rate_max, 150.0f),
+    AP_GROUPINFO("SRMAX", 7, AP_RollController, _slew_rate_max, 300.0f),
 
     // @Param: SRTAU
     // @DisplayName: Servo slew rate decay time constant
-    // @Description: This sets the time constant used to recover the D-gain after it has been reduced due to excessive servo slew rate.
+    // @Description: This sets the time constant used to recover the D gain after it has been reduced due to excessive servo slew rate. Set to the angle error time constant (controlled by the TCONST parameter) as first guess.
     // @Units: deg/sec
     // @Range: 0.5 5.0
     // @Increment: 0.1
     // @User: Advanced
-    AP_GROUPINFO("SRTAU", 8, AP_RollController, _slew_rate_tau, 1.0f),
+    AP_GROUPINFO("SRTAU", 8, AP_RollController, _slew_rate_tau, 0.5f),
 
     AP_GROUPEND
 };
