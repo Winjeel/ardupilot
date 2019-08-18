@@ -54,8 +54,8 @@ Plane::Plane(const char *home_str, const char *frame_str) :
     }
     if (strstr(frame_str, "-catapult")) {
         have_launcher = true;
-        launch_accel = 15;
-        launch_time = 2;
+        launch_accel = 25.0f;
+        launch_time = 0.5f;
     }
     if (strstr(frame_str, "-bungee")) {
         have_launcher = true;
@@ -323,8 +323,7 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
                 launch_start_ms = now;
             }
             if (now - launch_start_ms < launch_time*1000) {
-                force.x += launch_accel;
-                force.z += launch_accel/3;
+                force.x += launch_accel * mass;
             }
         } else {
             // allow reset of catapult
