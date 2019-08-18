@@ -1185,10 +1185,10 @@ struct PACKED log_DSTL {
 #define MAG_UNITS "sGGGGGGGGG-s"
 #define MAG_MULTS "FCCCCCCCCC-F"
 
-#define PID_LABELS "TimeUS,Des,P,I,D,FF,Dmod"
-#define PID_FMT    "Qffffff"
-#define PID_UNITS  "s------"
-#define PID_MULTS  "F------"
+#define PID_LABELS "TimeUS,Des,Act,P,I,D,FF,Dmod"
+#define PID_FMT    "Qfffffff"
+#define PID_UNITS  "s-------"
+#define PID_MULTS  "F-------"
 
 #define QUAT_LABELS "TimeUS,Q1,Q2,Q3,Q4"
 #define QUAT_FMT    "Qffff"
