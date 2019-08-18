@@ -26,13 +26,9 @@ using namespace SITL;
 Plane::Plane(const char *home_str, const char *frame_str) :
     Aircraft(home_str, frame_str)
 {
-    mass = 5.0f;
 
-    /*
-       scaling from motor power to Newtons. Allows the plane to hold
-       vertically against gravity when the motor is at hover_throttle
-    */
     frame_height = 0.1f;
+    mass = 5.0f;
 
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
     
