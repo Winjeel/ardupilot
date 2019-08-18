@@ -539,7 +539,7 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
             // zero roll/pitch, but keep yaw
             float r, p, y;
             dcm.to_euler(&r, &p, &y);
-            dcm.from_euler(0.0f, radians(18.0f), y);
+            dcm.from_euler(0.0f, radians(sitl->launch_elevation), y);
             // no X or Y movement
             velocity_ef.x = 0.0f;
             velocity_ef.y = 0.0f;
@@ -554,7 +554,7 @@ void Aircraft::update_dynamics(const Vector3f &rot_accel)
             // zero roll/pitch, but keep yaw
             float r, p, y;
             dcm.to_euler(&r, &p, &y);
-            dcm.from_euler(0.0f, radians(18.0f), y);
+            dcm.from_euler(0.0f, radians(sitl->launch_elevation), y);
             // only fwd movement
             Vector3f v_bf = dcm.transposed() * velocity_ef;
             v_bf.y = 0.0f;

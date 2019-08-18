@@ -167,6 +167,9 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
 
     AP_GROUPINFO("GND_BEHAV",   41, SITL,  gnd_behav, -1),
 
+    // launch parameters
+    AP_GROUPINFO("LAUNCH_ELE",   42, SITL,  launch_elevation,  20.0f),
+
     AP_GROUPEND
 };
     
