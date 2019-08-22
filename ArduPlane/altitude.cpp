@@ -565,7 +565,7 @@ float Plane::rangefinder_correction(void)
     // for now we only support the rangefinder for landing 
     bool using_rangefinder = (g.rangefinder_landing == 1 && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < 5000));
     float hagl;
-    bool using_estimator = g.rangefinder_landing == 2 && ahrs.get_hagl(hagl);
+    bool using_estimator = g.rangefinder_landing == 2 && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(hagl);
     if (using_rangefinder) {
         return rangefinder_state.correction;
     } else if (using_estimator) {
