@@ -135,6 +135,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
 
+    // @Param: TKOFF_THR_MINDST
+    // @DisplayName: Takeoff throttle min distanvce
+    // @Description: Minimum forward distance in m before arming the ground speed check in auto-takeoff. This is meant to be used for bungee launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For bungee launches this should be set to the distance travelled before the cable becomes slack and the bungee releases. The TKOFF_MIN_ACC threshold needs to be set to record the starting position so that the distanve travelled can be measured.   // @Units: m
+    // @Range: 0 30
+    // @Increment: 0.1
+    // @User: User
+    GSCALAR(takeoff_throttle_min_dist,     "TKOFF_THR_MINDST",  0),
+
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay
     // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. For bungee launches a larger value can be used (such as 30) to give time for the bungee to release from the aircraft before the motor is started.
