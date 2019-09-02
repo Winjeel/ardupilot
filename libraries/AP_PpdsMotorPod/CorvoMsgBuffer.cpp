@@ -52,16 +52,12 @@ bool CorvoMsgBuffer::_isValidMsg(void) {
                 calc = crc8x_fast_accum(calc, &byte, 1);
             }
         }
-        if (crc == calc) {
-            result = true;
-        } else {
-            result = false;
-        }
+
+        result = (crc == calc);
     }
 
     return result;
 }
-
 
 
 bool CorvoMsgBuffer::hasMsg(void) {
@@ -72,12 +68,11 @@ bool CorvoMsgBuffer::hasMsg(void) {
         switch (state) {
         case AwaitSentinel:
             if (_hasSentinel()) {
-                bytesNeeded = 3;
+                bytesNeeded = (kHeaderSz + kFooterSz - kSentinelSz);
                 state = AwaitMessage;
             } else {
                 removeFromHead(1);
-                bytesNeeded = 1;
-                // state = AwaitSentinel; // NOP
+                bytesNeeded = kSentinelSz;
             }
             break;
 
@@ -88,8 +83,8 @@ bool CorvoMsgBuffer::hasMsg(void) {
                     bytesNeeded = 0;
                 } else {
                     // invalid msg, so remove the sentinel and reset the state machine
-                    removeFromHead(1);
-                    bytesNeeded = 1;
+                    removeFromHead(kSentinelSz);
+                    bytesNeeded = kSentinelSz;
                     state = AwaitSentinel;
                 }
             } else {
@@ -98,7 +93,7 @@ bool CorvoMsgBuffer::hasMsg(void) {
                     // buffer is not big enough to hold entire message, so discard it
                     // and reset the state machine
                     removeFromHead(1);
-                    bytesNeeded = 1;
+                    bytesNeeded = kSentinelSz;
                     state = AwaitSentinel;
                     // TODO: need a notification here
                 }

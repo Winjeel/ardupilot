@@ -59,6 +59,8 @@ class CorvoMsgBuffer : private CircularBuffer<256, 0> {
         bool _isValidMsg(void);
 
         enum {
+            kSentinelSz     = sizeof(((CorvoPacket *)0)->sentinel),
+
             kSentinelOffset = offsetof(CorvoPacket, sentinel),
             kIdOffset       = offsetof(CorvoPacket, id),
             kSzOffset       = offsetof(CorvoPacket, dataSz),
