@@ -93,7 +93,7 @@ void Plane::update_is_flying_5Hz(void)
 
                     // check optical flow sensor
                     if (g.crash_flow_threshold > 0 &&
-                        optflow.flowRate().x > (float)g.crash_flow_threshold &&
+                        optflow.flowRate().y > (float)g.crash_flow_threshold &&
                         optflow.quality() > 128) {
                         crash_state.flow_timer_ms = now_ms;
                     } else if (g.crash_flow_threshold == 0) {
