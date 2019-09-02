@@ -599,6 +599,13 @@ private:
 
         // length of time impact_detected has been true. Times out after a few seconds. Used to clip isFlyingProbability
         uint32_t impact_timer_ms;
+
+        // First time that the optical flow sensor value indicates a failing launch
+        uint32_t flow_timer_ms;
+
+        // First time that the GPS horizontal velocity indicates a failed launch
+        uint32_t gps_timer_ms;
+
     } crash_state;
 
     // true if we are in an auto-throttle mode, which means

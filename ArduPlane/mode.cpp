@@ -27,6 +27,9 @@ bool Mode::enter()
     // reset crash detection
     plane.crash_state.is_crashed = false;
     plane.crash_state.impact_detected = false;
+    plane.crash_state.flow_timer_ms = 0;
+    plane.crash_state.gps_timer_ms = 0;
+    plane.crash_state.impact_timer_ms = 0;
 
     // reset external attitude guidance
     plane.guided_state.last_forced_rpy_ms.zero();

@@ -81,6 +81,49 @@ void Plane::update_is_flying_5Hz(void)
             switch (flight_stage)
             {
             case AP_Vehicle::FixedWing::FLIGHT_TAKEOFF:
+                // special case to detect a failed AUTO launch for up to 5 seconds after launch is detected
+                if (now_ms - takeoff_state.accel_event_ms < 5000) {
+                    // check peak -ve X accel
+                    if (g.crash_accel_threshold > 0 &&
+                        ins.get_accel_peak_hold_neg_x() < -(g.crash_accel_threshold)) {
+                        crash_state.impact_timer_ms = now_ms;
+                    } else if (g.crash_accel_threshold == 0) {
+                        crash_state.impact_timer_ms = 0;
+                    }
+
+                    // check optical flow sensor
+                    if (g.crash_flow_threshold > 0 &&
+                        optflow.flowRate().x > (float)g.crash_flow_threshold &&
+                        optflow.quality() > 128) {
+                        crash_state.flow_timer_ms = now_ms;
+                    } else if (g.crash_flow_threshold == 0) {
+                        // can't use optical flow sensor
+                        crash_state.flow_timer_ms = 0;
+                    }
+
+                    // check GPS ground speed
+                    if (gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
+                        float gps_spd_acc;
+                        bool use_spd_acc = gps.speed_accuracy(gps_spd_acc);
+                        if (use_spd_acc && gps.ground_speed() < gps_spd_acc) {
+                            crash_state.gps_timer_ms = now_ms;
+                        } else if (!use_spd_acc && gps.ground_speed() < 0.5f) {
+                            crash_state.gps_timer_ms = now_ms;
+                        }
+                    }
+
+                    // a large flow transient followed immediately by a large negative X accel
+                    // transient and a non-moving vehicle indicates that the launch has failed
+                    // so we force an immediate disarm
+                    if (crash_state.impact_timer_ms - crash_state.flow_timer_ms < 300 &&
+                        crash_state.gps_timer_ms - crash_state.impact_timer_ms < 2000) {
+                        crash_state.impact_detected = true;
+                        crash_state.is_crashed = true;
+                        is_flying_bool = false;
+                        isFlyingProbability = 0.0f;
+                        plane.disarm_motors();
+                    }
+                }
                 break;
 
             case AP_Vehicle::FixedWing::FLIGHT_NORMAL:
