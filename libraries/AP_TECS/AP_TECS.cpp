@@ -371,7 +371,7 @@ void AP_TECS::_update_speed(float load_factor)
     if (DT > 1.0f) {
         _TAS_state = (_EAS * _EAS2TAS);
         _integDTAS_state = 0.0f;
-        DT            = 0.1f; // when first starting TECS, use a
+        DT            = 0.02f; // when first starting TECS, use a
         // small time constant
     }
 
@@ -462,13 +462,13 @@ void AP_TECS::_update_height_demand(void)
     }
 
     // Limit height rate of change
-    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * 0.1f))
+    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * _DT))
     {
-        _hgt_dem = _hgt_dem_prev + _maxClimbRate * 0.1f;
+        _hgt_dem = _hgt_dem_prev + _maxClimbRate * _DT;
     }
-    else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * 0.1f))
+    else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * _DT))
     {
-        _hgt_dem = _hgt_dem_prev - max_sink_rate * 0.1f;
+        _hgt_dem = _hgt_dem_prev - max_sink_rate * _DT;
     }
     _hgt_dem_prev = _hgt_dem;
 
@@ -490,15 +490,16 @@ void AP_TECS::_update_height_demand(void)
 
         // bring it in over 1s to prevent overshoot
         if (_flare_counter < 10) {
-            _hgt_rate_dem = _hgt_rate_dem * 0.8f - 0.2f * land_sink_rate_adj;
+            float alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
+            _hgt_rate_dem = _hgt_rate_dem * (1.0f - alpha_coef) - alpha_coef * land_sink_rate_adj;
             _flare_counter++;
         } else {
             _hgt_rate_dem = - land_sink_rate_adj;
         }
-        _land_hgt_dem += 0.1f * _hgt_rate_dem;
+        _land_hgt_dem += _DT * _hgt_rate_dem;
         _hgt_dem_adj = _land_hgt_dem;
     } else {
-        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / 0.1f;
+        _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
         _flare_counter = 0;
     }
 
@@ -510,11 +511,11 @@ void AP_TECS::_update_height_demand(void)
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
         if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += 0.1f; // increment at 10Hz to gradually apply the compensation at first
+            hgt_dem_lag_filter_slew += _DT; // increment at 10Hz to gradually apply the compensation at first
         } else {
             hgt_dem_lag_filter_slew = 1;
         }
-        new_hgt_dem += hgt_dem_lag_filter_slew*(_hgt_dem_adj - _hgt_dem_adj_last)*10.0f*(timeConstant()+1);
+        new_hgt_dem += hgt_dem_lag_filter_slew * (_hgt_dem_adj - _hgt_dem_adj_last) * (timeConstant()+1) / _DT;
     } else {
         hgt_dem_lag_filter_slew = 0;
     }
@@ -581,13 +582,13 @@ void AP_TECS::_update_energies(void)
 float AP_TECS::timeConstant(void) const
 {
     if (_flags.is_doing_auto_land) {
-        if (_landTimeConst < 0.1f) {
-            return 0.1f;
+        if (_landTimeConst < _DT) {
+            return _DT;
         }
         return _landTimeConst;
     }
-    if (_timeConst < 0.1f) {
-        return 0.1f;
+    if (_timeConst < _DT) {
+        return _DT;
     }
     return _timeConst;
 }
@@ -617,7 +618,8 @@ void AP_TECS::_update_throttle_with_airspeed(void)
 
     // Apply 0.5 second first order filter to STEdot_error
     // This is required to remove accelerometer noise from the  measurement
-    STEdot_error = 0.2f*STEdot_error + 0.8f*_STEdotErrLast;
+    float alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
+    STEdot_error = alpha_coef * STEdot_error + (1.0f - alpha_coef) * _STEdotErrLast;
     _STEdotErrLast = STEdot_error;
 
     // Calculate throttle demand
@@ -937,7 +939,7 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _flags.underspeed        = false;
         _flags.badDescent        = false;
         _flags.reached_speed_takeoff = false;
-        _DT                = 0.1f; // when first starting TECS, use a
+        _DT                = 0.02f; // when first starting TECS, use a
         // small time constant
         _EAS2TAS = _TAS2EAS = 1.0f;
     }
@@ -979,7 +981,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 {
     // Calculate time in seconds since last update
     uint64_t now = AP_HAL::micros64();
-    _DT = (now - _update_pitch_throttle_last_usec) * 1.0e-6f;
+    _DT = constrain_float((now - _update_pitch_throttle_last_usec) * 1.0e-6f, 0.001f, 0.15f);
     _update_pitch_throttle_last_usec = now;
 
     _flags.is_doing_auto_land = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND);
