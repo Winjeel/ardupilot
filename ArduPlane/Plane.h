@@ -601,10 +601,13 @@ private:
         uint32_t impact_timer_ms;
 
         // First time that the optical flow sensor value indicates a failing launch
-        uint32_t flow_timer_ms;
+        uint32_t launch_flow_timer_ms;
 
         // First time that the GPS horizontal velocity indicates a failed launch
-        uint32_t gps_timer_ms;
+        uint32_t launch_gps_timer_ms;
+
+        // true when we are about to hit the ground
+        bool ground_impact_pending;
 
     } crash_state;
 

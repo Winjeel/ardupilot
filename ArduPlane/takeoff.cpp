@@ -13,6 +13,11 @@ bool Plane::auto_takeoff_check(void)
 {
     // boolean set to true if aborting launch
     bool abort_launch = false;
+    
+    // return false to inhibit motor use if an imminent ground impact is detected
+    if (crash_state.ground_impact_pending) {
+        return false;
+    }
 
     // this is a more advanced check that relies on TECS
     uint32_t now = millis();

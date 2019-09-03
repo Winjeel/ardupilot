@@ -78,6 +78,13 @@ void Plane::update_is_flying_5Hz(void)
                 crash_state.impact_detected = false;
             }
 
+            // if not in takeoff we need to reset crash state variables assoicated with a failed takeoff
+            if (flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) {
+                crash_state.launch_flow_timer_ms = 0;
+                crash_state.launch_gps_timer_ms = 0;
+                crash_state.ground_impact_pending = false;
+            }
+
             switch (flight_stage)
             {
             case AP_Vehicle::FixedWing::FLIGHT_TAKEOFF:
@@ -95,28 +102,43 @@ void Plane::update_is_flying_5Hz(void)
                     if (g.crash_flow_threshold > 0 &&
                         optflow.flowRate().y > (float)g.crash_flow_threshold &&
                         optflow.quality() > 128) {
-                        crash_state.flow_timer_ms = now_ms;
+                        crash_state.launch_flow_timer_ms = now_ms;
                     } else if (g.crash_flow_threshold == 0) {
                         // can't use optical flow sensor
-                        crash_state.flow_timer_ms = 0;
+                        crash_state.launch_flow_timer_ms = 0;
                     }
 
                     // check GPS ground speed
-                    if (gps.status() >= AP_GPS::GPS_OK_FIX_3D) {
-                        float gps_spd_acc;
-                        bool use_spd_acc = gps.speed_accuracy(gps_spd_acc);
-                        if (use_spd_acc && gps.ground_speed() < gps_spd_acc) {
-                            crash_state.gps_timer_ms = now_ms;
-                        } else if (!use_spd_acc && gps.ground_speed() < 0.5f) {
-                            crash_state.gps_timer_ms = now_ms;
+                    float gps_spd_acc;
+                    bool use_spd_acc = (gps.status() >= AP_GPS::GPS_OK_FIX_3D) && gps.speed_accuracy(gps_spd_acc);
+                    if (use_spd_acc) {
+                        if (gps.ground_speed() < gps_spd_acc) {
+                            crash_state.launch_gps_timer_ms = now_ms;
+                        }
+                    }
+
+                    // ground proximity as measured using optical flow/forward speed and a negative pitch angle 
+                    // indicate impending ground contact.
+                    if (use_spd_acc && crash_state.launch_flow_timer_ms == now_ms) {
+                        Vector2f rel_vel_bf = ahrs.rotate_earth_to_body2D(ahrs.groundspeed_vector());
+                        float hagl_est = rel_vel_bf.x / optflow.flowRate().y;
+                        Vector3f rel_vel_ef;
+                        if (ahrs.get_velocity_NED(rel_vel_ef)) {
+                            float time_to_impact = hagl_est / rel_vel_ef.z;
+                            if (hagl_est < 1.0f && hagl_est > 0.0f && // close to ground
+                                rel_vel_ef.z > 0.0f && // losing height
+                                time_to_impact < 1.0f && // will hit ground soon
+                                ahrs.pitch < 0.0f) { // nose down
+                                crash_state.ground_impact_pending = true;
+                            }
                         }
                     }
 
                     // a large flow transient followed immediately by a large negative X accel
                     // transient and a non-moving vehicle indicates that the launch has failed
                     // so we force an immediate disarm
-                    if (crash_state.impact_timer_ms - crash_state.flow_timer_ms < 300 &&
-                        crash_state.gps_timer_ms - crash_state.impact_timer_ms < 2000) {
+                    if (crash_state.impact_timer_ms - crash_state.launch_flow_timer_ms < 300 &&
+                        crash_state.launch_gps_timer_ms - crash_state.impact_timer_ms < 2000) {
                         crash_state.impact_detected = true;
                         crash_state.is_crashed = true;
                         is_flying_bool = false;
