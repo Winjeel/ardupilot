@@ -330,14 +330,14 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     // calculate thrust from RPM
     const float pitch = 8.5f * 0.0254f; // assume 14x8.5" prop
     const float static_thrust_max = 50.0f;
-    const float rpm1_max = 12000;
+    const float rpm1_max = 13000; // assume 530Kv motor running on 24.6 volts
 
     // simulate engine RPM
     rpm1 = throttle * rpm1_max;
 
     float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
     if (rpm1 - rpm_inflow >= 0.0f) {
-        thrust_scale = (rpm1 / rpm1_max) *  sqrtf((rpm1 - rpm_inflow) / rpm1_max);
+        thrust_scale = pow((rpm1 / rpm1_max) *  sqrtf((rpm1 - rpm_inflow) / rpm1_max), 0.7f);
     } else {
         thrust_scale = - (rpm1 / rpm1_max) * sqrtf((rpm_inflow - rpm1) / rpm1_max);
     }
