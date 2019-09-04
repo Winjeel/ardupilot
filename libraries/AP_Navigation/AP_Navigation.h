@@ -36,6 +36,11 @@ public:
     // bearing.
     virtual int32_t bearing_error_cd(void) const = 0;
 
+    // return the loiter radius in metres as used internally by the loiter controller
+    // which includes any loiter controller adjustment for vehicle performance limits 
+    // a positve value indicates a CW loiter, a negative value indicates a CCW loiter
+    virtual float get_loiter_radius(void) const = 0;
+
     // return the target bearing in centi-degrees. This is the bearing
     // from the vehicles current position to the target waypoint. This
     // should be calculated in the update_*() functions below.
