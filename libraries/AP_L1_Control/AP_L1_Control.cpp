@@ -338,6 +338,9 @@ void AP_L1_Control::update_loiter(const struct Location &center_WP, float radius
     // stable at high altitude
     radius = loiter_radius(fabsf(radius));
 
+    // the adjusted loiter radius is made available outside the loiter controller
+    _adj_loiter_radius = radius * (float)loiter_direction;
+
     // Calculate guidance gains used by PD loop (used during circle tracking)
     float omega = (6.2832f / _L1_period);
     float Kx = omega * omega;
