@@ -1074,20 +1074,34 @@ bool Plane::verify_loiter_heading(bool init)
     int32_t bearing_cd = current_loc.get_bearing_to(next_nav_cmd.content.location);
 
     // get current heading.
-    int32_t heading_cd = gps.ground_course_cd();
+    Vector2f gndspdvec = ahrs.groundspeed_vector();
+    int32_t heading_cd = (int32_t)(100.0f * degrees(atan2f(gndspdvec.y,gndspdvec.x)));
 
     // positive error when target on right hand side
     int32_t heading_err_cd = wrap_180_cd(bearing_cd - heading_cd);
 
     /*
         Whenever next waypoint is inside the turn, we are flying past and should exit
-        to prevent us from never exiting. This is gtrue if both the following conditions are met:
+        to prevent us from never exiting. This is true if both the following conditions are met:
+
         a) The bearing to the next waypoint is on the same side of the ground track as the
            direction of turn.
-        b) The distance to the next waypoint is less than the distance to the current waypoint.
+
+           and
+
+        b) The distance from current to next waypoint is less than our distance to the current waypoint.
+
+            and
+
+        c) magnitude of bearing to next waypoint exceeds 90 deg 
     */
-    if ((int32_t)loiter.direction * heading_err_cd > 0 &&
-        (current_loc.get_distance(next_nav_cmd.content.location) < current_loc.get_distance(next_WP_loc))) {
+    int32_t remaining_turn_to_exit_cd = (int32_t)loiter.direction * heading_err_cd;
+    float distance_between_waypoints = next_WP_loc.get_distance(next_nav_cmd.content.location);
+    float distance_to_current_wp = current_loc.get_distance(next_WP_loc);
+    if (remaining_turn_to_exit_cd > 0 &&
+        distance_between_waypoints < distance_to_current_wp &&
+        labs(heading_err_cd) > 9000) {
+        gcs().send_text(MAV_SEVERITY_INFO, "Loiter Heading - Bad Geometry");
         return true;
     }
 
@@ -1095,20 +1109,27 @@ bool Plane::verify_loiter_heading(bool init)
         loiter.sum_cd = 0;
     }
 
-    /*
-      Check to see if the the plane is heading toward the land
-      waypoint. We use 20 degrees (+/-10 deg) of margin so that
-      we can handle 200 degrees/second of yaw.
+    // estimate rate of turn assuming a circular flight path and using speed and radius
+    float turn_radius = nav_controller->get_loiter_radius();
+    if (fabsf(turn_radius) > 1.0f) {
+        // calculate turn rate in rad/sec
+        float turn_rate = ahrs.groundspeed() / turn_radius;
 
-      After every full circle, extend acceptance criteria to ensure
-      aircraft will not loop forever in case high winds are forcing
-      it beyond 200 deg/sec when passing the desired exit course
-    */
+        // calculate time to exit turn assuming 60 deg/sec average roll rate back to level
+        float time_to_level = fabsf(ahrs.roll) / radians(60);
 
-    // Use integer division to get discrete steps
-    int32_t expanded_acceptance = 1000 * (loiter.sum_cd / 36000);
+        // estimate the addtional heading change before we will be wings level if we start to unbank now
+        // and limit to prevent badly conditioned geometries
+        float lead_angle_deg = constrain_float( degrees(turn_rate) * time_to_level, -45.0f, 45.0f);
 
-    if (labs(heading_err_cd) <= 1000 + expanded_acceptance) {
+        // adjust heading error to allow sufficient time to exit turn
+        heading_err_cd -= (int32_t)(100.0f * lead_angle_deg);
+    }
+
+    // Check to see if the the plane is heading toward the next waypoint
+    int32_t exit_metric = (int32_t)loiter.direction * heading_err_cd;
+    if (exit_metric < 0 && exit_metric > -1000) {
+
         // Want to head in a straight line from _here_ to the next waypoint instead of center of loiter wp
 
         // 0 to xtrack from center of waypoint, 1 to xtrack from tangent exit location
