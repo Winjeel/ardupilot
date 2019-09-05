@@ -48,6 +48,6 @@ private:
     uint32_t driver_init_time = 0;
 
 #if (CORVO_DEBUG)
-    uint8_t tick = 0;
+    uint8_t debug_tick = 0;
 #endif // SIGHTLINE_DEBUG
 };

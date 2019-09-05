@@ -263,6 +263,10 @@ void AP_SerialManager::init()
     state[5].uart = hal.uartF;  // serial5
     state[6].uart = hal.uartG;  // serial6
 
+    // hard code serial 5 to be Corvo protocol for testing
+    // TODO: Remove this
+    state[5].protocol = SerialProtocol_Corvo;
+
     if (state[0].uart == nullptr) {
         init_console();
     }

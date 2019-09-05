@@ -17,6 +17,8 @@
 
 #include "GCS_MAVLink/GCS.h"
 
+#include "autopilot-interface.h"
+#include "OpticalFlowState.h"
 
 #include <cstring>
 
@@ -31,7 +33,7 @@ AP_PpdsMotorPod::AP_PpdsMotorPod(void) :
             driver_init_time(AP_HAL::millis())
 {
     if (CORVO_DEBUG) {
-        tick = 0;
+        debug_tick = 0;
     }
 }
 
@@ -48,6 +50,14 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
     }
 }
 
+#define _debug_freq(freq, lvl, fmt, ...)                  \
+    do {                                                  \
+        if (CORVO_DEBUG && ((debug_tick % freq) == 0)) {  \
+            gcs().send_text(lvl, fmt, ##__VA_ARGS__);     \
+        }                                                 \
+    } while (0)
+#define _debug(lvl, fmt, ...) _debug_freq(10, lvl, fmt, ##__VA_ARGS__)
+
 /*
   update AP_PpdsMotorPod state for all instances. This should be called at
   around 10Hz by main loop
@@ -56,21 +66,17 @@ void AP_PpdsMotorPod::update(void) {
 
     uint32_t time_now = AP_HAL::millis();
 
-    if (CORVO_DEBUG) {
-        tick = ((tick + 1) % 10);
-        if (tick == 0) {
-            gcs().send_text(MAV_SEVERITY_WARNING, "[%lums] PMP: update", time_now);
-        }
-    }
+    _debug(MAV_SEVERITY_WARNING, "[%8lums] PMP: update", time_now);
 
     // TODO: re-init?
     if (uart == nullptr) {
+        _debug(MAV_SEVERITY_WARNING, "\tPMP: uart == null");
         return;
     }
 
     if (!uart->is_initialized()) {
         // TODO: is this needed, and how do we recover?
-        gcs().send_text(MAV_SEVERITY_WARNING, "    PMP: uart !init");
+        _debug(MAV_SEVERITY_WARNING, "\tPMP: uart !init");
         return;
     }
 
@@ -80,39 +86,85 @@ void AP_PpdsMotorPod::update(void) {
         num_bytes = buffer_free;
     }
 
-    if (CORVO_DEBUG && num_bytes) {
-        gcs().send_text(MAV_SEVERITY_DEBUG, "    PMP: got %lu bytes", num_bytes);
-    }
+    if (num_bytes) {
+        _debug(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
 
-    while (num_bytes-- > 0) {
-        msg_buffer.push(uart->read());
-    }
+        while (num_bytes-- > 0) {
+            msg_buffer.push(uart->read());
+        }
 
-    while (msg_buffer.hasMsg()) {
-        CorvoMsgID msg_id = msg_buffer.getID();
-        switch (msg_id) {
+        while (msg_buffer.hasMsg()) {
+            CorvoMsgID msg_id = msg_buffer.getID();
+            uint8_t dataSz = msg_buffer.getDataSz();
+            switch (msg_id) {
+                case OPTICAL_FLOW_STATE: {
 
+                    _debug(MAV_SEVERITY_DEBUG, "\tPMP: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
+                    if (dataSz >= getOpticalFlowStateMinDataLength()) {
+                        uint8_t tmp[getOpticalFlowStateMaxDataLength()];
+                        int sz = msg_buffer.copyData(tmp, sizeof(tmp));
+                        (void)sz;
 
-            // TODO: Handle other received messages
-            default: {
-                gcs().send_text(MAV_SEVERITY_DEBUG, "    PMP: got msg 0x%02x", msg_id);
-                break;
+                        OpticalFlowState_t flow;
+                        int idx = 0;
+                        decodeOpticalFlowState_t(tmp, &idx, &flow);
+
+                        _debug(MAV_SEVERITY_DEBUG, "\t\ttimeDelta_us=%lums", flow.timeDelta_us);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tsurfaceQual=%u", flow.surfaceQuality);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.X=%f", flow.flowDelta.x);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.Y=%f", flow.flowDelta.y);
+                    }
+
+                    break;
+                }
+
+                // TODO: Handle other received messages
+                default: {
+                    _debug(MAV_SEVERITY_DEBUG, "\tPMP:   got msg 0x%02x", msg_id);
+                    break;
+                }
             }
-        }
 
-        // Done with the current msg, so remove it from the buffer (otherwise
-        // we'll get an infinite loop)
-        size_t eaten = msg_buffer.consume();
-        if (CORVO_DEBUG) {
-            gcs().send_text(MAV_SEVERITY_DEBUG, "    PMP:     consumed=%lu:", eaten);
-        } else {
-            (void)eaten; // suppress unused warning
+            // Done with the current msg, so remove it from the buffer (otherwise
+            // we'll get an infinite loop)
+            size_t eaten = msg_buffer.consume();
+            _debug(MAV_SEVERITY_DEBUG, "\tPMP: ate %lu bytes", eaten);
         }
+    } else {
+        _debug(MAV_SEVERITY_DEBUG, "\tPMP: got no bytes", num_bytes);
     }
+
+#define SEND_PACKET (0)
+#if SEND_PACKET
+    CorvoPacket pkt{ 0, 0, 0, nullptr, 0, };
+    finishPpdsMotorPodPacket(&pkt, 0, OPTICAL_FLOW_STATE);
+
+    uint16_t sentBytes = 0;
+
+    size_t toSend = 3;
+    size_t tx = uart->write((uint8_t *)&pkt, toSend);
+    if (tx == toSend) {
+        sentBytes += tx;
+        toSend = pkt.dataSz;
+        tx = uart->write(pkt.data, toSend);
+    }
+    if (tx == toSend) {
+        sentBytes += tx;
+        sentBytes += uart->write(&pkt.crc, 1);
+    }
+    _debug(MAV_SEVERITY_DEBUG, "\tPMP: sent %lu bytes", sentBytes);
+    if (sentBytes == 4) {
+        _debug(MAV_SEVERITY_DEBUG, "\t\t{ %u, %u, %u, %u }", pkt.sentinel, pkt.id, pkt.dataSz, pkt.crc);
+    }
+#endif // SEND_PACKET
+
 
     if (!is_connected) {
         // TODO: send query message
     } else {
         // TODO: send update request(?)
     }
+
+    // update debug tick
+    debug_tick++;
 }
