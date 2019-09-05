@@ -25,17 +25,19 @@
 extern const AP_HAL::HAL &hal;
 
 
+AP_PpdsMotorPod *AP_PpdsMotorPod::_singleton = nullptr;
+
 AP_PpdsMotorPod::AP_PpdsMotorPod(void) :
             uart(nullptr),
-
             is_connected(false),
-
             driver_init_time(AP_HAL::millis())
 {
+    _singleton = this;
     if (CORVO_DEBUG) {
         debug_tick = 0;
     }
 }
+
 
 /*
   initialise the AP_PpdsMotorPod class.
@@ -63,6 +65,7 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
   around 10Hz by main loop
  */
 void AP_PpdsMotorPod::update(void) {
+    WITH_SEMAPHORE(_flow_sem);
 
     uint32_t time_now = AP_HAL::millis();
 
@@ -113,6 +116,11 @@ void AP_PpdsMotorPod::update(void) {
                         _debug(MAV_SEVERITY_DEBUG, "\t\tsurfaceQual=%u", flow.surfaceQuality);
                         _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.X=%f", flow.flowDelta.x);
                         _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.Y=%f", flow.flowDelta.y);
+
+                        _flow_data.surfaceQuality = flow.surfaceQuality;
+                        _flow_data.delta.x += flow.flowDelta.x;
+                        _flow_data.delta.y += flow.flowDelta.y;
+                        _flow_data.delta.t_us += flow.timeDelta_us;
                     }
 
                     break;
@@ -167,4 +175,27 @@ void AP_PpdsMotorPod::update(void) {
 
     // update debug tick
     debug_tick++;
+}
+
+bool AP_PpdsMotorPod::getFlowData(FlowData * const flow_data) {
+    WITH_SEMAPHORE(_flow_sem);
+    bool has_data = (_flow_data.delta.t_us > 0);
+
+    if (has_data) {
+        memcpy(flow_data, &_flow_data, sizeof(*flow_data));
+    }
+
+    return has_data;
+}
+
+void AP_PpdsMotorPod::clearFlowData(void) {
+    WITH_SEMAPHORE(_flow_sem);
+    memset(&_flow_data, 0, sizeof(_flow_data));
+}
+
+
+namespace AP {
+    AP_PpdsMotorPod *motorPod() {
+        return AP_PpdsMotorPod::get_singleton();
+    }
 }

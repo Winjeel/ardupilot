@@ -50,7 +50,8 @@ public:
         CXOF = 4,
         MAVLINK = 5,
         UAVCAN = 6,
-        SITL = 10
+        SITL = 10,
+        MOTOR_POD = 128, // High value to de-conflict with upstream
     };
 
     // init - initialise sensor

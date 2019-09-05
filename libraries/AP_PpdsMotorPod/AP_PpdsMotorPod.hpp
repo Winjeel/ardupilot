@@ -38,6 +38,27 @@ public:
     void update(void);
 
 
+    typedef struct {
+        uint8_t surfaceQuality;
+        struct {
+            uint32_t t_us;
+            int32_t x;
+            int32_t y;
+        } delta;
+    } FlowData;
+
+    // Copy the accumulated flow data.
+    // Returns true if data is available and has been copied.
+    bool getFlowData(FlowData * const flow_data);
+
+    // Clear the accumulated flow data
+    void clearFlowData(void);
+
+    // get singleton instance
+    static AP_PpdsMotorPod *get_singleton() {
+        return AP_PpdsMotorPod::_singleton;
+    }
+
 private:
     AP_HAL::UARTDriver *uart = nullptr;
 
@@ -47,7 +68,16 @@ private:
 
     uint32_t driver_init_time = 0;
 
+    FlowData _flow_data = {};
+    HAL_Semaphore _flow_sem;
+
+    static AP_PpdsMotorPod *_singleton;
+
 #if (CORVO_DEBUG)
     uint8_t debug_tick = 0;
-#endif // SIGHTLINE_DEBUG
+#endif // CORVO_DEBUG
 };
+
+namespace AP {
+    AP_PpdsMotorPod *motorPod();
+}

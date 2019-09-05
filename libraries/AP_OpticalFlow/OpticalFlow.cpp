@@ -7,6 +7,7 @@
 #include "AP_OpticalFlow_CXOF.h"
 #include "AP_OpticalFlow_MAV.h"
 #include "AP_OpticalFlow_HereFlow.h"
+#include "AP_OpticalFlow_MotorPod.h"
 #include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
@@ -142,6 +143,9 @@ void OpticalFlow::init(uint32_t log_bit)
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         backend = new AP_OpticalFlow_SITL(*this);
 #endif
+        break;
+    case OpticalFlowType::MOTOR_POD:
+        backend = AP_OpticalFlow_MotorPod::detect(*this);
         break;
     }
 
