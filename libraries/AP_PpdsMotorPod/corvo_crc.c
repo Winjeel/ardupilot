@@ -12,7 +12,7 @@ uint8_t crc8x_simple(uint8_t const * data, size_t sz) {
 
 uint8_t crc8x_simple_accum(uint8_t crc, uint8_t const * data, size_t sz) {
     if (data == NULL) {
-        return 0xff;
+        return crc;
     }
     while (sz--) {
         crc ^= *data++;
@@ -68,7 +68,7 @@ uint8_t crc8x_fast_accum(uint8_t crc, uint8_t const * data, size_t sz) {
     };
 
     if (data == NULL) {
-        return 0xff;
+        return crc;
     }
     while (sz--) {
         crc = kCrc8x_table[crc ^ *data++];

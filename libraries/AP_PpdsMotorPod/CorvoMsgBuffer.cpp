@@ -129,6 +129,14 @@ CorvoMsgID CorvoMsgBuffer::getID(void) {
     return get(kIdOffset);
 }
 
+uint8_t CorvoMsgBuffer::getDataSz(void) {
+    if (getBytesUsed() <= kSzOffset) {
+        return 0;
+    }
+
+    return get(kSzOffset);
+}
+
 // size_t CorvoMsgBuffer::copyMsg(uint8_t * const out, size_t outSz) {
 //     if (_isValidMsg() && (outSz >= _getMsgSz())) {
 //         return copyFromHead(out, _getMsgSz());
