@@ -77,7 +77,7 @@ public:
         k_param_ins,                // libraries/AP_InertialSensor variables
         k_param_takeoff_throttle_min_speed,
         k_param_takeoff_throttle_min_accel,
-        k_param_takeoff_throttle_min_dist, // unused
+        k_param_takeoff_throttle_min_dist,
         k_param_level_roll_limit,
         k_param_hil_servos,
         k_param_vtail_output, // unused
