@@ -246,6 +246,15 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Increment: 0.1
     // @User: User
     AP_GROUPINFO("DASH_THR", 28, AP_TECS, _dashThrIncr, -1.0f),
+
+    // @Param: HGT_SHAPE
+    // @DisplayName: Height demand shaping
+    // @Description: This is the ratio of the time constant used to shape the height demand to the time constant of the height control loop. When set to a larger value, response to changes will be slower. When set to larger values the respoinse to height changes will be faster, but overshoot of demanded height changes may occur. Set to the largest value that gives acceptable overshoot. 
+    // @Range: 0.5 1.0
+    // @Increment: 0.05
+    // @User: Advanced
+    AP_GROUPINFO("HGT_SHAPE", 29, AP_TECS, _heightShapeTconstRatio, 0.7f),
+
     
     AP_GROUPEND
 };
@@ -461,19 +470,23 @@ void AP_TECS::_update_height_demand(void)
         max_sink_rate = _maxSinkRate_approach;
     }
 
-    // Limit height rate of change
-    if ((_hgt_dem - _hgt_dem_prev) > (_maxClimbRate * _DT))
+    // Limit height rate of change and limit acceleration to half of vehicle limit to allow control amrgin for height tracking
+    // Use square root law to calculate velocity profile when braking to stop at final height
+    const float acc_max_for_braking = 0.5f * _vertAccLim;
+    float hgt_rate_brake_lim = sqrtf(2.0f * acc_max_for_braking * fabsf(_hgt_dem - _hgt_dem_prev));
+    if ((_hgt_dem - _hgt_dem_prev) > (MIN(_maxClimbRate, hgt_rate_brake_lim) * _DT))
     {
-        _hgt_dem = _hgt_dem_prev + _maxClimbRate * _DT;
+        _hgt_dem = _hgt_dem_prev + MIN(_maxClimbRate, hgt_rate_brake_lim) * _DT;
     }
-    else if ((_hgt_dem - _hgt_dem_prev) < (-max_sink_rate * _DT))
+    else if ((_hgt_dem - _hgt_dem_prev) < (-MIN(max_sink_rate, hgt_rate_brake_lim) * _DT))
     {
-        _hgt_dem = _hgt_dem_prev - max_sink_rate * _DT;
+        _hgt_dem = _hgt_dem_prev - MIN(max_sink_rate, hgt_rate_brake_lim) * _DT;
     }
     _hgt_dem_prev = _hgt_dem;
 
-    // Apply first order lag to height demand
-    _hgt_dem_adj = 0.05f * _hgt_dem + 0.95f * _hgt_dem_adj_last;
+    // Apply first order shaping filter to height demand 
+    float alpha_coef = constrain_float(_DT / (_heightShapeTconstRatio * timeConstant()), 0.0f, 1.0f);
+    _hgt_dem_adj = alpha_coef * _hgt_dem + (1.0f - alpha_coef) * _hgt_dem_adj_last;
 
     // when flaring force height rate demand to the
     // configured sink rate and adjust the demanded height to
@@ -490,7 +503,7 @@ void AP_TECS::_update_height_demand(void)
 
         // bring it in over 1s to prevent overshoot
         if (_flare_counter < 10) {
-            float alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
+            alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
             _hgt_rate_dem = _hgt_rate_dem * (1.0f - alpha_coef) - alpha_coef * land_sink_rate_adj;
             _flare_counter++;
         } else {
