@@ -197,6 +197,10 @@ void NavEKF2_core::FuseAirspeed()
 // select fusion of true airspeed measurements
 void NavEKF2_core::SelectTasFusion()
 {
+    // We don't use measured airspeed if a default value has been specified by the user
+    if (frontend->_easDefault >= 5.0f) {
+        return;
+    }
     // Check if the magnetometer has been fused on that time step and the filter is running at faster than 200 Hz
     // If so, don't fuse measurements on this time step to reduce frame over-runs
     // Only allow one time slip to prevent high rate magnetometer data locking out fusion of other measurements
