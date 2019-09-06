@@ -484,8 +484,9 @@ void AP_TECS::_update_height_demand(void)
     }
     _hgt_dem_prev = _hgt_dem;
 
-    // Apply first order shaping filter to height demand 
-    float alpha_coef = constrain_float(_DT / (_heightShapeTconstRatio * timeConstant()), 0.0f, 1.0f);
+    // Apply first order noise filter to height demand
+    const float tconst_ratio = 0.7f;
+    float alpha_coef = constrain_float(_DT / (tconst_ratio * timeConstant()), 0.0f, 1.0f);
     _hgt_dem_adj = alpha_coef * _hgt_dem + (1.0f - alpha_coef) * _hgt_dem_adj_last;
 
     // when flaring force height rate demand to the
@@ -812,9 +813,7 @@ void AP_TECS::_update_pitch(void)
     // A SKE_weighting of 2 provides 100% priority to speed control. This is used when an underspeed condition is detected. In this instance, if airspeed
     // rises above the demanded value, the pitch angle will be increased by the TECS controller.
     float SKE_weighting = constrain_float(_spdWeight, 0.0f, 2.0f);
-    if (!_ahrs.airspeed_sensor_enabled()) {
-        SKE_weighting = 0.0f;
-    } else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_VTOL) {
+    if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_VTOL) {
         // if we are in VTOL mode then control pitch without regard to
         // speed. Speed is also taken care of independently of
         // height. This is needed as the usual relationship of speed
@@ -935,6 +934,72 @@ void AP_TECS::_update_pitch(void)
     _last_pitch_dem = _pitch_dem;
 }
 
+void AP_TECS::_update_pitch_without_airspeed(void)
+{
+    // demand a climb rate as a function of feed forward climb rate
+    float climb_rate_dem = _hgt_rate_dem;
+
+    // when not flaring we also demand an additional climb rate to correct height tracking error
+    if (!_landing.is_flaring()) {
+        climb_rate_dem += (1.0f/timeConstant()) * (_hgt_dem_adj - _height);
+    }
+    climb_rate_dem = constrain_float(climb_rate_dem, -_maxSinkRate, _maxClimbRate);
+
+    logging.climb_rate_dem = climb_rate_dem;
+
+    // convert climb rate demand to a pitch angle demand using the TAS estimate
+    float climb_rate_err = climb_rate_dem - _climb_rate;
+    float tas_dem  = get_target_airspeed_filt() / _EAS2TAS;
+    _pitch_dem_unc = (climb_rate_dem + (1.0f/timeConstant()) * climb_rate_err) / tas_dem;
+
+    // Constrain pitch demand
+    _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
+
+    // limit of pitch trim adjustment in radians
+    const float pitch_trim_limit = radians(5.0f);
+
+    // Calculate pitch trim correction from integrated error
+    // Don't integrate in a direction that will saturate the pitch angle demand
+    const float integ_gain = 1.0f / (timeConstant() * tas_dem);
+    float integ_increment;
+    if (_pitch_dem_unc > (_PITCHmaxf - pitch_trim_limit) || _on_pos_pitch_rate_limit) {
+        integ_increment = MAX(climb_rate_err * integ_gain, 0.0f) * _DT;
+    } else if (_pitch_dem_unc < (_PITCHminf + pitch_trim_limit) || _on_neg_pitch_rate_limit) {
+        integ_increment = MIN(climb_rate_err * integ_gain, 0.0f) * _DT;
+    } else {
+        integ_increment = climb_rate_err * integ_gain * _DT;
+    }
+
+    // Protect integrator input from large spikes
+    _pitch_err_integ += constrain_float(integ_increment, -pitch_trim_limit, pitch_trim_limit);
+
+    // Integrator state represents steady state pitch angle required to maintain altitude.
+    // If the vehicle is trimmed to maintain altitude with zero stick in FBWA by appropriate 
+    // adjustment of TRIM_PITCH_CD or AHRS_TRIM_Y, then a maximum trim range of +-5 degrees is sufficient.
+    _pitch_err_integ = constrain_float(_pitch_err_integ, -radians(5.0f), radians(5.0f));
+
+    // Add integrator term and re-constrain pitch demand
+    _pitch_dem = constrain_float(_pitch_dem + _pitch_err_integ, _PITCHminf, _PITCHmaxf);
+
+    // Rate limit the pitch demand to comply with specified vertical
+    // acceleration limit
+    float ptchRateIncr = _DT * _vertAccLim / _TAS_state ;
+    if ((_pitch_dem - _last_pitch_dem) > ptchRateIncr) {
+        _pitch_dem = _last_pitch_dem + ptchRateIncr;
+        _on_pos_pitch_rate_limit = true;
+        _on_neg_pitch_rate_limit = false;
+    } else if ((_pitch_dem - _last_pitch_dem) < -ptchRateIncr) {
+        _pitch_dem = _last_pitch_dem - ptchRateIncr;
+        _on_neg_pitch_rate_limit = true;
+        _on_pos_pitch_rate_limit = false;
+    } else {
+        _on_pos_pitch_rate_limit = false;
+        _on_neg_pitch_rate_limit = false;
+    }
+
+    _last_pitch_dem = _pitch_dem;
+}
+
 void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
 {
     // Initialise states and variables if DT > 1 second or in climbout
@@ -955,6 +1020,9 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _DT                = 0.02f; // when first starting TECS, use a
         // small time constant
         _EAS2TAS = _TAS2EAS = 1.0f;
+        _pitch_err_integ  = 0.0f;
+        _on_pos_pitch_rate_limit = false;
+        _on_neg_pitch_rate_limit = false;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {
@@ -1078,7 +1146,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             _flags.reached_speed_takeoff = true;
         }
     }
-    
+
     // convert to radians
     _PITCHmaxf = radians(_PITCHmaxf);
     _PITCHminf = radians(_PITCHminf);
@@ -1122,7 +1190,11 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     }
 
     // Calculate pitch demand
-    _update_pitch();
+    if (_ahrs.airspeed_sensor_enabled() || _use_synthetic_airspeed) {
+         _update_pitch();
+    } else {
+        _update_pitch_without_airspeed();
+    }
 
     // log to AP_Logger
     AP::logger().Write(
@@ -1146,10 +1218,12 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_TAS_rate_dem,
         (double)logging.SKE_weighting,
         _flags_byte);
-    AP::logger().Write("TEC2", "TimeUS,KErr,PErr,EDelta,LF", "Qffff",
+    AP::logger().Write("TEC2", "TimeUS,KErr,PErr,EDelta,LF,PEI,CRD", "Qffffff",
                                            now,
                                            (double)logging.SKE_error,
                                            (double)logging.SPE_error,
                                            (double)logging.SEB_delta,
-                                           (double)load_factor);
+                                           (double)load_factor,
+                                           (double)_pitch_err_integ,
+                                           (double)logging.climb_rate_dem);
 }
