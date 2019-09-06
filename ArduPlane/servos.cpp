@@ -927,7 +927,7 @@ float Plane::calc_fwd_compensation_gain()
     // contrain resting voltage estimate (resting voltage is actual voltage with sag removed based on current draw and resistance)
     batt_voltage_resting_estimate = constrain_float(batt_voltage_resting_estimate, g2.batt_voltage_min, g2.batt_voltage_max);
 
-    // filter at 0.5 Hz
+    // filter at frequency set by AP_MOTORS_BATT_VOLT_FILT_HZ
     float rpm_max_ratio = _batt_voltage_filt.apply(batt_voltage_resting_estimate/g2.batt_voltage_max, scheduler.get_loop_period_s());
 
     // avoid divide by zero
