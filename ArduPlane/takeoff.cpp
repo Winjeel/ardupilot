@@ -296,6 +296,6 @@ void Plane::complete_auto_takeoff(void)
  */
 void Plane::landing_gear_update(void)
 {
-    g2.landing_gear.update(relative_ground_altitude(g.rangefinder_landing == 1));
+    g2.landing_gear.update(relative_ground_altitude(g.rangefinder_landing == land_hagl_source::RANGEFINDER));
 }
 #endif

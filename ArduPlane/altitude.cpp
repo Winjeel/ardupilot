@@ -563,9 +563,9 @@ float Plane::lookahead_adjustment(void)
 float Plane::rangefinder_correction(void)
 {
     // for now we only support the rangefinder for landing 
-    bool using_rangefinder = (g.rangefinder_landing == 1 && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < 5000));
+    bool using_rangefinder = (g.rangefinder_landing == land_hagl_source::RANGEFINDER && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < 5000));
     float hagl;
-    bool using_estimator = g.rangefinder_landing == 2 && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(hagl);
+    bool using_estimator = g.rangefinder_landing == land_hagl_source::EKF && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(hagl);
     if (using_rangefinder) {
         return rangefinder_state.correction;
     } else if (using_estimator) {
@@ -611,7 +611,7 @@ void Plane::rangefinder_height_update(void)
                  control_mode == &mode_qland ||
                  control_mode == &mode_qrtl ||
                  (control_mode == &mode_auto && quadplane.is_vtol_land(plane.mission.get_current_nav_cmd().id))) &&
-                g.rangefinder_landing == 1) {
+                g.rangefinder_landing == land_hagl_source::RANGEFINDER) {
                 rangefinder_state.in_use = true;
                 gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder engaged at %.2fm", (double)rangefinder_state.height_estimate);
             }

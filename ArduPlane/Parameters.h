@@ -495,6 +495,13 @@ public:
     AP_Int8 parachute_channel;
 };
 
+// enums used by RNGFND_LANDING parameter
+enum land_hagl_source {
+    NONE = 0,
+    RANGEFINDER = 1,
+    EKF = 2,
+    };
+
 /*
   2nd block of parameters, to avoid going past 256 top level keys
  */
