@@ -914,10 +914,9 @@ void Plane::servos_auto_trim(void)
 // return scale factor for forward thrust motor ESC demands
 float Plane::calc_fwd_compensation_gain()
 {
-    // sanity check battery_voltage_min is not too small
-    // if disabled or misconfigured exit immediately
+    // check sanity of battery voltage limits and if misconfigured exit immediately
     float batt_voltage_resting_estimate = AP::battery().voltage_resting_estimate(g2.batt_idx);
-    if((g2.batt_voltage_max <= 0) || (g2.batt_voltage_min >= g2.batt_voltage_max) || (batt_voltage_resting_estimate < 0.25f*g2.batt_voltage_min)) {
+    if((g2.batt_voltage_max <= 0) || (g2.batt_voltage_min <= 0) || (g2.batt_voltage_min >= g2.batt_voltage_max)) {
         _batt_voltage_filt.reset(1.0f);
         return 1.0f;
     }
