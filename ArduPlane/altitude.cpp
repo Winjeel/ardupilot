@@ -563,7 +563,8 @@ float Plane::lookahead_adjustment(void)
 float Plane::rangefinder_correction(void)
 {
     // for now we only support the rangefinder for landing 
-    bool using_rangefinder = (g.rangefinder_landing == land_hagl_source::RANGEFINDER && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < 5000));
+    const uint32_t rangefinder_timeout_ms = 5000;
+    bool using_rangefinder = (g.rangefinder_landing == land_hagl_source::RANGEFINDER && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < rangefinder_timeout_ms));
     float hagl;
     bool using_estimator = g.rangefinder_landing == land_hagl_source::EKF && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(hagl);
     if (using_rangefinder) {
