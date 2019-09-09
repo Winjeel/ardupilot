@@ -109,7 +109,7 @@ class CircularBuffer {
             return copy(out, num, 0);
         }
 
-        size_t copy(void * const out, const size_t num, size_t offset) {
+        size_t copy(void * const out, const size_t num, size_t offset) const {
             if (out == nullptr) {
                 return 0;
             }
@@ -123,7 +123,7 @@ class CircularBuffer {
             memcpy(out, &buffer[head + offset], numAtHead);
             memcpy(((uint8_t * const)out + numAtHead), buffer, numAtZero);
 
-            // clear excess
+            // clear excess (don't copy junk into output buffer)
             size_t toClear = num - toCopy;
             void * const clearPtr = (uint8_t * const)out + toCopy;
             memset(clearPtr, kClearChar, toClear);
@@ -148,13 +148,15 @@ class CircularBuffer {
         }
 
         uint8_t operator[](size_t idx) const {
+            return get(idx);
+        }
+
+        uint8_t get(size_t idx) const {
             if (idx < bytesUsed) {
                 return buffer[(head + idx) % kBufferSz];
             }
             return kClearChar;
         }
-
-        uint8_t get(size_t idx) const { return this->operator[](idx); }
 
         size_t getBufferSz(void) const { return kBufferSz; }
 

@@ -37,7 +37,7 @@ bool CorvoMsgBuffer::_isValidMsg(void) {
     if (_isCompleteMsg()) {
         uint8_t crc = get(_getCrcOffset());
 
-        uint8_t calc = 0;
+        uint8_t calc = ~crc;
 
         size_t msgCrcSz = _getMsgSz() - kCrcSz;
         if (msgCrcSz) {
@@ -137,13 +137,13 @@ uint8_t CorvoMsgBuffer::getDataSz(void) {
     return get(kSzOffset);
 }
 
-// size_t CorvoMsgBuffer::copyMsg(uint8_t * const out, size_t outSz) {
-//     if (_isValidMsg() && (outSz >= _getMsgSz())) {
-//         return copyFromHead(out, _getMsgSz());
-//     }
+size_t CorvoMsgBuffer::copyMsg(uint8_t * const out, size_t outSz) {
+    if (_isValidMsg() && (outSz >= _getMsgSz())) {
+        return copy(out, _getMsgSz());
+    }
 
-//     return 0;
-// }
+    return 0;
+}
 
 size_t CorvoMsgBuffer::copyData(void * const out, const size_t outSz) {
     if (_isValidMsg()) {

@@ -41,7 +41,8 @@ class CorvoMsgBuffer : private CircularBuffer<256, 0> {
         CorvoMsgID getID(void);
         uint8_t getDataSz(void);
 
-        size_t copyData(void * const out, const size_t len);
+        size_t copyMsg(uint8_t * const out, size_t outSz);
+        size_t copyData(void * const out, const size_t outSz);
 
 
     private:
