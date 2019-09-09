@@ -1251,7 +1251,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
     // @Param: BAT_VOLT_MAX
     // @DisplayName: Battery voltage compensation maximum voltage
-    // @Description: Battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust).  Recommend 4.4 * cell count, 0 = Disabled
+    // @Description: Battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust).  Recommend 4.4 * cell count. Disabled if 0 or > 0.6 x BAT_VOLT_MIN.
     // @Range: 6 35
     // @Units: V
     // @User: Advanced
@@ -1259,7 +1259,7 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
 
     // @Param: BAT_VOLT_MIN
     // @DisplayName: Battery voltage compensation minimum voltage
-    // @Description: Battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count, 0 = Disabled
+    // @Description: Battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count. Disabled if 0 or < 0.6 x BAT_VOLT_MAX.
     // @Range: 6 35
     // @Units: V
     // @User: Advanced

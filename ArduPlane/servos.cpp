@@ -916,12 +916,10 @@ float Plane::calc_fwd_compensation_gain()
 {
     // check sanity of battery voltage limits and if misconfigured exit immediately
     float batt_voltage_resting_estimate = AP::battery().voltage_resting_estimate(g2.batt_idx);
-    if((g2.batt_voltage_max <= 0) || (g2.batt_voltage_min <= 0) || (g2.batt_voltage_min >= g2.batt_voltage_max)) {
+    if((g2.batt_voltage_max <= 0) || (g2.batt_voltage_min <= 0) || (g2.batt_voltage_min >= g2.batt_voltage_max) || g2.batt_voltage_min < (0.6f * g2.batt_voltage_max)) {
         _batt_voltage_filt.reset(1.0f);
         return 1.0f;
     }
-
-    g2.batt_voltage_min = MAX(g2.batt_voltage_min, g2.batt_voltage_max * 0.6f);
 
     // contrain resting voltage estimate (resting voltage is actual voltage with sag removed based on current draw and resistance)
     batt_voltage_resting_estimate = constrain_float(batt_voltage_resting_estimate, g2.batt_voltage_min, g2.batt_voltage_max);
