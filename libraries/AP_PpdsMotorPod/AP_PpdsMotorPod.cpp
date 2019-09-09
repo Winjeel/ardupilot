@@ -65,8 +65,6 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
   around 10Hz by main loop
  */
 void AP_PpdsMotorPod::update(void) {
-    WITH_SEMAPHORE(_flow_sem);
-
     uint32_t time_now = AP_HAL::millis();
 
     _debug(MAV_SEVERITY_WARNING, "[%8lums] PMP: update", time_now);
@@ -91,9 +89,14 @@ void AP_PpdsMotorPod::update(void) {
 
     if (num_bytes) {
         _debug(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
+        WITH_SEMAPHORE(_flow_sem);
+
 
         while (num_bytes-- > 0) {
-            msg_buffer.push(uart->read());
+            int16_t c = uart->read();
+            if (c >= 0) {
+                msg_buffer.push(c);
+            }
         }
 
         while (msg_buffer.hasMsg()) {
@@ -106,7 +109,12 @@ void AP_PpdsMotorPod::update(void) {
                     if (dataSz >= getOpticalFlowStateMinDataLength()) {
                         uint8_t tmp[getOpticalFlowStateMaxDataLength()];
                         int sz = msg_buffer.copyData(tmp, sizeof(tmp));
-                        (void)sz;
+
+                        if (   (sz < getOpticalFlowStateMinDataLength())
+                            || (sz > getOpticalFlowStateMaxDataLength())
+                        ) {
+                            _debug(MAV_SEVERITY_ERROR, "PMP Bad! sz=%lums", sz);
+                        }
 
                         OpticalFlowState_t flow;
                         int idx = 0;
