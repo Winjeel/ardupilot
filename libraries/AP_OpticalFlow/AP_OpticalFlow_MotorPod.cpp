@@ -23,7 +23,6 @@
 #include "AP_OpticalFlow_MotorPod.h"
 #include <stdio.h>
 
-#define debug(fmt, args ...)  do {printf(fmt, ## args); } while(0)
 
 
 AP_OpticalFlow_MotorPod::AP_OpticalFlow_MotorPod(OpticalFlow &_frontend) :
@@ -45,17 +44,21 @@ AP_OpticalFlow_MotorPod *AP_OpticalFlow_MotorPod::detect(OpticalFlow &_frontend)
 }
 
 void AP_OpticalFlow_MotorPod::update(void) {
-    if (AP::motorPod() != nullptr) {
+    if (AP::motorPod() == nullptr) {
         return;
     }
 
     WITH_SEMAPHORE(_sem);
 
-    uint32_t now_us = AP_HAL::micros();
-    // TODO: configure this properly
-    if ((now_us - lastUpdate_us) < 100000) {
-        return;
-    }
+    const uint32_t kNow_us = AP_HAL::micros();
+    const uint32_t kUpdatePerdiod_us = (kNow_us - this->lastUpdate_us);
+    this->lastUpdate_us = kNow_us;
+
+    const Vector3f& kGyro_vec = AP::ahrs_navekf().get_gyro();
+    // accumulate gyro data
+    this->gyro_accum.x += kGyro_vec.x;
+    this->gyro_accum.y += kGyro_vec.y;
+    this->gyro_accum.t += kUpdatePerdiod_us;
 
     // Get optical flow data from MotorPod driver
     AP_PpdsMotorPod::FlowData flowData;
@@ -66,19 +69,21 @@ void AP_OpticalFlow_MotorPod::update(void) {
         return;
     }
 
-    const float kMicrosToSeconds = 1.0e-6;
-    float dt_gyro = (now_us - lastUpdate_us) * kMicrosToSeconds;
-    lastUpdate_us = now_us;
+    AP::motorPod()->clearFlowData();
 
     struct OpticalFlow::OpticalFlow_state state;
     state.surface_quality = flowData.surfaceQuality;
 
-    const Vector3f& gyro = AP::ahrs_navekf().get_gyro();
-    state.bodyRate = Vector2f(gyro.x / dt_gyro, gyro.y / dt_gyro);
+    const float kMicrosToSeconds = 1.0e-6;
+    float delta_t_flow = flowData.delta.t_us * kMicrosToSeconds;
+    float delta_t_gyro = this->gyro_accum.t * kMicrosToSeconds;
 
-    const float dt_flow = flowData.delta.t_us * kMicrosToSeconds;
-    const float kTimeout = 0.3; // TODO: configure this
-    if (is_positive(dt_flow) && (dt_flow < kTimeout)) {
+    // sanity check the values from the Motor Pod
+    if (fabs(delta_t_flow * 0.9f) > delta_t_gyro) {
+        delta_t_flow = -1.0;
+    }
+
+    if (is_positive(delta_t_flow)) {
 
         const Vector2f flowScaler = _flowScaler();
         float flowScaleFactorX = 1.0f + 0.001f * flowScaler.x;
@@ -86,14 +91,21 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
         state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX,
                                   flowData.delta.y * flowScaleFactorY);
-        state.flowRate *= kFlowPixelScaling / dt_flow;
+        state.flowRate *= kFlowPixelScaling / delta_t_flow;
+
+        state.bodyRate = Vector2f(this->gyro_accum.x / delta_t_gyro,
+                                  this->gyro_accum.y / delta_t_gyro);
+
+        // clear the accumulator after we use the data
+        this->gyro_accum.x = 0;
+        this->gyro_accum.y = 0;
+        this->gyro_accum.t = 0;
 
         // we only apply yaw to flowRate as body rate comes from AHRS
         _applyYaw(state.flowRate);
-
-        AP::motorPod()->clearFlowData();
     } else {
         state.flowRate.zero();
+        state.bodyRate.zero();
     }
 
     // copy results to front end

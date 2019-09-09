@@ -25,5 +25,11 @@ private:
 
     const float kFlowPixelScaling = 1.26e-3;
 
+    struct GyroAccum {
+        float x;
+        float y;
+        uint64_t t;
+    } gyro_accum;
+
     uint32_t lastUpdate_us;
 };
