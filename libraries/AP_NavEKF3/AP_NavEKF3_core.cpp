@@ -32,6 +32,7 @@ NavEKF3_core::NavEKF3_core(void) :
     _perf_test[9] = hal.util->perf_alloc(AP_HAL::Util::PC_ELAPSED, "EK3_Test9");
     firstInitTime_ms = 0;
     lastInitFailReport_ms = 0;
+    lastAlignMoveFail_ms = 0;
 }
 
 // setup this core backend
@@ -192,6 +193,7 @@ void NavEKF3_core::InitialiseVariables()
     lastPosResetD_ms = 0;
     lastRngMeasTime_ms = 0;
     terrainHgtStableSet_ms = 0;
+    lastAlignMoveFail_ms = 0;
 
     // initialise other variables
     gpsNoiseScaler = 1.0f;
@@ -281,6 +283,7 @@ void NavEKF3_core::InitialiseVariables()
     flowFusionActive = false;
     airSpdFusionDelayed = false;
     sideSlipFusionDelayed = false;
+    airDataFusionWindOnly = false;
     posResetNE.zero();
     velResetNE.zero();
     posResetD = 0.0f;
@@ -306,6 +309,7 @@ void NavEKF3_core::InitialiseVariables()
     posOffsetNED.zero();
     posResetSource = DEFAULT;
     velResetSource = DEFAULT;
+    externalEasDefault = frontend->_easDefault;
 
     // range beacon fusion variables
     memset((void *)&rngBcnDataNew, 0, sizeof(rngBcnDataNew));
@@ -434,14 +438,30 @@ bool NavEKF3_core::InitialiseFilterBootstrap(void)
         return false;
     }
 
+    // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
+    Vector3f initAccVec = imuDataDelayed.delVel * (1.0f / imuDataDelayed.delVelDT);
+
+    // angular rate vector in XYZ body axes measured by the IMU (rad/s)
+    Vector3f initAngRateVec =  imuDataDelayed.delAng * (1.0f / imuDataDelayed.delAngDT);
+
+    // require upright and not rotating too fast
+    float xy_length_sq = initAccVec.x*initAccVec.x + initAccVec.y*initAccVec.y;
+    float accel_length = initAccVec.length();
+    if ((initAngRateVec.length() > radians(10.0f)) // rotating less than 10 deg/sec
+            || (initAccVec.z > 0.0f) // right way up
+            || (accel_length > 1.1f * GRAVITY_MSS) // not shaken
+            || (accel_length < 0.9f * GRAVITY_MSS) // not shaken
+            || (xy_length_sq > sq(0.5f * GRAVITY_MSS))) { // not tilted past ~30 deg
+        lastAlignMoveFail_ms = imuSampleTime_ms;
+        return false;
+    } else if ((imuSampleTime_ms - lastAlignMoveFail_ms) < 1000) {
+        // require a second of low movement to reduce chance of starting alignmnet inadvertently during hand carriage
+        return false;
+    }
+    lastAlignMoveFail_ms = 0;
+
     // set re-used variables to zero
     InitialiseVariables();
-
-    // acceleration vector in XYZ body axes measured by the IMU (m/s^2)
-    Vector3f initAccVec;
-
-    // TODO we should average accel readings over several cycles
-    initAccVec = AP::ins().get_accel(imu_index);
 
     // normalise the acceleration vector
     float pitch=0, roll=0;

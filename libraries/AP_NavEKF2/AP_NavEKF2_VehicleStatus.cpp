@@ -310,16 +310,30 @@ void NavEKF2_core::detectFlight()
         bool highAirSpd = false;
         bool largeHgtChange = false;
 
-        // trigger at 8 m/s airspeed
-        if (_ahrs->airspeed_sensor_enabled()) {
-            const AP_Airspeed *airspeed = _ahrs->get_airspeed();
-            if (airspeed->get_airspeed() * airspeed->get_EAS2TAS() > 10.0f) {
-                highAirSpd = true;
-            }
+        // adjust check thresholds to provide some hysteresis and protect against premature 'on ground' detection during landing.
+        float gndSpdThreshold;
+        float airSpdThreshold;
+        if (inFlight) {
+            gndSpdThreshold = 5.0f;
+            airSpdThreshold = 5.0f;
+        } else {
+            gndSpdThreshold = 8.0f;
+            airSpdThreshold = 8.0f;
         }
 
-        // trigger at 10 m/s GPS velocity, but not if GPS is reporting bad velocity errors
-        if (gndSpdSq > 100.0f && gpsSpdAccuracy < 1.0f) {
+        // trigger on high airspeed
+        const AP_Airspeed *airspeed = _ahrs->get_airspeed();
+        if (_ahrs->airspeed_sensor_enabled()) {
+            // use measured airspeed if available
+            highAirSpd = airspeed->get_airspeed() * airspeed->get_EAS2TAS() > 8.0f;
+        } else if (!inhibitWindStates) {
+            // use estimated airspeed if available
+            float tas_est_sq = sq(stateStruct.velocity.x-stateStruct.wind_vel.x) + sq(stateStruct.velocity.y-stateStruct.wind_vel.y) + sq(stateStruct.velocity.z);
+            highAirSpd = tas_est_sq > sq(airSpdThreshold * airspeed->get_EAS2TAS());
+        }
+
+        // trigger on high groundspeed if GPS has OK speed accuracy
+        if (gndSpdSq > sq(gndSpdThreshold) && gpsSpdAccuracy < 1.0f) {
             highGndSpd = true;
         }
 
@@ -335,14 +349,14 @@ void NavEKF2_core::detectFlight()
         }
 
         // if is possible we are in flight, set the time this condition was last detected
-        if (motorsArmed && (highGndSpd || highAirSpd || largeHgtChange)) {
+        if (motorsArmed && (highGndSpd || highAirSpd)) {
             airborneDetectTime_ms = imuSampleTime_ms;
             onGround = false;
         }
 
         // Determine to a high certainty we are not flying
-        // after 5 seconds of not detecting a possible flight condition or we are disarmed, we transition to on-ground mode
-        if(!motorsArmed || ((imuSampleTime_ms - airborneDetectTime_ms) > 5000)) {
+        // after 10 seconds of not detecting a possible flight condition or we are disarmed, we transition to on-ground mode
+        if(!motorsArmed || ((imuSampleTime_ms - airborneDetectTime_ms) > 10000)) {
             onGround = true;
             inFlight = false;
         }

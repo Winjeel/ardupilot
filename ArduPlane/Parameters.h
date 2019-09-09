@@ -77,7 +77,7 @@ public:
         k_param_ins,                // libraries/AP_InertialSensor variables
         k_param_takeoff_throttle_min_speed,
         k_param_takeoff_throttle_min_accel,
-        k_param_takeoff_heading_hold, // unused
+        k_param_takeoff_throttle_min_dist,
         k_param_level_roll_limit,
         k_param_hil_servos,
         k_param_vtail_output, // unused
@@ -469,6 +469,7 @@ public:
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;
     AP_Float takeoff_throttle_min_accel;
+    AP_Float takeoff_throttle_min_dist;
     AP_Int8 takeoff_throttle_delay;
     AP_Int8 takeoff_tdrag_elevator;
     AP_Float takeoff_tdrag_speed1;
@@ -493,6 +494,13 @@ public:
     AP_Int16 gcs_pid_mask;
     AP_Int8 parachute_channel;
 };
+
+// enums used by RNGFND_LANDING parameter
+enum land_hagl_source {
+    NONE = 0,
+    RANGEFINDER = 1,
+    EKF = 2,
+    };
 
 /*
   2nd block of parameters, to avoid going past 256 top level keys
@@ -564,6 +572,11 @@ public:
     AP_Int8 crow_flap_weight_inner;
     AP_Int8 crow_flap_options;
     AP_Int8 crow_flap_aileron_matching;
+
+    // thrust motor voltage and altitude scaling
+    AP_Int8 batt_idx;              // battery index used for compensation
+    AP_Float batt_voltage_max;     // maximum voltage used to scale thrust
+    AP_Float batt_voltage_min;     // minimum voltage used to scale thrust
 };
 
 extern const AP_Param::Info var_info[];

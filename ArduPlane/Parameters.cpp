@@ -135,6 +135,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
 
+    // @Param: TKOFF_THR_MINDST
+    // @DisplayName: Takeoff throttle min distanvce
+    // @Description: Minimum forward distance in m before arming the ground speed check in auto-takeoff. This is meant to be used for bungee launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For bungee launches this should be set to the distance travelled before the cable becomes slack and the bungee releases. The TKOFF_MIN_ACC threshold needs to be set to record the starting position so that the distanve travelled can be measured.   // @Units: m
+    // @Range: 0 30
+    // @Increment: 0.1
+    // @User: User
+    GSCALAR(takeoff_throttle_min_dist,     "TKOFF_THR_MINDST",  0),
+
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay
     // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. For bungee launches a larger value can be used (such as 30) to give time for the bungee to release from the aircraft before the motor is started.
@@ -905,8 +913,8 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: RNGFND_LANDING
     // @DisplayName: Enable rangefinder for landing
-    // @Description: This enables the use of a rangefinder for automatic landing. The rangefinder will be used both on the landing approach and for final flare
-    // @Values: 0:Disabled,1:Enabled
+    // @Description: This enables the use of a rangefinder or EKF terrain estimator. The chosen source will be used both on the landing approach and for final flare
+    // @Values: 0:Disabled,1:Use rangefinder,2:Use EKF
     // @User: Standard
     GSCALAR(rangefinder_landing,    "RNGFND_LANDING",   0),
 
@@ -1233,6 +1241,29 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("DSPOILER_AILMTCH", 21, ParametersG2, crow_flap_aileron_matching, 100),
+
+    // @Param: BAT_IDX
+    // @DisplayName: Battery compensation index
+    // @Description: Which battery monitor should be used for doing compensation
+    // @Values: 0:First battery, 1:Second battery
+    // @User: Advanced
+    AP_GROUPINFO("BAT_IDX",  22, ParametersG2,  batt_idx, 0),
+
+    // @Param: BAT_VOLT_MAX
+    // @DisplayName: Battery voltage compensation maximum voltage
+    // @Description: Battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust).  Recommend 4.4 * cell count. Disabled if 0 or > 0.6 x BAT_VOLT_MIN.
+    // @Range: 6 35
+    // @Units: V
+    // @User: Advanced
+    AP_GROUPINFO("BAT_VOLT_MAX", 23, ParametersG2, batt_voltage_max, 0.0f),
+
+    // @Param: BAT_VOLT_MIN
+    // @DisplayName: Battery voltage compensation minimum voltage
+    // @Description: Battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count. Disabled if 0 or < 0.6 x BAT_VOLT_MAX.
+    // @Range: 6 35
+    // @Units: V
+    // @User: Advanced
+    AP_GROUPINFO("BAT_VOLT_MIN", 24, ParametersG2, batt_voltage_min, 0.0f),
 
     AP_GROUPEND
 };

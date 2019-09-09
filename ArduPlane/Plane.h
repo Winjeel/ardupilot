@@ -101,6 +101,8 @@
 #include "quadplane.h"
 #include "tuning.h"
 
+#include <Filter/Filter.h>                     // Filter library
+
 // Configuration
 #include "config.h"
 
@@ -463,6 +465,7 @@ private:
         uint8_t accel_event_counter;
         uint32_t accel_event_ms;
         uint32_t start_time_ms;
+        Vector2f position_at_start;
     } takeoff_state;
     
     // ground steering controller state
@@ -987,6 +990,7 @@ private:
     void servo_output_mixers(void);
     void servos_output(void);
     void servos_auto_trim(void);
+    float calc_fwd_compensation_gain(void);
     void servos_twin_engine_mix();
     void throttle_watt_limiter(int8_t &min_throttle, int8_t &max_throttle);
     void update_is_flying_5Hz(void);
@@ -1062,6 +1066,10 @@ private:
     bool allow_reverse_thrust(void) const;
     bool have_reverse_thrust(void) const;
     int16_t get_throttle_input(bool no_deadzone=false) const;
+
+    // battery voltage, current and air pressure compensation variables
+    LowPassFilterFloat  _batt_voltage_filt; // filtered battery voltage expressed as a percentage (0 ~ 1.0) of batt_voltage_max
+    float throttle_scaler;
 
     // support for AP_Avoidance custom flight mode, AVOID_ADSB
     bool avoid_adsb_init(bool ignore_checks);

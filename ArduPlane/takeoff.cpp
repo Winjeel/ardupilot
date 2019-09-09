@@ -34,6 +34,15 @@ bool Plane::auto_takeoff_check(void)
         // no auto takeoff without GPS lock
         return false;
     }
+    float distance_travelled;
+    if (takeoff_state.launchTimerStarted) {
+        Vector2f current_position_NE = {};
+        ahrs.get_relative_position_NE_origin(current_position_NE);
+        Vector2f relative_position_NE = current_position_NE - takeoff_state.position_at_start;
+        distance_travelled = relative_position_NE.length();
+    } else {
+        distance_travelled = 0.0f;
+    }
 
     if (!takeoff_state.launchTimerStarted && !is_zero(g.takeoff_throttle_min_accel)) {
         // we are requiring an X acceleration event to launch
@@ -63,6 +72,7 @@ bool Plane::auto_takeoff_check(void)
     if (!takeoff_state.launchTimerStarted) {
         takeoff_state.launchTimerStarted = true;
         takeoff_state.last_tkoff_arm_time = now;
+        ahrs.get_relative_position_NE_origin(takeoff_state.position_at_start);
         if (now - takeoff_state.last_report_ms > 2000) {
             gcs().send_text(MAV_SEVERITY_INFO, "Armed AUTO, xaccel = %.1f m/s/s, waiting %.1f sec",
                               (double)SpdHgt_Controller->get_VXdot(), (double)(wait_time_ms*0.001f));
@@ -92,8 +102,14 @@ bool Plane::auto_takeoff_check(void)
 
     // Check ground speed and time delay
     if (((gps.ground_speed() > g.takeoff_throttle_min_speed || is_zero(g.takeoff_throttle_min_speed))) &&
-        ((now - takeoff_state.last_tkoff_arm_time) >= wait_time_ms)) {
-        gcs().send_text(MAV_SEVERITY_INFO, "Triggered AUTO. GPS speed = %.1f", (double)gps.ground_speed());
+        ((now - takeoff_state.last_tkoff_arm_time) >= wait_time_ms) &&
+        (distance_travelled > g.takeoff_throttle_min_dist || is_zero(g.takeoff_throttle_min_dist))) {
+        if (!is_zero(g.takeoff_throttle_min_speed)) {
+            gcs().send_text(MAV_SEVERITY_INFO, "Triggered AUTO. GPS speed = %.1f", (double)gps.ground_speed());
+        }
+        if (!is_zero(g.takeoff_throttle_min_dist)) {
+            gcs().send_text(MAV_SEVERITY_INFO, "Triggered AUTO. distance = %.1f", (double)distance_travelled);
+        }
         takeoff_state.launchTimerStarted = false;
         takeoff_state.last_tkoff_arm_time = 0;
         takeoff_state.start_time_ms = now;
@@ -157,15 +173,10 @@ void Plane::takeoff_calc_pitch(void)
         return;
     }
 
-    if (ahrs.airspeed_sensor_enabled()) {
-        int16_t takeoff_pitch_min_cd = get_takeoff_pitch_min_cd();
-        calc_nav_pitch();
-        if (nav_pitch_cd < takeoff_pitch_min_cd) {
-            nav_pitch_cd = takeoff_pitch_min_cd;
-        }
-    } else {
-        nav_pitch_cd = ((gps.ground_speed()*100) / (float)aparm.airspeed_cruise_cm) * auto_state.takeoff_pitch_cd;
-        nav_pitch_cd = constrain_int32(nav_pitch_cd, 500, auto_state.takeoff_pitch_cd);
+    int16_t takeoff_pitch_min_cd = get_takeoff_pitch_min_cd();
+    calc_nav_pitch();
+    if (nav_pitch_cd < takeoff_pitch_min_cd) {
+        nav_pitch_cd = takeoff_pitch_min_cd;
     }
 
     if (aparm.stall_prevention != 0) {
@@ -285,6 +296,6 @@ void Plane::complete_auto_takeoff(void)
  */
 void Plane::landing_gear_update(void)
 {
-    g2.landing_gear.update(relative_ground_altitude(g.rangefinder_landing));
+    g2.landing_gear.update(relative_ground_altitude(g.rangefinder_landing == land_hagl_source::RANGEFINDER));
 }
 #endif
