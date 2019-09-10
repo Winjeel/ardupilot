@@ -1093,13 +1093,19 @@ bool Plane::verify_loiter_heading(bool init)
 
             and
 
-        c) magnitude of bearing to next waypoint exceeds 90 deg 
+        c) The distance to the next waypoint is less than the distancve to the current waypoint
+
+            and
+
+        d) magnitude of bearing to next waypoint exceeds 90 deg 
     */
     int32_t remaining_turn_to_exit_cd = (int32_t)loiter.direction * heading_err_cd;
     float distance_between_waypoints = next_WP_loc.get_distance(next_nav_cmd.content.location);
     float distance_to_current_wp = current_loc.get_distance(next_WP_loc);
+    float distance_to_next_wp = current_loc.get_distance(next_nav_cmd.content.location);
     if (remaining_turn_to_exit_cd > 0 &&
         distance_between_waypoints < distance_to_current_wp &&
+        distance_to_next_wp < distance_to_current_wp &&
         labs(heading_err_cd) > 9000) {
         gcs().send_text(MAV_SEVERITY_INFO, "Loiter Heading - Bad Geometry");
         return true;
