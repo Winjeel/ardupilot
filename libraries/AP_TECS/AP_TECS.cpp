@@ -470,7 +470,7 @@ void AP_TECS::_update_height_demand(void)
         max_sink_rate = _maxSinkRate_approach;
     }
 
-    // Limit height rate of change and limit acceleration to half of vehicle limit to allow control amrgin for height tracking
+    // Limit height rate of change and limit acceleration to half of vehicle limit to allow control margin for height tracking
     // Use square root law to calculate velocity profile when braking to stop at final height
     const float acc_max_for_braking = 0.5f * _vertAccLim;
     float hgt_rate_brake_lim = sqrtf(2.0f * acc_max_for_braking * fabsf(_hgt_dem - _hgt_dem_prev));
@@ -525,7 +525,7 @@ void AP_TECS::_update_height_demand(void)
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
         if (hgt_dem_lag_filter_slew < 1) {
-            hgt_dem_lag_filter_slew += _DT; // increment at 10Hz to gradually apply the compensation at first
+            hgt_dem_lag_filter_slew += _DT; // gradually apply the compensation over one second
         } else {
             hgt_dem_lag_filter_slew = 1;
         }
