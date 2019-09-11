@@ -45,7 +45,7 @@ public:
     int32_t bearing_error_cd(void) const override;
 
     // Return the loiter radius in metres last used by the loiter controller
-    // A posisitve value indicates a CW loiter, a egative value indicates a CCW loiter
+    // A positive value indicates a CW loiter, a negative value indicates a CCW loiter
     float get_loiter_radius(void) const override { return _adj_loiter_radius; }
 
     float crosstrack_error(void) const override { return _crosstrack_error; }
@@ -117,8 +117,8 @@ private:
     // previous value of cross-track velocity
     float _last_Nu;
 
-    // radius of loiter in m after adjustement for vehicle limits and as used by the controller
-    // a positive value indicates a CW loiter, a negative value indicates a
+    // radius of loiter in metres after adjustment for vehicle limits and as used by the controller
+    // a positive value indicates a CW loiter, a negative value indicates a CCW loiter
     float _adj_loiter_radius = 0.0f;
 
     // prevent indecision in waypoint tracking
