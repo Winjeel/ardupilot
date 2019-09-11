@@ -286,6 +286,16 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @User: Standard
     GSCALAR(rtl_radius,             "RTL_RADIUS",  0),
+
+    // @Param: NAV_UNBANK_RATE
+    // @DisplayName: Average roll rate achieved when unbanking.
+    // @Description: Used by the autopilot during tangent loiter exit to exit early to allow for the time required to unbank. Set to zero to disable early exit 
+    // @Units: deg/sec
+    // @Range: 0 128
+    // @User: Advanced
+    GSCALAR(loiter_unbank_rate, "NAV_UNBANK_RATE", 60),
+
+
     
 #if GEOFENCE_ENABLED == ENABLED
     // @Param: FENCE_ACTION
