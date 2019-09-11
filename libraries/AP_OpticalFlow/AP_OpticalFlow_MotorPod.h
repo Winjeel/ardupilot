@@ -28,7 +28,7 @@ private:
     struct GyroAccum {
         float x;
         float y;
-        uint64_t t;
+        uint32_t t;
     } gyro_accum;
 
     uint32_t lastUpdate_us;
