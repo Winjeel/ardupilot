@@ -6,9 +6,10 @@
 
 #include <cstring> // for memset
 
+#define OVERWRITE_REMOVED (false)
 
-// TODO: Currently kBufferSz needs to be a power of two...
-template <size_t kBufferSz, int kClearChar = '\0'>
+
+template <size_t kBufferSz, uint8_t kClearChar = '\0'>
 class CircularBuffer {
     public:
         CircularBuffer(void) :
@@ -37,11 +38,12 @@ class CircularBuffer {
 
             size_t toClear = (num < bytesUsed) ? num : bytesUsed;
 
-            // // overwrite removed chars
-            // for (size_t i = 0; i < toClear; i++) {
-            //     size_t clearIdx = (head + i) % kBufferSz;
-            //     buffer[clearIdx] = kClearChar;
-            // }
+            if (OVERWRITE_REMOVED) {
+                for (size_t i = 0; i < toClear; i++) {
+                    size_t clearIdx = (head + i) % kBufferSz;
+                    buffer[clearIdx] = kClearChar;
+                }
+            }
 
             head = (head + toClear) % kBufferSz;
             bytesUsed -= toClear;
@@ -56,18 +58,19 @@ class CircularBuffer {
 
             size_t toClear = (num < bytesUsed) ? num : bytesUsed;
 
-            // // overwrite removed chars
-            // for (size_t i = 0; i < toClear; i++) {
-            //     size_t clearIdx = (head + bytesUsed - i - 1) % kBufferSz;
-            //     buffer[clearIdx] = kClearChar;
-            // }
+            if (OVERWRITE_REMOVED) {
+                for (size_t i = 0; i < toClear; i++) {
+                    size_t clearIdx = (head + bytesUsed - i - 1) % kBufferSz;
+                    buffer[clearIdx] = kClearChar;
+                }
+            }
 
             bytesUsed -= toClear;
 
             return toClear;
         }
 
-        size_t push(uint8_t byte) {
+        size_t push(const uint8_t byte) {
             size_t bytesPushed = 0;
 
             if (getBytesFree() > 0) {
@@ -81,7 +84,7 @@ class CircularBuffer {
             return bytesPushed;
         }
 
-        size_t push(uint8_t bytes[], size_t num) {
+        size_t push(const uint8_t bytes[], size_t num) {
             const size_t kFree = getBytesFree();
 
             if (kFree == 0) {
@@ -117,16 +120,16 @@ class CircularBuffer {
             size_t bytesAvailable = (offset < bytesUsed) ? (bytesUsed - offset) : 0;
             size_t toCopy = (num < bytesAvailable) ? num : bytesAvailable;
 
-            // copy data
-            size_t numAtHead = (toCopy < (kBufferSz - head)) ? toCopy : (kBufferSz - head);
-            size_t numAtZero = (numAtHead < toCopy) ? (toCopy -  numAtHead): 0;
-            memcpy(out, &buffer[head + offset], numAtHead);
-            memcpy(((uint8_t * const)out + numAtHead), buffer, numAtZero);
-
-            // clear excess (don't copy junk into output buffer)
-            size_t toClear = num - toCopy;
-            void * const clearPtr = (uint8_t * const)out + toCopy;
-            memset(clearPtr, kClearChar, toClear);
+            size_t copyStart = ((head + offset) % kBufferSz);
+            bool isWrapping = (copyStart >= head);
+            if (isWrapping) {
+                size_t numAtHead = (toCopy < (kBufferSz - copyStart)) ? toCopy : (kBufferSz - copyStart);
+                size_t numAtZero = (numAtHead < toCopy) ? (toCopy - numAtHead): 0;
+                memcpy(out, &buffer[copyStart], numAtHead);
+                memcpy(((uint8_t * const)out + numAtHead), buffer, numAtZero);
+            } else {
+                memcpy(out, &buffer[copyStart], toCopy);
+            }
 
             return toCopy;
         }
@@ -140,6 +143,9 @@ class CircularBuffer {
             return (kBufferSz - bytesUsed);
         }
 
+        size_t getHead(void) const {
+            return head;
+        }
 
     protected:
 
@@ -158,7 +164,9 @@ class CircularBuffer {
             return kClearChar;
         }
 
-        size_t getBufferSz(void) const { return kBufferSz; }
+        size_t getBufferSz(void) const {
+            return kBufferSz;
+        }
 
     private:
         uint8_t buffer[kBufferSz];

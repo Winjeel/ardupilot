@@ -113,3 +113,8 @@ cmake-build-*/
 /reports/
 /GCOV_*.log
 
+# ignore test executables
+/libraries/*/test/test_*
+# don't ignore source files
+!/libraries/*/test/*.c*
+!/libraries/*/test/*.h*
