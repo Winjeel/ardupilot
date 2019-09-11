@@ -217,8 +217,7 @@ public:
         k_param_RTL_altitude_cm,
         k_param_inverted_flight_ch_unused, // unused
         k_param_min_gndspeed_cm,
-        k_param_crosstrack_use_wind, // unused
-
+        k_param_loiter_unbank_rate,
 
         //
         // Camera and mount parameters
@@ -391,6 +390,7 @@ public:
     AP_Int16 waypoint_radius;
     AP_Int16 waypoint_max_radius;
     AP_Int16 rtl_radius;
+    AP_Int8 loiter_unbank_rate;
 
 #if GEOFENCE_ENABLED == ENABLED
     AP_Int8 fence_action;

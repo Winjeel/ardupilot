@@ -1122,7 +1122,12 @@ bool Plane::verify_loiter_heading(bool init)
         float turn_rate = ahrs.groundspeed() / turn_radius;
 
         // calculate time to exit turn assuming 60 deg/sec average roll rate back to level
-        float time_to_level = fabsf(ahrs.roll) / radians(60);
+        float time_to_level;
+        if (g.loiter_unbank_rate > 0) {
+            time_to_level = fabsf(ahrs.roll) / radians((float)g.loiter_unbank_rate);
+        } else {
+            time_to_level = 0.0f;
+        }
 
         // estimate the addtional heading change before we will be wings level if we start to unbank now
         // and limit to prevent badly conditioned geometries
