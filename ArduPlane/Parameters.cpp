@@ -152,14 +152,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  2),
 
-    // @Param: TKOFF_TIMEOUT
+    // @Param: TKOFF_ABORT_TOUT
     // @DisplayName: Takeoff completion citeria timeout delay
     // @Description: This parameter sets the time delay (in 1/10ths of a second) from detection of launch start to when all completion criteria must have passed before the launch times out.
     // @Units: ds
     // @Range: 1 127
     // @Increment: 1
     // @User: User
-    GSCALAR(takeoff_criteria_timeout,     "TKOFF_TIMEOUT",  1),
+    GSCALAR(takeoff_criteria_timeout,     "TKOFF_ABORT_TOUT",  1),
 
     // @Param: TKOFF_TDRAG_ELEV
     // @DisplayName: Takeoff tail dragger elevator
