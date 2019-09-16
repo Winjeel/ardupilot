@@ -88,7 +88,7 @@ public:
         k_param_scheduler,
         k_param_relay,
         k_param_takeoff_throttle_delay,
-        k_param_skip_gyro_cal, // unused
+        k_param_takeoff_criteria_timeout,
         k_param_auto_fbw_steer,
         k_param_waypoint_max_radius,
         k_param_ground_steer_alt,        
@@ -471,6 +471,7 @@ public:
     AP_Float takeoff_throttle_min_accel;
     AP_Float takeoff_throttle_min_dist;
     AP_Int8 takeoff_throttle_delay;
+    AP_Int8 takeoff_criteria_timeout;
     AP_Int8 takeoff_tdrag_elevator;
     AP_Float takeoff_tdrag_speed1;
     AP_Float takeoff_rotate_speed;
