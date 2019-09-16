@@ -78,11 +78,12 @@ void Plane::update_is_flying_5Hz(void)
                 crash_state.impact_detected = false;
             }
 
-            // if not in takeoff we need to reset crash state variables assoicated with a failed takeoff
+            // if not in takeoff we need to reset crash state variables associated with a failed takeoff
             if (flight_stage != AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) {
                 crash_state.launch_flow_timer_ms = 0;
                 crash_state.launch_gps_timer_ms = 0;
                 crash_state.ground_impact_pending = false;
+                crash_state.launch_impact_time_ms = 0;
             }
 
             switch (flight_stage)
@@ -93,9 +94,9 @@ void Plane::update_is_flying_5Hz(void)
                     // check peak -ve X accel
                     if (g.crash_accel_threshold > 0 &&
                         ins.get_accel_peak_hold_neg_x() < -(g.crash_accel_threshold)) {
-                        crash_state.impact_timer_ms = now_ms;
+                        crash_state.launch_impact_time_ms = now_ms;
                     } else if (g.crash_accel_threshold == 0) {
-                        crash_state.impact_timer_ms = 0;
+                        crash_state.launch_impact_time_ms = 0;
                     }
 
                     // check optical flow sensor
@@ -137,8 +138,8 @@ void Plane::update_is_flying_5Hz(void)
                     // a large flow transient followed immediately by a large negative X accel
                     // transient and a non-moving vehicle indicates that the launch has failed
                     // so we force an immediate disarm
-                    if (crash_state.impact_timer_ms - crash_state.launch_flow_timer_ms < 300 &&
-                        crash_state.launch_gps_timer_ms - crash_state.impact_timer_ms < 2000) {
+                    if (crash_state.launch_impact_time_ms - crash_state.launch_flow_timer_ms < 300 &&
+                        crash_state.launch_gps_timer_ms - crash_state.launch_impact_time_ms < 2000) {
                         crash_state.impact_detected = true;
                         crash_state.is_crashed = true;
                         is_flying_bool = false;

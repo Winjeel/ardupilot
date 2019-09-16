@@ -600,6 +600,9 @@ private:
         // length of time impact_detected has been true. Times out after a few seconds. Used to clip isFlyingProbability
         uint32_t impact_timer_ms;
 
+        // last time ground impact detected during takeoff/launch. Used to check the timing of other failed launch criteria such as grouynd speed and optical flow.
+        uint32_t launch_impact_time_ms;
+
         // First time that the optical flow sensor value indicates a failing launch
         uint32_t launch_flow_timer_ms;
 

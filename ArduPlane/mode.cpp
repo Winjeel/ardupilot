@@ -30,6 +30,7 @@ bool Mode::enter()
     plane.crash_state.launch_flow_timer_ms = 0;
     plane.crash_state.launch_gps_timer_ms = 0;
     plane.crash_state.impact_timer_ms = 0;
+    plane.crash_state.launch_impact_time_ms = 0;
 
     // reset external attitude guidance
     plane.guided_state.last_forced_rpy_ms.zero();
