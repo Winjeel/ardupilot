@@ -882,13 +882,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(crash_accel_threshold,          "CRASH_ACC_THRESH",   25),
 
-    // @Param: CRASH_OF_THRESH
+    // @Param: CRASH_FLOW_THRESH
     // @DisplayName: Crash Optical Flow Threshold
     // @Description: Y-Axis flow data threshold to notify the crash detector that there is a pending  impact which helps disarm the motor quickly after a crash. Set to zero to disable this check.
     // @Units: rad/s
     // @Range: 10 127
     // @User: Advanced
-    GSCALAR(crash_flow_threshold,          "CRASH_OF_THRESH",   15),
+    GSCALAR(crash_flow_threshold,          "CRASH_FLOW_THRESH",   15),
 
     // @Param: CRASH_DETECT
     // @DisplayName: Crash Detection
