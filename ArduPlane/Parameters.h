@@ -115,7 +115,7 @@ public:
         k_param_rangefinder,
         k_param_terrain,
         k_param_terrain_follow,
-        k_param_stab_pitch_down_cd_old, // deprecated
+        k_param_crash_flow_threshold,
         k_param_glide_slope_min,
         k_param_stab_pitch_down,
         k_param_terrain_lookahead,
@@ -359,6 +359,7 @@ public:
     AP_Int8  rtl_autoland;
 
     AP_Int8  crash_accel_threshold;
+    AP_Int8  crash_flow_threshold;
 
     // Feed-forward gains
     //
