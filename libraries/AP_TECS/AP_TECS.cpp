@@ -517,11 +517,9 @@ void AP_TECS::_update_height_demand(void)
         _flare_counter = 0;
     }
 
-    // for landing approach we will predict ahead by the time constant
-    // plus the lag produced by the first order filter. This avoids a
-    // lagged height demand while constantly descending which causes
-    // us to consistently be above the desired glide slope. This will
-    // be replaced with a better zero-lag filter in the future.
+    // For landing approach we will predict ahead by the lag produced by the input shaping filter.
+    // This avoids a lagged height demand while constantly descending which causes us to consistently
+    // be above the desired glide slope.
     float new_hgt_dem = _hgt_dem_adj;
     if (_flags.is_doing_auto_land) {
         if (hgt_dem_lag_filter_slew < 1) {
@@ -529,7 +527,7 @@ void AP_TECS::_update_height_demand(void)
         } else {
             hgt_dem_lag_filter_slew = 1;
         }
-        new_hgt_dem += hgt_dem_lag_filter_slew * (_hgt_dem_adj - _hgt_dem_adj_last) * (timeConstant()+1) / _DT;
+        new_hgt_dem += hgt_dem_lag_filter_slew * (_hgt_dem_adj - _hgt_dem_adj_last) * (tconst_ratio * timeConstant()) / _DT;
     } else {
         hgt_dem_lag_filter_slew = 0;
     }
@@ -1199,10 +1197,10 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     // log to AP_Logger
     AP::logger().Write(
         "TECS",
-        "TimeUS,h,dh,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f",
-        "smnmnnnn----o--",
-        "F0000000----0--",
-        "QfffffffffffffB",
+        "TimeUS,h,dh,hdem,dhdem,spdem,sp,dsp,ith,iph,th,ph,dspdem,w,f,hin",
+        "smnmnnnn----o---",
+        "F0000000----0---",
+        "QfffffffffffffBf",
         now,
         (double)_height,
         (double)_climb_rate,
@@ -1217,7 +1215,8 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         (double)_pitch_dem,
         (double)_TAS_rate_dem,
         (double)logging.SKE_weighting,
-        _flags_byte);
+        _flags_byte,
+        (double)_hgt_dem);
     AP::logger().Write("TEC2", "TimeUS,KErr,PErr,EDelta,LF,PEI,CRD", "Qffffff",
                                            now,
                                            (double)logging.SKE_error,
