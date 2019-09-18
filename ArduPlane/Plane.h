@@ -466,8 +466,12 @@ private:
         uint32_t accel_event_ms;
         uint32_t start_time_ms;
         Vector2f position_at_start;
+        bool launch_started;
     } takeoff_state;
     
+    // latches to true when launch start has been detected and is reset when vehicle disarms
+    bool auto_launch_started = false;
+
     // ground steering controller state
     struct {
         // Direction held during phases of takeoff and landing centidegrees
@@ -509,9 +513,8 @@ private:
         // movement until altitude is reached
         bool idle_mode:1;
 
-        // used to 'wiggle' servos in idle mode to prevent them freezing
-        // at high altitudes
-        uint8_t idle_wiggle_stage;
+        // used to 'wiggle' servos before flight to enable visual check of operation
+        uint16_t idle_wiggle_stage;
 
         // Altitude threshold to complete a takeoff command in autonomous
         // modes.  Centimeters above home
@@ -559,7 +562,24 @@ private:
 
         // are we doing loiter mode as a VTOL?
         bool vtol_loiter:1;
+
     } auto_state;
+
+    // Used for control surface movement test
+    struct {
+        // true when control surface checks completed
+        bool control_checks_complete {false};
+
+        // deflection of control surface demanded during preflight test [-4500 ...  +4500]
+        int16_t servo_demand {0};
+
+        // true when surfaces should be set to launch position
+        bool set_to_launch_position {false};
+
+        // index used to control surface movement
+        uint16_t control_index;
+
+    } surface_test_state;
 
     struct {
         // roll pitch yaw commanded from external controller in centidegrees
@@ -992,6 +1012,7 @@ private:
     void update_control_mode(void);
     void stabilize();
     void set_servos_idle(void);
+    void set_servos_idle_preflight(void);
     void set_servos();
     void set_servos_manual_passthrough(void);
     void set_servos_controlled(void);

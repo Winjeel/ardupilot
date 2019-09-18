@@ -319,6 +319,52 @@ void Plane::set_servos_idle(void)
 }
 
 /*
+  setup servos for pre-flight movement test
+ */
+void Plane::set_servos_idle_preflight(void)
+{
+    // move over full range at a slew rate that corresponds to 1 second to travese between travel limits
+    // at a servo update rate of 50Hz
+    const int16_t delta = (4500 / 50);
+    if (surface_test_state.control_index != 0 && surface_test_state.control_index < 400) {
+        surface_test_state.control_index += 2;
+    }
+    if (surface_test_state.control_index == 0 && !surface_test_state.control_checks_complete) {
+        surface_test_state.servo_demand = 0;
+    } else if (surface_test_state.control_index < 50) {
+        // ramp from 0 to +max
+        surface_test_state.servo_demand = surface_test_state.control_index * delta;
+    } else if (surface_test_state.control_index < 150) {
+        // hold at +max for short period to allow observation
+        surface_test_state.servo_demand = 4500;
+    } else if (surface_test_state.control_index < 250) {
+        // ramp from +max to -max
+        surface_test_state.servo_demand = (200 - surface_test_state.control_index) * delta;
+    } else if (surface_test_state.control_index < 350) {
+        // hold at -max for short period to allow for observation
+        surface_test_state.servo_demand = -4500;
+    } else if (surface_test_state.control_index < 400) {
+        //ramp from -max to 0
+        surface_test_state.servo_demand = (surface_test_state.control_index - 400) * delta;
+    } else {
+        // when movement test has completed move surface to either 0 or launch position 
+        int16_t target;
+        const int16_t launch_target = 4500;
+        if (surface_test_state.set_to_launch_position) {
+            target = launch_target;
+        } else {
+            target = 0;
+        }
+        if (target - surface_test_state.servo_demand > 0) {
+            surface_test_state.servo_demand += MIN(2*delta, target - surface_test_state.servo_demand);
+        } else if (target - surface_test_state.servo_demand < 0) {
+            surface_test_state.servo_demand -= MIN(2*delta, surface_test_state.servo_demand - target);
+        }
+        surface_test_state.control_checks_complete = true;
+    }
+}
+
+/*
   pass through channels in manual mode
  */
 void Plane::set_servos_manual_passthrough(void)
@@ -791,6 +837,47 @@ void Plane::set_servos(void)
             SRV_Channels::set_output_limit(SRV_Channel::k_elevator, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
             SRV_Channels::set_output_limit(SRV_Channel::k_rudder, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
         }
+    }
+
+    // special handling of PPDS preflight servo movement when in AUTO and waiting for launch
+    if (control_mode == &mode_auto && !takeoff_state.launch_started) {
+        if (!arming.is_armed()) {
+            // when pre-arm checks ar passing
+            if (AP_Notify::flags.pre_arm_check) {
+                if (!surface_test_state.control_checks_complete) {
+                    // start servo movement checks
+                    if (surface_test_state.control_index == 0) {
+                        surface_test_state.control_index = 1;
+                    }
+                } else {
+                    // try to arm when movement checks complete
+                    arming.arm(AP_Arming::Method::MAVLINK, true);
+                }
+            }
+            surface_test_state.set_to_launch_position = false;
+        } else {
+            // reset control test states to allow for repeating movement tests if disarmed and armed again
+            surface_test_state.control_checks_complete = true;
+
+            // Once armed, place control surfaces in the luanch position to let operator know it is ready
+            surface_test_state.set_to_launch_position = true;
+
+        }
+
+        // calculate the deflection value surface_test_state.servo_demand to be sent to the servos
+        set_servos_idle_preflight();
+
+        // Drive elevon channels directly so that full servo movement can be achieved
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_left, surface_test_state.servo_demand);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_right, surface_test_state.servo_demand);
+
+        // Run  functions required to send pwm demands to servos normally called by servos_output()
+        SRV_Channels::cork();
+        SRV_Channels::calc_pwm();
+        SRV_Channels::output_ch_all();
+        SRV_Channels::push();
+
+        return;
     }
 
     uint8_t override_pct;

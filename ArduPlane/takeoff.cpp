@@ -11,6 +11,10 @@
  */
 bool Plane::auto_takeoff_check(void)
 {
+    if (!plane.arming.is_armed()) {
+        takeoff_state.launch_started = false;
+    }
+
     // boolean set to true if aborting launch
     bool abort_launch = false;
     
@@ -79,6 +83,8 @@ bool Plane::auto_takeoff_check(void)
     // we've reached the acceleration threshold, so start the timer
     if (!abort_launch && !takeoff_state.launchTimerStarted) {
         takeoff_state.launchTimerStarted = true;
+        takeoff_state.launchTimerStarted = true;
+        takeoff_state.launch_started = true;
         takeoff_state.last_tkoff_arm_time = now;
         ahrs.get_relative_position_NE_origin(takeoff_state.position_at_start);
         if (now - takeoff_state.last_report_ms > 2000) {

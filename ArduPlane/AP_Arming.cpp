@@ -100,7 +100,18 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
         ret = false;
     }
 
+    // additional checks to determine when on launch ramp
+    if (!plane.arming.is_armed()) {
+        if (plane.ahrs.pitch_sensor > 2500 ||
+            plane.ahrs.pitch_sensor < 1500 ||
+            plane.ahrs.roll_sensor > 500 ||
+            plane.ahrs.roll_sensor < -500) {
+            ret = false;
+        }
+    }
+
     return ret;
+
 }
 
 bool AP_Arming_Plane::ins_checks(bool display_failure)
