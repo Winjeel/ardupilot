@@ -21,8 +21,21 @@
 #include <AP_AHRS/AP_AHRS.h>
 #include "OpticalFlow.h"
 #include "AP_OpticalFlow_MotorPod.h"
+#include "AP_PpdsMotorPod/AP_PpdsMotorPod.hpp"
 #include <stdio.h>
 
+// TODO: this is a bit of a hack. Is there a better way?
+// For this driver to work, the AP_PpdsMotorPod driver needs to be included for
+// compilation. As we don't have feature flags or other conditional compilation,
+// we add weak versions of the required AP_PpdsMotorPod functions to allow this
+// to compile without the AP_PpdsMotorPod driver.
+namespace AP {
+    WEAK AP_PpdsMotorPod *motorPod() {
+        return nullptr;
+    }
+}
+WEAK bool AP_PpdsMotorPod::getFlowData(FlowData * const flow_data) { return false; }
+WEAK void AP_PpdsMotorPod::clearFlowData(void) { /* empty */ }
 
 
 AP_OpticalFlow_MotorPod::AP_OpticalFlow_MotorPod(OpticalFlow &_frontend) :
