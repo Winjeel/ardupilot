@@ -258,6 +258,13 @@ extern AP_IOMCU iomcu;
 
 void Plane::one_second_loop()
 {
+    // logic to select AUTO mode if a valid mission plan is available and the vehicle is disarmed
+    // TODO - allow RC override for testing
+    if (!plane.arming.is_armed() && plane.check_mission() && plane.control_mode != &plane.mode_auto) {
+        plane.set_mode(plane.mode_auto, MODE_REASON_UNKNOWN);
+        plane.mission.set_current_cmd(1);
+    }
+
     // make it possible to change control channel ordering at runtime
     set_control_channels();
 

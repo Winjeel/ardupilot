@@ -850,8 +850,12 @@ void Plane::set_servos(void)
                         surface_test_state.control_index = 1;
                     }
                 } else {
-                    // try to arm when movement checks complete
-                    arming.arm(AP_Arming::Method::MAVLINK, true);
+                    // try to arm when movement checks complete provided the mission plan checks pass
+                    if (plane.mission.get_current_nav_index() == 1) {
+                        arming.arm(AP_Arming::Method::MAVLINK, true);
+                    } else {
+                        plane.mission.set_current_cmd(1);
+                    }
                 }
             }
             surface_test_state.set_to_launch_position = false;
