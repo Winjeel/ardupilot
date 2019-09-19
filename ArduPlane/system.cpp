@@ -511,3 +511,21 @@ bool Plane::disarm_motors(void)
 
     return true;
 }
+
+// returns true if a valid mission is already loaded or has been created
+bool Plane::check_mission()
+{
+    // Basic check that the first waypoint is a takeoff waypoint and there is more than three waypoints
+    bool has_mission = false;
+    AP_Mission::Mission_Command cmd = {};
+    if (plane.mission.get_next_nav_cmd(1, cmd)) {
+        has_mission = (cmd.id == MAV_CMD_NAV_TAKEOFF) && (plane.mission.num_commands() > 2);
+    }
+
+    // Basic check that the last waypoint is a landing waypoint
+    if (plane.mission.get_next_nav_cmd(plane.mission.num_commands(), cmd)) {
+        has_mission &= (cmd.id == MAV_CMD_NAV_LAND);
+    }
+
+    return has_mission;
+}
