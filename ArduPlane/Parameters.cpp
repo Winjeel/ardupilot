@@ -85,6 +85,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(stab_pitch_down, "STAB_PITCH_DOWN",   2.0f),
 
+    // @Param: LAUNCH_PITCH_DEG
+    // @DisplayName: Pitch angle of launcher
+    // @Description: This sets the expected pitch angle of the vehicle before launch. If this is set to a positive number, then the vehicle will not arm unless the wings are level and the pitch angle matches this paraemter to an accuracy of +- 5deg. If a ramp or catapult launcher is being used, then this can be used to prevent arming if the AHRS solution is incorrect or the vehicle is  powered when not on the launcher.
+    // @Range: 0 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_pitch_deg, "LAUNCH_PITCH_DEG", 0),
+
     // @Param: GLIDE_SLOPE_MIN
     // @DisplayName: Glide slope minimum
     // @Description: This controls the minimum altitude change for a waypoint before a glide slope will be used instead of an immediate altitude change. The default value is 15 meters, which helps to smooth out waypoint missions where small altitude changes happen near waypoints. If you don't want glide slopes to be used in missions then you can set this to zero, which will disable glide slope calculations. Otherwise you can set it to a minimum number of meters of altitude error to the destination waypoint before a glide slope will be used to change altitude.
