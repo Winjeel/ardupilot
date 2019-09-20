@@ -627,6 +627,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(auto_preflight,        "AUTO_PREFLIGHT",     0),
 
+    // @Param: LAUNCH_ELEVATOR
+    // @DisplayName: Elevator servo deflection when ready for launch.
+    // @Description: When automatic preflight sequencing selected by AUTO_PREFLIGHT is being used, the pitch control surfaces will be set to this angle when all checks have passed and the vehicle is ready for launch. When launch acceleration is detected, surfaces will be immediately be set to the autopilot demands.
+    // @Range: -45 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_elevator, "LAUNCH_ELEVATOR", 0),
+
     // @Param: LIM_ROLL_CD
     // @DisplayName: Maximum Bank Angle
     // @Description: Maximum bank angle commanded in modes with stabilized limits. Increase this value for sharper turns, but decrease to prevent accelerated stalls.

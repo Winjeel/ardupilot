@@ -331,36 +331,50 @@ void Plane::set_servos_idle_preflight(void)
     }
     if (surface_test_state.control_index == 0 && !surface_test_state.control_checks_complete) {
         surface_test_state.servo_demand = 0;
+        surface_test_state.pitch_servo_demand = 0;
     } else if (surface_test_state.control_index < 50) {
         // ramp from 0 to +max
         surface_test_state.servo_demand = surface_test_state.control_index * delta;
+        surface_test_state.pitch_servo_demand = surface_test_state.servo_demand;
     } else if (surface_test_state.control_index < 150) {
         // hold at +max for short period to allow observation
         surface_test_state.servo_demand = 4500;
+        surface_test_state.pitch_servo_demand = surface_test_state.servo_demand;
     } else if (surface_test_state.control_index < 250) {
         // ramp from +max to -max
         surface_test_state.servo_demand = (200 - surface_test_state.control_index) * delta;
+        surface_test_state.pitch_servo_demand = surface_test_state.servo_demand;
     } else if (surface_test_state.control_index < 350) {
         // hold at -max for short period to allow for observation
         surface_test_state.servo_demand = -4500;
+        surface_test_state.pitch_servo_demand = surface_test_state.servo_demand;
     } else if (surface_test_state.control_index < 400) {
         //ramp from -max to 0
         surface_test_state.servo_demand = (surface_test_state.control_index - 400) * delta;
+        surface_test_state.pitch_servo_demand = surface_test_state.servo_demand;
     } else {
-        // when movement test has completed move surface to either 0 or launch position 
+        surface_test_state.control_checks_complete = true;
+
+       // When movement test has completed, ramp pitch surfaces to either neutral or launch position
         int16_t target;
-        const int16_t launch_target = 4500;
+        const int16_t launch_target = 100 * (uint16_t)plane.g.launch_elevator;
         if (surface_test_state.set_to_launch_position) {
             target = launch_target;
         } else {
             target = 0;
         }
-        if (target - surface_test_state.servo_demand > 0) {
-            surface_test_state.servo_demand += MIN(2*delta, target - surface_test_state.servo_demand);
+        if (target - surface_test_state.pitch_servo_demand > 0) {
+            surface_test_state.pitch_servo_demand += MIN(2*delta, target - surface_test_state.pitch_servo_demand);
         } else if (target - surface_test_state.servo_demand < 0) {
-            surface_test_state.servo_demand -= MIN(2*delta, surface_test_state.servo_demand - target);
+            surface_test_state.pitch_servo_demand -= MIN(2*delta, surface_test_state.pitch_servo_demand - target);
         }
-        surface_test_state.control_checks_complete = true;
+
+        // other surfaces are ramped to neutral
+        if (surface_test_state.servo_demand < 0) {
+            surface_test_state.servo_demand += MIN(2*delta, - surface_test_state.servo_demand);
+        } else if (surface_test_state.servo_demand > 0) {
+            surface_test_state.servo_demand -= MIN(2*delta, surface_test_state.servo_demand );
+        }
     }
 }
 
@@ -872,11 +886,16 @@ void Plane::set_servos(void)
         // calculate the deflection value surface_test_state.servo_demand to be sent to the servos
         set_servos_idle_preflight();
 
-        // Drive elevon channels directly so that full servo movement can be achieved
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_left, surface_test_state.servo_demand);
-        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_right, surface_test_state.servo_demand);
+        // Drive pitch control surface channels - these will be set to LAUNCH_ELEVATOR when ready to launch
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_left, surface_test_state.pitch_servo_demand);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_right, surface_test_state.pitch_servo_demand);       
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, surface_test_state.pitch_servo_demand);
 
-        // Run  functions required to send pwm demands to servos normally called by servos_output()
+        // Drive other control surface channels - these will be set to neutral when ready to launch
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, surface_test_state.servo_demand);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, surface_test_state.servo_demand);       
+
+        // Run functions normally called by servos_output() required to send PWM demands to servos 
         SRV_Channels::cork();
         SRV_Channels::calc_pwm();
         SRV_Channels::output_ch_all();

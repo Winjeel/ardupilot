@@ -56,7 +56,7 @@ public:
         k_param_pitch_trim_cd,
         k_param_mix_mode,
         k_param_auto_preflight,
-        k_param_reverse_ch1_elevon, // unused
+        k_param_launch_elevator,
         k_param_reverse_ch2_elevon, // unused
         k_param_flap_1_percent,
         k_param_flap_1_speed,
@@ -462,6 +462,7 @@ public:
     AP_Int8  hil_mode;
 #endif
     AP_Int8 auto_preflight;
+    AP_Int8 launch_elevator;
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;
