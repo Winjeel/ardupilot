@@ -262,7 +262,8 @@ void Plane::one_second_loop()
     // Allow operator to select stabilize mode for checking of motor, servo movement and autopilot stabilisation
     // The mode entered after intializing completes is set by the INITIAL_MODE parameter
     // Mission plan checking is controlled by the ARMING_MIS_ITEMS parameter
-    if (!plane.arming.is_armed() &&
+    if (plane.g.auto_preflight == 1 &&
+            !plane.arming.is_armed() &&
             plane.control_mode != &plane.mode_auto &&
             plane.control_mode != &plane.mode_initializing &&
             plane.control_mode != &plane.mode_stabilize &&

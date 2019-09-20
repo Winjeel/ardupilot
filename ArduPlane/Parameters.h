@@ -55,7 +55,7 @@ public:
         k_param_log_bitmask_old,  // unused
         k_param_pitch_trim_cd,
         k_param_mix_mode,
-        k_param_reverse_elevons, // unused
+        k_param_auto_preflight,
         k_param_reverse_ch1_elevon, // unused
         k_param_reverse_ch2_elevon, // unused
         k_param_flap_1_percent,
@@ -461,7 +461,7 @@ public:
 #if HIL_SUPPORT
     AP_Int8  hil_mode;
 #endif
-
+    AP_Int8 auto_preflight;
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;

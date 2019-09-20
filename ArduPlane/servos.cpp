@@ -839,8 +839,9 @@ void Plane::set_servos(void)
         }
     }
 
-    // special handling of PPDS preflight servo movement when in AUTO and waiting for launch
-    if (control_mode == &mode_auto && !takeoff_state.launch_started) {
+    // Special handling of preflight servo movement when in AUTO and waiting for launch
+    // Thsi enables launching without GCS using control surfaces to signal
+    if (plane.g.auto_preflight == 1 && control_mode == &mode_auto && !takeoff_state.launch_started) {
         if (!arming.is_armed()) {
             // when pre-arm checks ar passing
             if (AP_Notify::flags.pre_arm_check) {

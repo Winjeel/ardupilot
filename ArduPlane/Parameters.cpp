@@ -620,6 +620,13 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(initial_mode,        "INITIAL_MODE",     Mode::Number::MANUAL),
 
+    // @Param: AUTO_PREFLIGHT
+    // @DisplayName: Enable automatic preflight sequencing
+    // @Description: Set to 1 to enable the aircraft to automatically select AUTO maode, perform control surface movement checks and arm ready for launch. USed where operation without a GCS or handset is required. Use LAUNCH_PITCH_DEG to add checking of launch angle where a ramp or catapult launcher is required. USe ARMING_MIS_ITEMS to ensure that required mission items are present.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(auto_preflight,        "AUTO_PREFLIGHT",     0),
+
     // @Param: LIM_ROLL_CD
     // @DisplayName: Maximum Bank Angle
     // @Description: Maximum bank angle commanded in modes with stabilized limits. Increase this value for sharper turns, but decrease to prevent accelerated stalls.
