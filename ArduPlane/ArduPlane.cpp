@@ -261,11 +261,12 @@ void Plane::one_second_loop()
     // Logic to select AUTO mode if a valid mission plan is available and the vehicle is disarmed
     // Allow operator to select stabilize mode for checking of motor, servo movement and autopilot stabilisation
     // The mode entered after intializing completes is set by the INITIAL_MODE parameter
+    // Mission plan checking is controlled by the ARMING_MIS_ITEMS parameter
     if (!plane.arming.is_armed() &&
             plane.control_mode != &plane.mode_auto &&
             plane.control_mode != &plane.mode_initializing &&
             plane.control_mode != &plane.mode_stabilize &&
-            plane.check_mission()) {
+            arming.mission_check_pass(false)) {
         plane.set_mode(plane.mode_auto, MODE_REASON_UNKNOWN);
         plane.mission.set_current_cmd(1);
     }
