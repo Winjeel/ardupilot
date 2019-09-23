@@ -319,38 +319,40 @@ void Plane::set_servos_idle(void)
 }
 
 /*
-  setup servos for pre-flight movement test
+  Perform pre-flight movement test of servos and then park them in a position that indicates when ready for launch
  */
 void Plane::set_servos_idle_preflight(void)
 {
-    // move over full range at a slew rate that corresponds to 1 second to travese between travel limits
-    // at a servo update rate of 50Hz
-    const int16_t delta = (4500 / 50);
-    if (surface_test_state.control_index != 0 && surface_test_state.control_index < 400) {
-        surface_test_state.control_index += 2;
+    // Calculate an increment to the servo demand that corresponds to 1 second to travese
+    // between deflection limits of +-4500 at the nominal servo update rate
+    const int16_t delta = (9000 / scheduler.get_loop_rate_hz());
+    if (surface_test_state.control_index != 0 && surface_test_state.control_index < 200) {
+        // once the movement sequence starts, continue to progress until complete
+        surface_test_state.control_index++;
     }
     if (surface_test_state.control_index == 0 && !surface_test_state.control_checks_complete) {
-        surface_test_state.servo_demand_cd = 0;
-        surface_test_state.pitch_servo_demand_cd = 0;
-    } else if (surface_test_state.control_index < 50) {
+        // waiting for movement sequence to start so set surfaces to neutral
+        surface_test_state.servo_demand_cd = 0; // used for all surfaces other than pitch axis
+        surface_test_state.pitch_servo_demand_cd = 0; // used for pitch axis surfaces
+    } else if (surface_test_state.control_index < 25) {
         // ramp from 0 to +max
         surface_test_state.servo_demand_cd = surface_test_state.control_index * delta;
         surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
-    } else if (surface_test_state.control_index < 150) {
+    } else if (surface_test_state.control_index < 75) {
         // hold at +max for short period to allow observation
         surface_test_state.servo_demand_cd = 4500;
         surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
-    } else if (surface_test_state.control_index < 250) {
+    } else if (surface_test_state.control_index < 125) {
         // ramp from +max to -max
-        surface_test_state.servo_demand_cd = (200 - surface_test_state.control_index) * delta;
+        surface_test_state.servo_demand_cd = (100 - surface_test_state.control_index) * delta;
         surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
-    } else if (surface_test_state.control_index < 350) {
+    } else if (surface_test_state.control_index < 175) {
         // hold at -max for short period to allow for observation
         surface_test_state.servo_demand_cd = -4500;
         surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
-    } else if (surface_test_state.control_index < 400) {
+    } else if (surface_test_state.control_index < 200) {
         //ramp from -max to 0
-        surface_test_state.servo_demand_cd = (surface_test_state.control_index - 400) * delta;
+        surface_test_state.servo_demand_cd = (surface_test_state.control_index - 200) * delta;
         surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
     } else {
         surface_test_state.control_checks_complete = true;
@@ -364,16 +366,16 @@ void Plane::set_servos_idle_preflight(void)
             target = 0;
         }
         if (target - surface_test_state.pitch_servo_demand_cd > 0) {
-            surface_test_state.pitch_servo_demand_cd += MIN(2*delta, target - surface_test_state.pitch_servo_demand_cd);
+            surface_test_state.pitch_servo_demand_cd += MIN(delta, target - surface_test_state.pitch_servo_demand_cd);
         } else if (target - surface_test_state.servo_demand_cd < 0) {
-            surface_test_state.pitch_servo_demand_cd -= MIN(2*delta, surface_test_state.pitch_servo_demand_cd - target);
+            surface_test_state.pitch_servo_demand_cd -= MIN(delta, surface_test_state.pitch_servo_demand_cd - target);
         }
 
         // other surfaces are ramped to neutral
         if (surface_test_state.servo_demand_cd < 0) {
-            surface_test_state.servo_demand_cd += MIN(2*delta, - surface_test_state.servo_demand_cd);
+            surface_test_state.servo_demand_cd += MIN(delta, - surface_test_state.servo_demand_cd);
         } else if (surface_test_state.servo_demand_cd > 0) {
-            surface_test_state.servo_demand_cd -= MIN(2*delta, surface_test_state.servo_demand_cd );
+            surface_test_state.servo_demand_cd -= MIN(delta, surface_test_state.servo_demand_cd );
         }
     }
 }
