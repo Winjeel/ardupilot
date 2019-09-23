@@ -513,8 +513,9 @@ private:
         // movement until altitude is reached
         bool idle_mode:1;
 
-        // used to 'wiggle' servos before flight to enable visual check of operation
-        uint16_t idle_wiggle_stage;
+        // used to 'wiggle' servos in idle mode to prevent them freezing
+        // at high altitudes
+        uint8_t idle_wiggle_stage;
 
         // Altitude threshold to complete a takeoff command in autonomous
         // modes.  Centimeters above home
