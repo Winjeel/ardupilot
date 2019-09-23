@@ -571,10 +571,10 @@ private:
         bool control_checks_complete {false};
 
         // deflection of roll and yaw control servos demanded during preflight test [-4500 ...  +4500]
-        int16_t servo_demand {0};
+        int16_t servo_demand_cd {0};
 
         // deflection of pitch control servos demanded during preflight test [-4500 ...  +4500]
-        int16_t pitch_servo_demand {0};
+        int16_t pitch_servo_demand_cd {0};
 
         // true when surfaces should be set to launch position
         bool set_to_launch_position {false};
