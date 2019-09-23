@@ -267,7 +267,7 @@ void Plane::one_second_loop()
             plane.control_mode != &plane.mode_auto &&
             plane.control_mode != &plane.mode_initializing &&
             plane.control_mode != &plane.mode_stabilize &&
-            arming.mission_check_pass(false)) {
+            arming.mission_checks(false)) {
         plane.set_mode(plane.mode_auto, MODE_REASON_UNKNOWN);
         plane.mission.set_current_cmd(1);
     }
