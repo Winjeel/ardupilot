@@ -468,9 +468,6 @@ private:
         Vector2f position_at_start;
         bool launch_started;
     } takeoff_state;
-    
-    // latches to true when launch start has been detected and is reset when vehicle disarms
-    bool auto_launch_started = false;
 
     // ground steering controller state
     struct {
