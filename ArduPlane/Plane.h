@@ -466,7 +466,7 @@ private:
         uint32_t accel_event_ms;
         uint32_t start_time_ms;
         Vector2f position_at_start;
-        bool launch_started;
+        bool control_check_inhibit;
     } takeoff_state;
 
     // ground steering controller state
