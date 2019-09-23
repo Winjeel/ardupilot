@@ -854,7 +854,7 @@ void Plane::set_servos(void)
     }
 
     // Special handling of preflight servo movement when in AUTO and waiting for launch
-    // Thsi enables launching without GCS using control surfaces to signal
+    // This enables launching without GCS using control surfaces to signal
     if (plane.g.auto_preflight == 1 && control_mode == &mode_auto && !takeoff_state.launch_started) {
         if (!arming.is_armed()) {
             // when pre-arm checks ar passing
@@ -873,14 +873,11 @@ void Plane::set_servos(void)
                     }
                 }
             }
+            // When checks complete, don't place surfaces in launch position until arming is confirmed
             surface_test_state.set_to_launch_position = false;
         } else {
-            // reset control test states to allow for repeating movement tests if disarmed and armed again
-            surface_test_state.control_checks_complete = true;
-
-            // Once armed, place control surfaces in the luanch position to let operator know it is ready
+            // Once armed, place control surfaces in the launch position to indicate ready to launch
             surface_test_state.set_to_launch_position = true;
-
         }
 
         // calculate the deflection value surface_test_state.servo_demand to be sent to the servos
@@ -902,6 +899,12 @@ void Plane::set_servos(void)
         SRV_Channels::push();
 
         return;
+    } else {
+        // reset to allow surface movement check to be repeated if the vehicle is placed into a different
+        // mode, eg STABILIZE for testing, and re-enters auto preflight
+        surface_test_state.control_checks_complete = false;
+        surface_test_state.control_index = 0;
+        surface_test_state.set_to_launch_position = false;
     }
 
     uint8_t override_pct;
