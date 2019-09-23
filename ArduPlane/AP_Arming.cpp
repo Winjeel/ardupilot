@@ -103,11 +103,12 @@ bool AP_Arming_Plane::pre_arm_checks(bool display_failure)
     // additional checks to determine if at correct launch attitude
     if (plane.g.launch_pitch_deg > 0) {
         if (!plane.arming.is_armed()) {
-            int16_t launch_pitch_cd = 100 * (int16_t)plane.g.launch_pitch_deg;
-            if (plane.ahrs.pitch_sensor > (launch_pitch_cd + 500) ||
-                    plane.ahrs.pitch_sensor < (launch_pitch_cd - 500) ||
-                    plane.ahrs.roll_sensor > 500 ||
-                    plane.ahrs.roll_sensor < -500) {
+            const int16_t launch_pitch_cd = 100 * (int16_t)plane.g.launch_pitch_deg;
+            const int16_t tolerance_cd = 500;
+            if (plane.ahrs.pitch_sensor > (launch_pitch_cd + tolerance_cd) ||
+                    plane.ahrs.pitch_sensor < (launch_pitch_cd - tolerance_cd) ||
+                    plane.ahrs.roll_sensor > tolerance_cd ||
+                    plane.ahrs.roll_sensor < -tolerance_cd) {
                 check_failed(ARMING_CHECK_NONE, display_failure,"Not at correct launch angle");
                 ret = false;
             }
