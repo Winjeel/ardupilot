@@ -20,6 +20,8 @@
 
 #include "CorvoMsgBuffer.hpp"
 
+#include "AdcState.h"
+
 
 #define CORVO_DEBUG (false)
 
@@ -54,6 +56,8 @@ public:
     // Clear the accumulated flow data
     void clearFlowData(void);
 
+    bool getAdcData(AdcState_t * const adc_data);
+
     // get singleton instance
     static AP_PpdsMotorPod *get_singleton() {
         return AP_PpdsMotorPod::_singleton;
@@ -70,6 +74,9 @@ private:
 
     FlowData _flow_data = {};
     HAL_Semaphore _flow_sem;
+
+    AdcState_t _adc_data = {};
+    HAL_Semaphore _adc_sem;
 
     static AP_PpdsMotorPod *_singleton;
 

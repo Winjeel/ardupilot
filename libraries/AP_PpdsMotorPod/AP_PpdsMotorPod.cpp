@@ -19,7 +19,6 @@
 
 #include "autopilot-interface.h"
 #include "OpticalFlowState.h"
-#include "AdcState.h"
 
 #include <cstring>
 
@@ -151,13 +150,12 @@ void AP_PpdsMotorPod::update(void) {
                             _debug(MAV_SEVERITY_ERROR, "PMP ADC Bad! sz=%lums", sz);
                         }
 
-                        AdcState_t adc;
                         int idx = 0;
-                        decodeAdcState_t(tmp, &idx, &adc);
+                        decodeAdcState_t(tmp, &idx, &_adc_data);
 
-                        _debug(MAV_SEVERITY_DEBUG, "\t\tcurrent=%f", adc.current);
-                        _debug(MAV_SEVERITY_DEBUG, "\t\tvoltage=%f", adc.voltage);
-                        _debug(MAV_SEVERITY_DEBUG, "\t\ttemp=%f", adc.temperature);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tcurrent=%f", _adc_data.current);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tvoltage=%f", _adc_data.voltage);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\ttemp=%f", _adc_data.temperature);
                     }
                     break;
                 }
@@ -232,6 +230,16 @@ void AP_PpdsMotorPod::clearFlowData(void) {
     memset(&_flow_data, 0, sizeof(_flow_data));
 }
 
+bool AP_PpdsMotorPod::getAdcData(AdcState_t * const adc_data) {
+    WITH_SEMAPHORE(_adc_sem);
+    bool has_data = true; // TBD
+
+    if (has_data) {
+        memcpy(adc_data, &_adc_data, sizeof(*adc_data));
+    }
+
+    return has_data;
+}
 
 namespace AP {
     AP_PpdsMotorPod *motorPod() {

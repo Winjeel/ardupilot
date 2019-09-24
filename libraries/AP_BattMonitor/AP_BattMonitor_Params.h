@@ -24,6 +24,9 @@ public:
         BattMonitor_TYPE_BLHeliESC                  = 9,
         BattMonitor_TYPE_Sum                        = 10,
         BattMonitor_TYPE_FuelFlow                   = 11,
+
+        // de-conflict with upstream changes
+        BattMonitor_TYPE_MotorPod                   = 64,
     };
 
     // low voltage sources (used for BATT_LOW_TYPE parameter)

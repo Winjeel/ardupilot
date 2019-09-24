@@ -5,6 +5,7 @@
 #include "AP_BattMonitor_BLHeliESC.h"
 #include "AP_BattMonitor_Sum.h"
 #include "AP_BattMonitor_FuelFlow.h"
+#include "AP_BattMonitor_MotorPod.h"
 
 #include <AP_HAL/AP_HAL.h>
 
@@ -111,37 +112,49 @@ AP_BattMonitor::init()
             case AP_BattMonitor_Params::BattMonitor_TYPE_ANALOG_VOLTAGE_AND_CURRENT:
                 drivers[instance] = new AP_BattMonitor_Analog(*this, state[instance], _params[instance]);
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_SOLO:
                 drivers[instance] = new AP_BattMonitor_SMBus_Solo(*this, state[instance], _params[instance],
                                                                   hal.i2c_mgr->get_device(AP_BATTMONITOR_SMBUS_BUS_INTERNAL, AP_BATTMONITOR_SMBUS_I2C_ADDR,
                                                                                           100000, true, 20));
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_MAXELL:
                 drivers[instance] = new AP_BattMonitor_SMBus_Maxell(*this, state[instance], _params[instance],
                                                                     hal.i2c_mgr->get_device(AP_BATTMONITOR_SMBUS_BUS_EXTERNAL, AP_BATTMONITOR_SMBUS_I2C_ADDR,
                                                                                             100000, true, 20));
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_BEBOP:
 #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP || CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_DISCO
                 drivers[instance] = new AP_BattMonitor_Bebop(*this, state[instance], _params[instance]);
 #endif
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_UAVCAN_BatteryInfo:
 #if HAL_WITH_UAVCAN
                 drivers[instance] = new AP_BattMonitor_UAVCAN(*this, state[instance], AP_BattMonitor_UAVCAN::UAVCAN_BATTERY_INFO, _params[instance]);
 #endif
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_BLHeliESC:
 #ifdef HAVE_AP_BLHELI_SUPPORT
                 drivers[instance] = new AP_BattMonitor_BLHeliESC(*this, state[instance], _params[instance]);
 #endif
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_Sum:
                 drivers[instance] = new AP_BattMonitor_Sum(*this, state[instance], _params[instance], instance);
                 break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_FuelFlow:
                 drivers[instance] = new AP_BattMonitor_FuelFlow(*this, state[instance], _params[instance]);
                 break;
+
+            case AP_BattMonitor_Params::BattMonitor_TYPE_MotorPod:
+                drivers[instance] = new AP_BattMonitor_MotorPod(*this, state[instance], _params[instance]);
+                break;
+
             case AP_BattMonitor_Params::BattMonitor_TYPE_NONE:
             default:
                 break;
@@ -249,7 +262,7 @@ AP_BattMonitor::read()
     }
 
     check_failsafes();
-    
+
     checkPoweringOff();
 }
 
