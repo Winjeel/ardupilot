@@ -21,7 +21,7 @@
 #include "CorvoMsgBuffer.hpp"
 
 
-#define CORVO_DEBUG (true)
+#define CORVO_DEBUG (false)
 
 
 class AP_PpdsMotorPod
