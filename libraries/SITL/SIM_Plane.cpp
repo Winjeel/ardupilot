@@ -51,7 +51,7 @@ Plane::Plane(const char *home_str, const char *frame_str) :
     if (strstr(frame_str, "-catapult")) {
         have_launcher = true;
         launch_accel = 25.0f;
-        launch_time = 0.5f;
+        launch_time = 0.7f;
     }
     if (strstr(frame_str, "-bungee")) {
         have_launcher = true;

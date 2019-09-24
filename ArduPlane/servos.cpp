@@ -319,6 +319,68 @@ void Plane::set_servos_idle(void)
 }
 
 /*
+  Perform pre-flight movement test of servos and then park them in a position that indicates when ready for launch
+ */
+void Plane::set_servos_idle_preflight(void)
+{
+    // Calculate an increment to the servo demand that corresponds to 1 second to travese
+    // between deflection limits of +-4500 at the nominal servo update rate
+    const int16_t delta = (9000 / scheduler.get_loop_rate_hz());
+    if (surface_test_state.control_index != 0 && surface_test_state.control_index < 200) {
+        // once the movement sequence starts, continue to progress until complete
+        surface_test_state.control_index++;
+    }
+    if (surface_test_state.control_index == 0 && !surface_test_state.control_checks_complete) {
+        // waiting for movement sequence to start so set surfaces to neutral
+        surface_test_state.servo_demand_cd = 0; // used for all surfaces other than pitch axis
+        surface_test_state.pitch_servo_demand_cd = 0; // used for pitch axis surfaces
+    } else if (surface_test_state.control_index < 25) {
+        // ramp from 0 to +max
+        surface_test_state.servo_demand_cd = surface_test_state.control_index * delta;
+        surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
+    } else if (surface_test_state.control_index < 75) {
+        // hold at +max for short period to allow observation
+        surface_test_state.servo_demand_cd = 4500;
+        surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
+    } else if (surface_test_state.control_index < 125) {
+        // ramp from +max to -max
+        surface_test_state.servo_demand_cd = (100 - surface_test_state.control_index) * delta;
+        surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
+    } else if (surface_test_state.control_index < 175) {
+        // hold at -max for short period to allow for observation
+        surface_test_state.servo_demand_cd = -4500;
+        surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
+    } else if (surface_test_state.control_index < 200) {
+        //ramp from -max to 0
+        surface_test_state.servo_demand_cd = (surface_test_state.control_index - 200) * delta;
+        surface_test_state.pitch_servo_demand_cd = surface_test_state.servo_demand_cd;
+    } else {
+        surface_test_state.control_checks_complete = true;
+
+       // When movement test has completed, ramp pitch surfaces to either neutral or launch position
+        int16_t target;
+        const int16_t launch_target = 100 * (uint16_t)plane.g.launch_elevator;
+        if (surface_test_state.set_to_launch_position) {
+            target = launch_target;
+        } else {
+            target = 0;
+        }
+        if (target - surface_test_state.pitch_servo_demand_cd > 0) {
+            surface_test_state.pitch_servo_demand_cd += MIN(delta, target - surface_test_state.pitch_servo_demand_cd);
+        } else if (target - surface_test_state.servo_demand_cd < 0) {
+            surface_test_state.pitch_servo_demand_cd -= MIN(delta, surface_test_state.pitch_servo_demand_cd - target);
+        }
+
+        // other surfaces are ramped to neutral
+        if (surface_test_state.servo_demand_cd < 0) {
+            surface_test_state.servo_demand_cd += MIN(delta, - surface_test_state.servo_demand_cd);
+        } else if (surface_test_state.servo_demand_cd > 0) {
+            surface_test_state.servo_demand_cd -= MIN(delta, surface_test_state.servo_demand_cd );
+        }
+    }
+}
+
+/*
   pass through channels in manual mode
  */
 void Plane::set_servos_manual_passthrough(void)
@@ -791,6 +853,62 @@ void Plane::set_servos(void)
             SRV_Channels::set_output_limit(SRV_Channel::k_elevator, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
             SRV_Channels::set_output_limit(SRV_Channel::k_rudder, SRV_Channel::SRV_CHANNEL_LIMIT_ZERO_PWM);
         }
+    }
+
+    // Special case handling of preflight servo movement when in AUTO and waiting for launch.
+    // This enables launching without GCS by using control surfaces to signal when ready to launch.
+    // This takes control of surface demands away from the pilot and attitude control loops.
+    // Following detection of launch movement, this special case is inhibited until the vehicle is disarmed.
+    if (plane.g.auto_preflight == 1 && control_mode == &mode_auto && !takeoff_state.control_check_inhibit) {
+        if (!arming.is_armed()) {
+            // when pre-arm checks ar passing
+            if (AP_Notify::flags.pre_arm_check) {
+                if (!surface_test_state.control_checks_complete) {
+                    // start servo movement checks
+                    if (surface_test_state.control_index == 0) {
+                        surface_test_state.control_index = 1;
+                    }
+                } else {
+                    // try to arm when movement checks complete provided the mission plan checks pass
+                    if (plane.mission.get_current_nav_index() == 1) {
+                        arming.arm(AP_Arming::Method::MAVLINK, true);
+                    } else {
+                        plane.mission.set_current_cmd(1);
+                    }
+                }
+            }
+            // When checks complete, don't place surfaces in launch position until arming is confirmed
+            surface_test_state.set_to_launch_position = false;
+        } else {
+            // Once armed, place control surfaces in the launch position to indicate ready to launch
+            surface_test_state.set_to_launch_position = true;
+        }
+
+        // calculate the deflection value surface_test_state.servo_demand_cd to be sent to the servos
+        set_servos_idle_preflight();
+
+        // Drive pitch control surface channels - these will be set to LAUNCH_ELEVATOR when ready to launch
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_left, surface_test_state.pitch_servo_demand_cd);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevon_right, surface_test_state.pitch_servo_demand_cd);  
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, surface_test_state.pitch_servo_demand_cd);
+
+        // Drive other control surface channels - these will be set to neutral when ready to launch
+        SRV_Channels::set_output_scaled(SRV_Channel::k_aileron, surface_test_state.servo_demand_cd);
+        SRV_Channels::set_output_scaled(SRV_Channel::k_rudder, surface_test_state.servo_demand_cd);
+
+        // Run functions normally called by servos_output() required to send PWM demands to servos 
+        SRV_Channels::cork();
+        SRV_Channels::calc_pwm();
+        SRV_Channels::output_ch_all();
+        SRV_Channels::push();
+
+        return;
+    } else {
+        // reset to allow surface movement check to be repeated if the vehicle is placed into a different
+        // mode, eg STABILIZE for testing, and re-enters auto preflight
+        surface_test_state.control_checks_complete = false;
+        surface_test_state.control_index = 0;
+        surface_test_state.set_to_launch_position = false;
     }
 
     uint8_t override_pct;

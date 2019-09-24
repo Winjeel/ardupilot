@@ -55,15 +55,15 @@ public:
         k_param_log_bitmask_old,  // unused
         k_param_pitch_trim_cd,
         k_param_mix_mode,
-        k_param_reverse_elevons, // unused
-        k_param_reverse_ch1_elevon, // unused
+        k_param_auto_preflight,
+        k_param_launch_elevator,
         k_param_reverse_ch2_elevon, // unused
         k_param_flap_1_percent,
         k_param_flap_1_speed,
         k_param_flap_2_percent,
         k_param_flap_2_speed,
         k_param_reset_switch_chan,
-        k_param_manual_level, // unused
+        k_param_launch_pitch_deg,
         k_param_land_pitch_cd,  // unused - moved to AP_Landing
         k_param_ins_old,            // *** Deprecated, remove with next eeprom number change
         k_param_stick_mixing,
@@ -461,7 +461,8 @@ public:
 #if HIL_SUPPORT
     AP_Int8  hil_mode;
 #endif
-
+    AP_Int8 auto_preflight;
+    AP_Int8 launch_elevator;
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;
@@ -495,6 +496,7 @@ public:
 #endif
     AP_Int16 gcs_pid_mask;
     AP_Int8 parachute_channel;
+    AP_Int8 launch_pitch_deg;
 };
 
 // enums used by RNGFND_LANDING parameter

@@ -466,8 +466,9 @@ private:
         uint32_t accel_event_ms;
         uint32_t start_time_ms;
         Vector2f position_at_start;
+        bool control_check_inhibit;
     } takeoff_state;
-    
+
     // ground steering controller state
     struct {
         // Direction held during phases of takeoff and landing centidegrees
@@ -559,7 +560,27 @@ private:
 
         // are we doing loiter mode as a VTOL?
         bool vtol_loiter:1;
+
     } auto_state;
+
+    // Used for control surface movement test
+    struct {
+        // true when control surface checks completed
+        bool control_checks_complete {false};
+
+        // deflection of roll and yaw control servos demanded during preflight test [-4500 ...  +4500]
+        int16_t servo_demand_cd {0};
+
+        // deflection of pitch control servos demanded during preflight test [-4500 ...  +4500]
+        int16_t pitch_servo_demand_cd {0};
+
+        // true when surfaces should be set to launch position
+        bool set_to_launch_position {false};
+
+        // index used to control surface movement
+        uint16_t control_index;
+
+    } surface_test_state;
 
     struct {
         // roll pitch yaw commanded from external controller in centidegrees
@@ -992,6 +1013,7 @@ private:
     void update_control_mode(void);
     void stabilize();
     void set_servos_idle(void);
+    void set_servos_idle_preflight(void);
     void set_servos();
     void set_servos_manual_passthrough(void);
     void set_servos_controlled(void);

@@ -85,6 +85,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(stab_pitch_down, "STAB_PITCH_DOWN",   2.0f),
 
+    // @Param: LAUNCH_PITCH_DEG
+    // @DisplayName: Pitch angle of launcher
+    // @Description: This sets the expected pitch angle of the vehicle before launch. If this is set to a positive number, then the vehicle will not arm unless the wings are level and the pitch angle matches this paraemter to an accuracy of +- 5deg. If a ramp or catapult launcher is being used, then this can be used to prevent arming if the AHRS solution is incorrect or the vehicle is  powered when not on the launcher.
+    // @Range: 0 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_pitch_deg, "LAUNCH_PITCH_DEG", 0),
+
     // @Param: GLIDE_SLOPE_MIN
     // @DisplayName: Glide slope minimum
     // @Description: This controls the minimum altitude change for a waypoint before a glide slope will be used instead of an immediate altitude change. The default value is 15 meters, which helps to smooth out waypoint missions where small altitude changes happen near waypoints. If you don't want glide slopes to be used in missions then you can set this to zero, which will disable glide slope calculations. Otherwise you can set it to a minimum number of meters of altitude error to the destination waypoint before a glide slope will be used to change altitude.
@@ -610,6 +619,22 @@ const AP_Param::Info Plane::var_info[] = {
     // @Values: 0:Manual,1:CIRCLE,2:STABILIZE,3:TRAINING,4:ACRO,5:FBWA,6:FBWB,7:CRUISE,8:AUTOTUNE,10:Auto,11:RTL,12:Loiter,14:AVOID_ADSB,15:Guided,17:QSTABILIZE,18:QHOVER,19:QLOITER,20:QLAND,21:QRTL,22:QAUTOTUNE
     // @User: Advanced
     GSCALAR(initial_mode,        "INITIAL_MODE",     Mode::Number::MANUAL),
+
+    // @Param: AUTO_PREFLIGHT
+    // @DisplayName: Enable automatic preflight sequencing
+    // @Description: Set to 1 to enable the aircraft to automatically select AUTO maode, perform control surface movement checks and arm ready for launch. USed where operation without a GCS or handset is required. Use LAUNCH_PITCH_DEG to add checking of launch angle where a ramp or catapult launcher is required. USe ARMING_MIS_ITEMS to ensure that required mission items are present.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(auto_preflight,        "AUTO_PREFLIGHT",     0),
+
+    // @Param: LAUNCH_ELEVATOR
+    // @DisplayName: Elevator servo deflection when ready for launch.
+    // @Description: When automatic preflight sequencing selected by AUTO_PREFLIGHT is being used, the pitch control surfaces will be set to this angle when all checks have passed and the vehicle is ready for launch. When launch acceleration is detected, surfaces will be immediately be set to the autopilot demands.
+    // @Range: -45 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_elevator, "LAUNCH_ELEVATOR", 0),
 
     // @Param: LIM_ROLL_CD
     // @DisplayName: Maximum Bank Angle
