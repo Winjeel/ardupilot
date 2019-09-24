@@ -24,6 +24,8 @@
 #include "AP_PpdsMotorPod/AP_PpdsMotorPod.hpp"
 #include <stdio.h>
 
+#include "GCS_MAVLink/GCS.h"
+
 // TODO: this is a bit of a hack. Is there a better way?
 // For this driver to work, the AP_PpdsMotorPod driver needs to be included for
 // compilation. As we don't have feature flags or other conditional compilation,
@@ -58,20 +60,21 @@ AP_OpticalFlow_MotorPod *AP_OpticalFlow_MotorPod::detect(OpticalFlow &_frontend)
 
 void AP_OpticalFlow_MotorPod::update(void) {
     if (AP::motorPod() == nullptr) {
+        gcs().send_text(MAV_SEVERITY_ERROR, "OFMP !MP");
         return;
     }
 
     WITH_SEMAPHORE(_sem);
 
     const uint32_t kNow_us = AP_HAL::micros();
-    const uint32_t kUpdatePerdiod_us = (kNow_us - this->lastUpdate_us);
+    const uint32_t kUpdatePeriod_us = (kNow_us - this->lastUpdate_us);
     this->lastUpdate_us = kNow_us;
 
     const Vector3f& kGyro_vec = AP::ahrs_navekf().get_gyro();
     // accumulate gyro data
     this->gyro_accum.x += kGyro_vec.x;
     this->gyro_accum.y += kGyro_vec.y;
-    this->gyro_accum.t += kUpdatePerdiod_us;
+    this->gyro_accum.t += kUpdatePeriod_us;
 
     // Get optical flow data from MotorPod driver
     AP_PpdsMotorPod::FlowData flowData;
@@ -79,6 +82,7 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
     // return without updating state if no readings
     if (!gotData) {
+        gcs().send_text(MAV_SEVERITY_ERROR, "OFMP !data");
         return;
     }
 

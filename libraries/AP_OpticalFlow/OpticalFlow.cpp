@@ -10,6 +10,10 @@
 #include "AP_OpticalFlow_MotorPod.h"
 #include <AP_Logger/AP_Logger.h>
 
+
+#include "GCS_MAVLink/GCS.h"
+
+
 extern const AP_HAL::HAL& hal;
 
 #ifndef OPTICAL_FLOW_TYPE_DEFAULT
@@ -158,10 +162,14 @@ void OpticalFlow::update(void)
 {
     // exit immediately if not enabled
     if (!enabled()) {
+        gcs().send_text(MAV_SEVERITY_ERROR, "OF !enabled");
         return;
     }
     if (backend != nullptr) {
+        // gcs().send_text(MAV_SEVERITY_INFO, "OF backend update");
         backend->update();
+    } else {
+        gcs().send_text(MAV_SEVERITY_ERROR, "OF !backend");
     }
 
     // only healthy if the data is less than 0.5s old
