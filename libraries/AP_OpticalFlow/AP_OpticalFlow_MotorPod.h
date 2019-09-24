@@ -22,8 +22,8 @@ public:
     static AP_OpticalFlow_MotorPod *detect(OpticalFlow &_frontend);
 
 private:
-
-    const float kFlowPixelScaling = 1.26e-3;
+    // TODO: Work out why this is 1000x larger than the Pixart driver...
+    const float kFlowPixelScaling = 1.26;
 
     struct GyroAccum {
         float x;

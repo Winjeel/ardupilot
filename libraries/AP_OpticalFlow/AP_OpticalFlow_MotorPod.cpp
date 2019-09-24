@@ -106,7 +106,8 @@ void AP_OpticalFlow_MotorPod::update(void) {
         float flowScaleFactorX = 1.0f + 0.001f * flowScaler.x;
         float flowScaleFactorY = 1.0f + 0.001f * flowScaler.y;
 
-        state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX,
+        // TODO: Work out why we need to invert the flow rate x-axis
+        state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX * -1.0,
                                   flowData.delta.y * flowScaleFactorY);
         state.flowRate *= kFlowPixelScaling / delta_t_flow;
 
