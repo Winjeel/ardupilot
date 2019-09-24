@@ -19,6 +19,7 @@
 
 #include "autopilot-interface.h"
 #include "OpticalFlowState.h"
+#include "AdcState.h"
 
 #include <cstring>
 
@@ -33,9 +34,9 @@ AP_PpdsMotorPod::AP_PpdsMotorPod(void) :
             driver_init_time(AP_HAL::millis())
 {
     _singleton = this;
-    if (CORVO_DEBUG) {
-        debug_tick = 0;
-    }
+#if (CORVO_DEBUG)
+    debug_tick = 0;
+#endif
 }
 
 
@@ -52,12 +53,16 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
     }
 }
 
-#define _debug_freq(freq, lvl, fmt, ...)                  \
-    do {                                                  \
-        if (CORVO_DEBUG && ((debug_tick % freq) == 0)) {  \
-            gcs().send_text(lvl, fmt, ##__VA_ARGS__);     \
-        }                                                 \
-    } while (0)
+#if (CORVO_DEBUG)
+    #define _debug_freq(freq, lvl, fmt, ...)                  \
+        do {                                                  \
+            if ((debug_tick % freq) == 0) {                   \
+                gcs().send_text(lvl, fmt, ##__VA_ARGS__);     \
+            }                                                 \
+        } while (0)
+#else
+    #define _debug_freq(freq, lvl, fmt, ...)
+#endif
 #define _debug(lvl, fmt, ...) _debug_freq(10, lvl, fmt, ##__VA_ARGS__)
 
 /*
@@ -65,19 +70,17 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
   around 10Hz by main loop
  */
 void AP_PpdsMotorPod::update(void) {
-    uint32_t time_now = AP_HAL::millis();
-
-    _debug(MAV_SEVERITY_WARNING, "[%8lums] PMP: update", time_now);
+    _debug(MAV_SEVERITY_WARNING, "[%8lums] PMP: update", AP_HAL::millis());
 
     // TODO: re-init?
     if (uart == nullptr) {
-        _debug(MAV_SEVERITY_WARNING, "\tPMP: uart == null");
+        gcs().send_text(MAV_SEVERITY_ERROR, "\tPMP: uart == null");
         return;
     }
 
     if (!uart->is_initialized()) {
         // TODO: is this needed, and how do we recover?
-        _debug(MAV_SEVERITY_WARNING, "\tPMP: uart !init");
+        gcs().send_text(MAV_SEVERITY_ERROR, "\tPMP: uart !init");
         return;
     }
 
@@ -120,10 +123,12 @@ void AP_PpdsMotorPod::update(void) {
                         int idx = 0;
                         decodeOpticalFlowState_t(tmp, &idx, &flow);
 
-                        _debug(MAV_SEVERITY_DEBUG, "\t\ttimeDelta_us=%lums", flow.timeDelta_us);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tsequence=%u", flow.sequence);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\ttimeDelta=%.3fms", flow.timeDelta_us / 1000.0);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tisMoving=%u", flow.isMoving);
                         _debug(MAV_SEVERITY_DEBUG, "\t\tsurfaceQual=%u", flow.surfaceQuality);
-                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.X=%f", flow.flowDelta.x);
-                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.Y=%f", flow.flowDelta.y);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.X=%d", flow.flowDelta.x);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tflowDelta.Y=%d", flow.flowDelta.y);
 
                         _flow_data.surfaceQuality = flow.surfaceQuality;
                         _flow_data.delta.x += flow.flowDelta.x;
@@ -131,6 +136,29 @@ void AP_PpdsMotorPod::update(void) {
                         _flow_data.delta.t_us += flow.timeDelta_us;
                     }
 
+                    break;
+                }
+
+                case ADC_STATE: {
+                    _debug(MAV_SEVERITY_DEBUG, "\tPMP: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
+                    if (dataSz >= getAdcStateMinDataLength()) {
+                        uint8_t tmp[getAdcStateMaxDataLength()];
+                        int sz = msg_buffer.copyData(tmp, sizeof(tmp));
+
+                        if (   (sz < getAdcStateMinDataLength())
+                            || (sz > getAdcStateMaxDataLength())
+                        ) {
+                            _debug(MAV_SEVERITY_ERROR, "PMP ADC Bad! sz=%lums", sz);
+                        }
+
+                        AdcState_t adc;
+                        int idx = 0;
+                        decodeAdcState_t(tmp, &idx, &adc);
+
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tcurrent=%f", adc.current);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\tvoltage=%f", adc.voltage);
+                        _debug(MAV_SEVERITY_DEBUG, "\t\ttemp=%f", adc.temperature);
+                    }
                     break;
                 }
 
@@ -145,9 +173,10 @@ void AP_PpdsMotorPod::update(void) {
             // we'll get an infinite loop)
             size_t eaten = msg_buffer.consume();
             _debug(MAV_SEVERITY_DEBUG, "\tPMP: ate %lu bytes", eaten);
+            (void)eaten;
         }
     } else {
-        _debug(MAV_SEVERITY_DEBUG, "\tPMP: got no bytes", num_bytes);
+        gcs().send_text(MAV_SEVERITY_ERROR, "\tPMP: got no bytes", num_bytes);
     }
 
 #define SEND_PACKET (0)
@@ -181,8 +210,10 @@ void AP_PpdsMotorPod::update(void) {
         // TODO: send update request(?)
     }
 
+#if (CORVO_DEBUG)
     // update debug tick
     debug_tick++;
+#endif // (CORVO_DEBUG)
 }
 
 bool AP_PpdsMotorPod::getFlowData(FlowData * const flow_data) {

@@ -15,21 +15,22 @@ extern "C" {
  * This is the external interface for the PPDS Motor Pod firmware, generated
  * with ProtoGen.
  *
- * The protocol version is 0.0.1.a
+ * The protocol version is 0.0.1.b
  */
 
 #include <stdint.h>
 #include "corvo_packet.h"	// Definition for Corvo packet structure.
 
 //! \return the protocol version string
-#define getPpdsMotorPodVersion() "0.0.1.a"
+#define getPpdsMotorPodVersion() "0.0.1.b"
 
 /*!
  * The list of packet identifiers.
  */
 typedef enum
 {
-    OPTICAL_FLOW_STATE //!< The data measured by the Optical Flow sensor.
+    OPTICAL_FLOW_STATE,//!< The data measured by the Optical Flow sensor.
+    ADC_STATE        //!< The data measured by the ADC.
 } PacketIds;
 
 

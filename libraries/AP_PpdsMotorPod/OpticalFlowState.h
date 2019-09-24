@@ -25,7 +25,9 @@ typedef struct
  */
 typedef struct
 {
+    uint8_t     sequence;      
     uint32_t    timeDelta_us;  
+    uint8_t     isMoving;      
     uint8_t     surfaceQuality; //!< surface quality
     flowDelta_t flowDelta;     
 }OpticalFlowState_t;
@@ -46,10 +48,10 @@ int decodeOpticalFlowStatePacketStructure(const CorvoPacket* pkt, OpticalFlowSta
 #define getOpticalFlowStatePacketID() (OPTICAL_FLOW_STATE)
 
 //! return the minimum encoded length for the OpticalFlowState packet
-#define getOpticalFlowStateMinDataLength() (9)
+#define getOpticalFlowStateMinDataLength() (11)
 
 //! return the maximum encoded length for the OpticalFlowState packet
-#define getOpticalFlowStateMaxDataLength() (9)
+#define getOpticalFlowStateMaxDataLength() (11)
 
 #ifdef __cplusplus
 }

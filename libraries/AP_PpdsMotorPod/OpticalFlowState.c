@@ -68,7 +68,11 @@ void encodeOpticalFlowState_t(uint8_t* _pg_data, int* _pg_bytecount, const Optic
 {
     int _pg_byteindex = *_pg_bytecount;
 
+    uint8ToBytes(_pg_user->sequence, _pg_data, &_pg_byteindex);
+
     uint32ToBeBytes(_pg_user->timeDelta_us, _pg_data, &_pg_byteindex);
+
+    uint8ToBytes(_pg_user->isMoving, _pg_data, &_pg_byteindex);
 
     // surface quality
     uint8ToBytes(_pg_user->surfaceQuality, _pg_data, &_pg_byteindex);
@@ -92,7 +96,11 @@ int decodeOpticalFlowState_t(const uint8_t* _pg_data, int* _pg_bytecount, Optica
 {
     int _pg_byteindex = *_pg_bytecount;
 
+    _pg_user->sequence = uint8FromBytes(_pg_data, &_pg_byteindex);
+
     _pg_user->timeDelta_us = uint32FromBeBytes(_pg_data, &_pg_byteindex);
+
+    _pg_user->isMoving = uint8FromBytes(_pg_data, &_pg_byteindex);
 
     // surface quality
     _pg_user->surfaceQuality = uint8FromBytes(_pg_data, &_pg_byteindex);
@@ -118,7 +126,11 @@ void encodeOpticalFlowStatePacketStructure(CorvoPacket* _pg_pkt, const OpticalFl
     uint8_t* _pg_data = getPpdsMotorPodPacketData(_pg_pkt);
     int _pg_byteindex = 0;
 
+    uint8ToBytes(_pg_user->sequence, _pg_data, &_pg_byteindex);
+
     uint32ToBeBytes(_pg_user->timeDelta_us, _pg_data, &_pg_byteindex);
+
+    uint8ToBytes(_pg_user->isMoving, _pg_data, &_pg_byteindex);
 
     // surface quality
     uint8ToBytes(_pg_user->surfaceQuality, _pg_data, &_pg_byteindex);
@@ -155,7 +167,11 @@ int decodeOpticalFlowStatePacketStructure(const CorvoPacket* _pg_pkt, OpticalFlo
     // The raw data from the packet
     _pg_data = getPpdsMotorPodPacketDataConst(_pg_pkt);
 
+    _pg_user->sequence = uint8FromBytes(_pg_data, &_pg_byteindex);
+
     _pg_user->timeDelta_us = uint32FromBeBytes(_pg_data, &_pg_byteindex);
+
+    _pg_user->isMoving = uint8FromBytes(_pg_data, &_pg_byteindex);
 
     // surface quality
     _pg_user->surfaceQuality = uint8FromBytes(_pg_data, &_pg_byteindex);

@@ -142,7 +142,7 @@
 <p>This is the external interface for the PPDS Motor Pod firmware, generated with
 ProtoGen.</p>
 
-<p>External definitions for PPDS Motor Pod firmware Protocol version is 0.0.1.a.</p>
+<p>External definitions for PPDS Motor Pod firmware Protocol version is 0.0.1.b.</p>
 
 <h2 id="packetidentifiers">Packet Identifiers</h2>
 
@@ -173,6 +173,11 @@ even more stuff!</p>
 	<td style="text-align:center;">0</td>
 	<td>The data measured by the Optical Flow sensor.</td>
 </tr>
+<tr>
+	<td><a href="#ADC_STATE">ADC Data</a></td>
+	<td style="text-align:center;">1</td>
+	<td>The data measured by the ADC.</td>
+</tr>
 </tbody>
 </table>
 
@@ -182,7 +187,7 @@ even more stuff!</p>
 
 <ul>
 <li>packet identifier: <code>OPTICAL_FLOW_STATE</code> : 0</li>
-<li>data length: 9</li>
+<li>data length: 11</li>
 </ul>
 
 <table>
@@ -207,37 +212,105 @@ even more stuff!</p>
 
 <tbody>
 <tr>
-	<td>0&#8230;3</td>
-	<td>1)timeDelta_us</td>
+	<td>0</td>
+	<td>1)sequence</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>1&#8230;4</td>
+	<td>2)timeDelta_us</td>
 	<td style="text-align:center;">U32</td>
 	<td style="text-align:center;">1</td>
 	<td><br>Units: microseconds.</td>
 </tr>
 <tr>
-	<td>4</td>
-	<td>2)surfaceQuality</td>
+	<td>5</td>
+	<td>3)isMoving</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>6</td>
+	<td>4)surfaceQuality</td>
 	<td style="text-align:center;">U8</td>
 	<td style="text-align:center;">1</td>
 	<td>surface quality.</td>
 </tr>
 <tr>
-	<td>5&#8230;8</td>
-	<td colspan="3">3)flowDelta</td>
-	<td></td>
-</tr>
-<tr>
-	<td>5&#8230;6</td>
-	<td>3.1)x</td>
-	<td style="text-align:center;">I16</td>
-	<td style="text-align:center;">1</td>
+	<td>7&#8230;10</td>
+	<td colspan="3">5)flowDelta</td>
 	<td></td>
 </tr>
 <tr>
 	<td>7&#8230;8</td>
-	<td>3.2)y</td>
+	<td>5.1)x</td>
 	<td style="text-align:center;">I16</td>
 	<td style="text-align:center;">1</td>
 	<td></td>
+</tr>
+<tr>
+	<td>9&#8230;10</td>
+	<td>5.2)y</td>
+	<td style="text-align:center;">I16</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="anameadc_stateaadcstatepacket"><a name="ADC_STATE"></a>AdcState packet</h2>
+
+<p>ADC state.</p>
+
+<ul>
+<li>packet identifier: <code>ADC_STATE</code> : 1</li>
+<li>data length: 12</li>
+</ul>
+
+<table>
+<caption id="adcstatepacketbytes">AdcState packet bytes</caption>
+<colgroup>
+<col/>
+<col/>
+<col style="text-align:center;"/>
+<col style="text-align:center;"/>
+<col/>
+</colgroup>
+
+<thead>
+<tr>
+	<th>Bytes</th>
+	<th>Name</th>
+	<th style="text-align:center;"><a href="#Enc">Enc</a></th>
+	<th style="text-align:center;">Repeat</th>
+	<th>Description</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td>0&#8230;3</td>
+	<td>1)current</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: amps.</td>
+</tr>
+<tr>
+	<td>4&#8230;7</td>
+	<td>2)voltage</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: volts.</td>
+</tr>
+<tr>
+	<td>8&#8230;11</td>
+	<td>3)temperature</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: degrees.</td>
 </tr>
 </tbody>
 </table>
