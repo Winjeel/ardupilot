@@ -110,7 +110,7 @@ public:
         SerialProtocol_Devo_Telem = 17,
         SerialProtocol_OpticalFlow = 18,
         SerialProtocol_Robotis = 19,
-        SerialProtocol_Corvo = 20,
+        SerialProtocol_Corvo = 64, // large number to deconflict with upstream
     };
 
     // get singleton instance
