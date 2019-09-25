@@ -10,20 +10,16 @@
 #include "AP_OpticalFlow_MotorPod.h"
 #include <AP_Logger/AP_Logger.h>
 
-
-#include "GCS_MAVLink/GCS.h"
-
-
 extern const AP_HAL::HAL& hal;
 
 #ifndef OPTICAL_FLOW_TYPE_DEFAULT
- #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_SKYVIPER_F412 || defined(HAL_HAVE_PIXARTFLOW_SPI)
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::PIXART
- #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::BEBOP
- #else
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::NONE
- #endif
+    #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_SKYVIPER_F412 || defined(HAL_HAVE_PIXARTFLOW_SPI)
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::PIXART
+    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::BEBOP
+    #else
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::NONE
+    #endif
 #endif
 
 const AP_Param::GroupInfo OpticalFlow::var_info[] = {
@@ -162,14 +158,10 @@ void OpticalFlow::update(void)
 {
     // exit immediately if not enabled
     if (!enabled()) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "OF !enabled");
         return;
     }
     if (backend != nullptr) {
-        // gcs().send_text(MAV_SEVERITY_INFO, "OF backend update");
         backend->update();
-    } else {
-        gcs().send_text(MAV_SEVERITY_ERROR, "OF !backend");
     }
 
     // only healthy if the data is less than 0.5s old

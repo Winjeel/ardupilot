@@ -5,8 +5,6 @@
 #include "AP_BattMonitor_MotorPod.h"
 #include "AP_PpdsMotorPod/AP_PpdsMotorPod.hpp"
 
-#include "GCS_MAVLink/GCS.h"
-
 extern const AP_HAL::HAL& hal;
 
 
@@ -34,10 +32,8 @@ AP_BattMonitor_MotorPod::AP_BattMonitor_MotorPod(AP_BattMonitor &mon,
 
 // read - read the voltage and current
 void AP_BattMonitor_MotorPod::read() {
-    _state.healthy = false;
-
     if (AP::motorPod() == nullptr) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "BMMP !MP");
+        _state.healthy = false;
         return;
     }
 
@@ -46,7 +42,7 @@ void AP_BattMonitor_MotorPod::read() {
 
     // return without updating state if no readings
     if (!gotData) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "BMMP !data");
+        _state.healthy = false;
         return;
     }
 
@@ -55,7 +51,6 @@ void AP_BattMonitor_MotorPod::read() {
     _state.current_amps = adcData.current;
     _state.voltage = adcData.voltage;
     _state.temperature = adcData.temperature;
-    // gcs().send_text(MAV_SEVERITY_DEBUG, "BMMP c=%f v=%f t=%f", adcData.current, adcData.voltage, adcData.temperature);
 
     _state.temperature_time = AP_HAL::millis();
 }

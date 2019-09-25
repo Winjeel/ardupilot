@@ -24,8 +24,6 @@
 #include "AP_PpdsMotorPod/AP_PpdsMotorPod.hpp"
 #include <stdio.h>
 
-#include "GCS_MAVLink/GCS.h"
-
 // TODO: this is a bit of a hack. Is there a better way?
 // For this driver to work, the AP_PpdsMotorPod driver needs to be included for
 // compilation. As we don't have feature flags or other conditional compilation,
@@ -60,7 +58,6 @@ AP_OpticalFlow_MotorPod *AP_OpticalFlow_MotorPod::detect(OpticalFlow &_frontend)
 
 void AP_OpticalFlow_MotorPod::update(void) {
     if (AP::motorPod() == nullptr) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "OFMP !MP");
         return;
     }
 
@@ -82,7 +79,6 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
     // return without updating state if no readings
     if (!gotData) {
-        gcs().send_text(MAV_SEVERITY_ERROR, "OFMP !data");
         return;
     }
 
