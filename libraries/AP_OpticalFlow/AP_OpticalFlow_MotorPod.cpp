@@ -91,11 +91,6 @@ void AP_OpticalFlow_MotorPod::update(void) {
     float delta_t_flow = flowData.delta.t_us * kMicrosToSeconds;
     float delta_t_gyro = this->gyro_accum.t * kMicrosToSeconds;
 
-    // sanity check the values from the Motor Pod
-    if (fabs(delta_t_flow * 0.9f) > delta_t_gyro) {
-        delta_t_flow = -1.0;
-    }
-
     if (is_positive(delta_t_flow)) {
 
         const Vector2f flowScaler = _flowScaler();
