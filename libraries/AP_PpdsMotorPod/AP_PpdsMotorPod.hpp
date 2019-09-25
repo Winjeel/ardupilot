@@ -41,6 +41,7 @@ public:
 
 
     typedef struct {
+        uint32_t receiveTime_us;
         uint8_t surfaceQuality;
         struct {
             uint32_t t_us;

@@ -87,7 +87,8 @@ void AP_PpdsMotorPod::update(void) {
         return;
     }
 
-    size_t num_bytes = uart->available();
+    size_t const kUartNumBytes = uart->available();
+    size_t num_bytes = kUartNumBytes;
     size_t buffer_free = msg_buffer.getBytesFree();
     if (num_bytes > buffer_free) {
         num_bytes = buffer_free;
@@ -96,7 +97,6 @@ void AP_PpdsMotorPod::update(void) {
     if (num_bytes) {
         _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
         WITH_SEMAPHORE(_flow_sem);
-
 
         while (num_bytes-- > 0) {
             int16_t c = uart->read();
@@ -133,6 +133,7 @@ void AP_PpdsMotorPod::update(void) {
                         _debug_sample(MAV_SEVERITY_DEBUG, "\t\tflowDelta.X=%d", flow.flowDelta.x);
                         _debug_sample(MAV_SEVERITY_DEBUG, "\t\tflowDelta.Y=%d", flow.flowDelta.y);
 
+                        _flow_data.receiveTime_us = uart->receive_time_constraint_us(kUartNumBytes);
                         _flow_data.surfaceQuality = flow.surfaceQuality;
                         _flow_data.delta.x += flow.flowDelta.x;
                         _flow_data.delta.y += flow.flowDelta.y;
