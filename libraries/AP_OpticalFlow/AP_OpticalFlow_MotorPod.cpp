@@ -97,6 +97,8 @@ void AP_OpticalFlow_MotorPod::update(void) {
         float flowScaleFactorX = 1.0f + 0.001f * flowScaler.x;
         float flowScaleFactorY = 1.0f + 0.001f * flowScaler.y;
 
+        // Same as the Pixart driver
+        float const kFlowPixelScaling = 1.26e-3;
         // TODO: Work out why we need to invert the flow rate x-axis
         state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX * -1.0,
                                   flowData.delta.y * flowScaleFactorY);
@@ -104,6 +106,10 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
         state.bodyRate = Vector2f(this->gyro_accum.x / delta_t_gyro,
                                   this->gyro_accum.y / delta_t_gyro);
+
+        // TODO: Work out why this is needed...
+        float const kBodyScaling = 1.0 / 50.0;
+        state.bodyRate *= kBodyScaling;
 
         // clear the accumulator after we use the data
         this->gyro_accum.x = 0;
