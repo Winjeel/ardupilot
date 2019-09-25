@@ -96,6 +96,8 @@
 #include <AP_Landing/AP_Landing.h>
 #include <AP_LandingGear/AP_LandingGear.h>     // Landing Gear library
 
+#include <AP_PpdsMotorPod/AP_PpdsMotorPod.hpp>
+
 #include "GCS_Mavlink.h"
 #include "GCS_Plane.h"
 #include "quadplane.h"
@@ -310,7 +312,7 @@ private:
 #if OSD_ENABLED == ENABLED
     AP_OSD osd;
 #endif
-    
+
     ModeCircle mode_circle;
     ModeStabilize mode_stabilize;
     ModeTraining mode_training;
@@ -375,10 +377,10 @@ private:
 
         // the time when the last HEARTBEAT message arrived from a GCS
         uint32_t last_heartbeat_ms;
-        
+
         // A timer used to track how long we have been in a "short failsafe" condition due to loss of RC signal
         uint32_t short_timer_ms;
-        
+
         uint32_t last_valid_rc_ms;
 
         //keeps track of the last valid rc as it relates to the AFS system
@@ -476,7 +478,7 @@ private:
         // this is a 0..36000 value, or -1 for disabled
         int32_t hold_course_cd;
 
-        // locked_course and locked_course_cd are used in stabilize mode 
+        // locked_course and locked_course_cd are used in stabilize mode
         // when ground steering is active, and for steering in auto-takeoff
         bool locked_course;
         float locked_course_err;
@@ -527,10 +529,10 @@ private:
         // the highest airspeed we have reached since entering AUTO. Used
         // to control ground takeoff
         float highest_airspeed;
-        
+
         // initial pitch. Used to detect if nose is rising in a tail dragger
         int16_t initial_pitch_cd;
-        
+
         // turn angle for next leg of mission
         float next_turn_angle {90};
 
@@ -539,13 +541,13 @@ private:
 
         // time when we first pass min GPS speed on takeoff
         uint32_t takeoff_speed_time_ms;
-        
+
         // distance to next waypoint
         float wp_distance;
-        
+
         // proportion to next waypoint
         float wp_proportion;
-        
+
         // last time is_flying() returned true in milliseconds
         uint32_t last_flying_ms;
 
@@ -600,7 +602,7 @@ private:
         int8_t last_cmd;
     } gear;
 #endif
-    
+
     struct {
         // on hard landings, only check once after directly a landing so you
         // don't trigger a crash when picking up the aircraft
@@ -642,13 +644,13 @@ private:
     // true if we are in an auto-navigation mode, which controls whether control input is ignored
     // with STICK_MIXING=0
     bool auto_navigation_mode:1;
-    
+
     // this allows certain flight modes to mix RC input with throttle depending on airspeed_nudge_cm
     bool throttle_allows_nudging:1;
 
     // this controls throttle suppression in auto modes
     bool throttle_suppressed;
-	
+
     // reduce throttle to eliminate battery over-current
     int8_t  throttle_watt_limit_max;
     int8_t  throttle_watt_limit_min; // for reverse thrust
@@ -721,7 +723,7 @@ private:
         // previous target bearing, used to update sum_cd
         int32_t old_target_bearing_cd;
 
-        // Total desired rotation in a loiter.  Used for Loiter Turns commands. 
+        // Total desired rotation in a loiter.  Used for Loiter Turns commands.
         int32_t total_cd;
 
         // total angle completed in the loiter so far
@@ -844,6 +846,8 @@ private:
 
     // support for transmitter tuning
     AP_Tuning_Plane tuning;
+
+    AP_PpdsMotorPod ppds_motor_pod;
 
     static const struct LogStructure log_structure[];
 

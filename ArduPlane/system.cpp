@@ -78,7 +78,7 @@ void Plane::init_ardupilot()
     notify_mode(*control_mode);
 
     init_rc_out_main();
-    
+
     // keep a record of how many resets have happened. This can be
     // used to detect in-flight resets
     g.num_resets.set_and_save(g.num_resets+1);
@@ -89,6 +89,8 @@ void Plane::init_ardupilot()
     // initialise rangefinder
     rangefinder.set_log_rfnd_bit(MASK_LOG_SONAR);
     rangefinder.init(ROTATION_PITCH_270);
+
+    ppds_motor_pod.init(serial_manager);
 
     // initialise battery monitoring
     battery.init();
@@ -154,13 +156,13 @@ void Plane::init_ardupilot()
     quadplane.setup();
 
     AP_Param::reload_defaults_file(true);
-    
+
     startup_ground();
 
     // don't initialise aux rc output until after quadplane is setup as
     // that can change initial values of channels
     init_rc_out_aux();
-    
+
     // choose the nav controller
     set_nav_controller();
 
@@ -337,7 +339,7 @@ void Plane::check_long_failsafe()
                    failsafe.last_heartbeat_ms != 0 &&
                    (tnow - failsafe.last_heartbeat_ms) > g.fs_timeout_long*1000) {
             failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
-        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_RSSI && 
+        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_RSSI &&
                    gcs().chan(0).last_radio_status_remrssi_ms != 0 &&
                    (tnow - gcs().chan(0).last_radio_status_remrssi_ms) > g.fs_timeout_long*1000) {
             failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
@@ -349,10 +351,10 @@ void Plane::check_long_failsafe()
             timeout_seconds = g.fs_timeout_short;
         }
         // We do not change state but allow for user to change mode
-        if (failsafe.state == FAILSAFE_GCS && 
+        if (failsafe.state == FAILSAFE_GCS &&
             (tnow - failsafe.last_heartbeat_ms) < timeout_seconds*1000) {
             failsafe_long_off_event(MODE_REASON_GCS_FAILSAFE);
-        } else if (failsafe.state == FAILSAFE_LONG && 
+        } else if (failsafe.state == FAILSAFE_LONG &&
                    !failsafe.rc_failsafe) {
             failsafe_long_off_event(MODE_REASON_RADIO_FAILSAFE);
         }
@@ -493,13 +495,13 @@ bool Plane::disarm_motors(void)
 
     // suppress the throttle in auto-throttle modes
     throttle_suppressed = auto_throttle_mode;
-    
+
     //only log if disarming was successful
     change_arm_state();
 
     // reload target airspeed which could have been modified by a mission
     plane.aparm.airspeed_cruise_cm.load();
-    
+
 #if QAUTOTUNE_ENABLED
     //save qautotune gains if enabled and success
     if (control_mode == &mode_qautotune) {
