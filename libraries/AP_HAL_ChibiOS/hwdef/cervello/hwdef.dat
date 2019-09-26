@@ -19,7 +19,9 @@ FLASH_SIZE_KB 2048
 env OPTIMIZE -O3
 
 # fallback to flash is no FRAM fitted
-define STORAGE_FLASH_PAGE 22
+# Page 0 is allocated to the Bootloader.
+# Pages 1 and 2 are allocated for parameter storage.
+define STORAGE_FLASH_PAGE 1
 
 # This is the STM32 timer that ChibiOS will use for the low level
 # driver. This must be a 32 bit timer, see hal_st_lld.c in ChibiOS for details.
