@@ -63,16 +63,6 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
     WITH_SEMAPHORE(_sem);
 
-    const uint32_t kNow_us = AP_HAL::micros();
-    const uint32_t kUpdatePeriod_us = (kNow_us - this->lastUpdate_us);
-    this->lastUpdate_us = kNow_us;
-
-    const Vector3f& kGyro_vec = AP::ahrs_navekf().get_gyro();
-    // accumulate gyro data
-    this->gyro_accum.x += kGyro_vec.x;
-    this->gyro_accum.y += kGyro_vec.y;
-    this->gyro_accum.t += kUpdatePeriod_us;
-
     // Get optical flow data from MotorPod driver
     AP_PpdsMotorPod::FlowData flowData;
     bool gotData = AP::motorPod()->getFlowData(&flowData);
@@ -89,7 +79,6 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
     const float kMicrosToSeconds = 1.0e-6;
     float delta_t_flow = flowData.delta.t_us * kMicrosToSeconds;
-    float delta_t_gyro = this->gyro_accum.t * kMicrosToSeconds;
 
     if (is_positive(delta_t_flow)) {
 
@@ -99,25 +88,22 @@ void AP_OpticalFlow_MotorPod::update(void) {
 
         // Same as the Pixart driver
         float const kFlowPixelScaling = 1.26e-3;
-        // TODO: Work out why we need to invert the flow rate x-axis
-        state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX * -1.0,
-                                  flowData.delta.y * flowScaleFactorY);
+
+        state.flowRate = Vector2f(flowData.delta.x * flowScaleFactorX, flowData.delta.y * flowScaleFactorY);
         state.flowRate *= kFlowPixelScaling / delta_t_flow;
 
-        state.bodyRate = Vector2f(this->gyro_accum.x / delta_t_gyro,
-                                  this->gyro_accum.y / delta_t_gyro);
-
-        // TODO: Work out why this is needed...
-        float const kBodyScaling = 1.0 / 50.0;
-        state.bodyRate *= kBodyScaling;
-
-        // clear the accumulator after we use the data
-        this->gyro_accum.x = 0;
-        this->gyro_accum.y = 0;
-        this->gyro_accum.t = 0;
+        // Unable to do high rate accumulation of pre-filtered gyro data across the optical flow sample interval
+        // Instead use the most recent filtered and bias corrected gyro rate. The group delay of the gyro rate LPF 
+        // controlled by the INS_GYRO_FILTER parameter (20Hz by default) will help bring the gyro and flow
+        // data together.
+        // TODO a better way of doing this 
+        const Vector3f& kGyro_vec = AP::ahrs_navekf().get_gyro();
+        state.bodyRate.x = kGyro_vec.x;
+        state.bodyRate.y = kGyro_vec.y;
 
         // we only apply yaw to flowRate as body rate comes from AHRS
         _applyYaw(state.flowRate);
+
     } else {
         state.flowRate.zero();
         state.bodyRate.zero();

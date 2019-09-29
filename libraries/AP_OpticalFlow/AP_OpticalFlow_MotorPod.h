@@ -23,11 +23,4 @@ public:
 
 private:
 
-    struct GyroAccum {
-        float x;
-        float y;
-        uint32_t t;
-    } gyro_accum;
-
-    uint32_t lastUpdate_us;
 };
