@@ -337,9 +337,11 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
 
     float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
     if (rpm1 - rpm_inflow >= 0.0f) {
+        // forward thryust condition
         thrust_scale = pow((rpm1 / rpm1_max) *  sqrtf((rpm1 - rpm_inflow) / rpm1_max), 0.7f);
     } else {
-        thrust_scale = - (rpm1 / rpm1_max) * sqrtf((rpm_inflow - rpm1) / rpm1_max);
+        // prop is less efficient when braking
+        thrust_scale = - 0.7f * (rpm1 / rpm1_max) * sqrtf((rpm_inflow - rpm1) / rpm1_max);
     }
 
     // scale thrust to newtons
