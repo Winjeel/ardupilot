@@ -49,7 +49,7 @@ void AP_BattMonitor_MotorPod::read() {
     _state.healthy = true;
 
     _state.current_amps = adcData.current;
-    _state.voltage = adcData.voltage;
+    _state.voltage = adcData.voltage * _params._volt_multiplier;
     _state.temperature = adcData.temperature;
 
     _state.temperature_time = AP_HAL::millis();
