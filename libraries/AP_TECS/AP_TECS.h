@@ -175,6 +175,8 @@ private:
     AP_Float _land_sink;
     AP_Float _land_sink_rate_change;
     AP_Int8  _pitch_max;
+    AP_Int8  _pitch_trim;
+    AP_Int8  _pitch_glide;
     AP_Int8  _pitch_min;
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
@@ -302,6 +304,8 @@ private:
 
     // Maximum and minimum floating point pitch limits
     float _PITCHmaxf;
+    float _PITCHtrimf;
+    float _PITCHglidef;
     float _PITCHminf;
 
     // Specific energy quantities

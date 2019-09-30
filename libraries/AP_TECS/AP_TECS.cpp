@@ -255,7 +255,22 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HGT_SHAPE", 29, AP_TECS, _heightShapeTconstRatio, 0.7f),
 
-    
+    // @Param: PITCH_TRIM
+    // @DisplayName: Pitch angle in level flight
+    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle at which throttle will be set to TRIM_THROTTLE. Set to the pitch angle that results in level flight at TRIM_ARSPD_CM. Must be greater than TECS_PITCH_GLIDE and less than TECS_PITCH_MAX
+    // @Range: 0 10
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("PITCH_TRIM", 30, AP_TECS, _pitch_trim, 4),
+
+    // @Param: PITCH_GLIDE
+    // @DisplayName: Pitch angle in glide
+    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle below which throttle will be set to zero or interpolated between zero and THR_MIN if THR_MIN is negagive. Set to the pitch angle that causes the aircraft to glide at the airspeed specified by TRIM_ARSPD_CM. Must be greater than TECS_PITCH_MIN
+    // @Range: -20 0
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("PITCH_GLIDE", 31, AP_TECS, _pitch_glide, -5),
+
     AP_GROUPEND
 };
 
@@ -740,16 +755,23 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     } else { //not landing or not using TECS_LAND_THR parameter
         nomThr = 0.01f * aparm.throttle_cruise;
     }
-    if (_pitch_dem > 0.0f && _PITCHmaxf > 0.0f)
+    if (_pitch_dem >= _PITCHtrimf && _PITCHmaxf > _PITCHtrimf)
     {
-        _throttle_dem = nomThr + (_THRmaxf - nomThr) * _pitch_dem / _PITCHmaxf;
+        // climb with forward throttle
+        _throttle_dem = nomThr + (_THRmaxf - nomThr) * (_pitch_dem - _PITCHtrimf) / (_PITCHmaxf - _PITCHtrimf);
     }
-    else if (_pitch_dem < 0.0f && _PITCHminf < 0.0f)
+    else if (_pitch_dem >= _PITCHglidef && _PITCHtrimf > _PITCHglidef)
+    {   // descent with forward throttle
+        _throttle_dem = nomThr * (_pitch_dem - _PITCHglidef) / (_PITCHtrimf - _PITCHglidef);
+    }
+    else if (_pitch_dem < _PITCHglidef && _PITCHminf < _PITCHglidef)
     {
-        _throttle_dem = nomThr + (_THRminf - nomThr) * _pitch_dem / _PITCHminf;
+        // reverse or zero throttle descent
+        _throttle_dem = _THRminf * (_pitch_dem - _PITCHglidef) / (_PITCHminf - _PITCHglidef);
     }
     else
     {
+        // error catch
         _throttle_dem = nomThr;
     }
 
@@ -950,6 +972,9 @@ void AP_TECS::_update_pitch_without_airspeed(void)
     float tas_dem  = get_target_airspeed_filt() / _EAS2TAS;
     _pitch_dem_unc = (climb_rate_dem + (1.0f/timeConstant()) * climb_rate_err) / tas_dem;
 
+    // Compensate for pitch angle required to maintain altitude
+    _pitch_dem_unc += _PITCHtrimf;
+
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
 
@@ -1098,6 +1123,9 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         _PITCHminf = MAX(_pitch_min, aparm.pitch_limit_min_cd * 0.01f);
     }
 
+    _PITCHtrimf = constrain_float((float)_pitch_trim, 0.0f, _PITCHmaxf);
+    _PITCHglidef = constrain_float((float)_pitch_glide, _PITCHminf, 0.0f);
+
     // apply temporary pitch limit and clear
     if (_pitch_max_limit < 90) {
         _PITCHmaxf = constrain_float(_PITCHmaxf, -90, _pitch_max_limit);
@@ -1137,6 +1165,13 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
         }
     }
 
+    // convert all limits to radians
+    // this is done last because all parameters and external supplied limits used in calculations above are in deg or centi-degrees.
+    _PITCHmaxf = radians(_PITCHmaxf);
+    _PITCHtrimf = radians(_PITCHtrimf);
+    _PITCHglidef = radians(_PITCHglidef);
+    _PITCHminf = radians(_PITCHminf);
+
     if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
         if (!_flags.reached_speed_takeoff && _TAS_state >= _TAS_dem_adj) {
             // we have reached our target speed in takeoff, allow for
@@ -1144,10 +1179,6 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             _flags.reached_speed_takeoff = true;
         }
     }
-
-    // convert to radians
-    _PITCHmaxf = radians(_PITCHmaxf);
-    _PITCHminf = radians(_PITCHminf);
 
     // initialise selected states and variables if DT > 1 second or in climbout
     _initialise_states(ptchMinCO_cd, hgt_afe);
