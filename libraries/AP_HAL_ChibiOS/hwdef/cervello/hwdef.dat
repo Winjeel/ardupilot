@@ -18,18 +18,22 @@ FLASH_SIZE_KB 2048
 # with 2M flash we can afford to optimize for speed
 env OPTIMIZE -O3
 
-# fallback to flash is no FRAM fitted
-# Page 0 is allocated to the Bootloader.
-# Pages 1 and 2 are allocated for parameter storage.
+# Allocate space for fallback to flash if no FRAM is fitted:
+#   - The first four (4) flash pages are 16kB each.
+#       - see the definition of flash_memmap[] in /AP_HAL_ChibiOS/hwdef/common/flash.c
+#   - The bootloader lives in the first flash page.
+#   - The second, third and fourth pages are reserved for parameters.
 define STORAGE_FLASH_PAGE 1
+#   - Gives us a total of 64kB to reserve before the main firmware.
+FLASH_RESERVE_START_KB 64
+
+define HAL_STORAGE_SIZE 16384
 
 # This is the STM32 timer that ChibiOS will use for the low level
 # driver. This must be a 32 bit timer, see hal_st_lld.c in ChibiOS for details.
 
 # ChibiOS system timer
 STM32_ST_USE_TIMER 5
-
-define HAL_STORAGE_SIZE 16384
 
 # USB setup
 USB_VENDOR 0x0483 # ST Microelectronics
