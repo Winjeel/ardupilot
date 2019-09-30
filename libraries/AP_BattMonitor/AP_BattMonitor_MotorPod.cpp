@@ -52,5 +52,21 @@ void AP_BattMonitor_MotorPod::read() {
     _state.voltage = adcData.voltage * _params._volt_multiplier;
     _state.temperature = adcData.temperature;
 
-    _state.temperature_time = AP_HAL::millis();
+    uint32_t current_time_micros = AP_HAL::micros();
+    float dt = current_time_micros - _state.last_time_micros;
+
+    float const kDtMax = 2000000.0f;
+    if (_state.last_time_micros != 0 && dt < kDtMax) {
+        float const kMicrosecondsToHours = (1.0f / (60.0f * 60.0f * 1000.0f * 1000.0f));
+        float const kAmpsToMilliAmps = 1000.0f;
+        float const kMilliAmpHoursFactor = kMicrosecondsToHours * kAmpsToMilliAmps;
+
+        float milliAmpHours = _state.current_amps * dt * kMilliAmpHoursFactor;
+        _state.consumed_mah += milliAmpHours;
+        // _state.voltage_resting_estimate will be the same as _state.voltage, as we don't have _state.resistance set
+        _state.consumed_wh  += (1 / kAmpsToMilliAmps) * milliAmpHours * _state.voltage_resting_estimate;
+    }
+
+    _state.last_time_micros = current_time_micros;
+    _state.temperature_time = current_time_micros / 1000; // micros to milliseconds
 }
