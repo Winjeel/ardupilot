@@ -77,10 +77,9 @@ void AP_OpticalFlow_MotorPod::update(void) {
     struct OpticalFlow::OpticalFlow_state state;
     state.surface_quality = flowData.surfaceQuality;
 
-    const float kMicrosToSeconds = 1.0e-6;
-    float delta_t_flow = flowData.delta.t_us * kMicrosToSeconds;
-
-    if (is_positive(delta_t_flow)) {
+    if (flowData.delta.t_us > 0) {
+        const float kMicrosToSeconds = 1.0e-6;
+        float delta_t_flow = flowData.delta.t_us * kMicrosToSeconds;
 
         const Vector2f flowScaler = _flowScaler();
         float flowScaleFactorX = 1.0f + 0.001f * flowScaler.x;
@@ -93,10 +92,10 @@ void AP_OpticalFlow_MotorPod::update(void) {
         state.flowRate *= kFlowPixelScaling / delta_t_flow;
 
         // Unable to do high rate accumulation of pre-filtered gyro data across the optical flow sample interval
-        // Instead use the most recent filtered and bias corrected gyro rate. The group delay of the gyro rate LPF 
+        // Instead use the most recent filtered and bias corrected gyro rate. The group delay of the gyro rate LPF
         // controlled by the INS_GYRO_FILTER parameter (20Hz by default) will help bring the gyro and flow
         // data together.
-        // TODO a better way of doing this 
+        // TODO a better way of doing this
         const Vector3f& kGyro_vec = AP::ahrs_navekf().get_gyro();
         state.bodyRate.x = kGyro_vec.x;
         state.bodyRate.y = kGyro_vec.y;
