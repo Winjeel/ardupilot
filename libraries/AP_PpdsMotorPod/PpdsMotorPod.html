@@ -267,7 +267,7 @@ even more stuff!</p>
 
 <ul>
 <li>packet identifier: <code>ADC_STATE</code> : 1</li>
-<li>data length: 12</li>
+<li>data length: 17</li>
 </ul>
 
 <table>
@@ -292,22 +292,36 @@ even more stuff!</p>
 
 <tbody>
 <tr>
-	<td>0&#8230;3</td>
-	<td>1)current</td>
+	<td>0</td>
+	<td>1)sequence</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>1&#8230;4</td>
+	<td>2)timeDelta_us</td>
+	<td style="text-align:center;">U32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: microseconds.</td>
+</tr>
+<tr>
+	<td>5&#8230;8</td>
+	<td>3)current</td>
 	<td style="text-align:center;">F32</td>
 	<td style="text-align:center;">1</td>
 	<td><br>Units: amps.</td>
 </tr>
 <tr>
-	<td>4&#8230;7</td>
-	<td>2)voltage</td>
+	<td>9&#8230;12</td>
+	<td>4)voltage</td>
 	<td style="text-align:center;">F32</td>
 	<td style="text-align:center;">1</td>
 	<td><br>Units: volts.</td>
 </tr>
 <tr>
-	<td>8&#8230;11</td>
-	<td>3)temperature</td>
+	<td>13&#8230;16</td>
+	<td>5)temperature</td>
 	<td style="text-align:center;">F32</td>
 	<td style="text-align:center;">1</td>
 	<td><br>Units: degrees.</td>
