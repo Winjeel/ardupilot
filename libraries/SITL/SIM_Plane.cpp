@@ -335,13 +335,18 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     // simulate engine RPM
     rpm1 = throttle * rpm1_max;
 
+    // Calculate thrust as a fraction of static thrust
+    // TODO proper model based on propeller CP, CT curves and electric motor physics
     float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
-    if (rpm1 - rpm_inflow >= 0.0f) {
-        // forward thrust condition
-        thrust_scale = pow((rpm1 / rpm1_max) *  sqrtf((rpm1 - rpm_inflow) / rpm1_max), 0.7f);
-    } else {
-        // prop is less efficient when braking
-        thrust_scale = - 0.7f * (rpm1 / rpm1_max) * sqrtf((rpm_inflow - rpm1) / rpm1_max);
+    thrust_scale = powf(fabsf(rpm1 / rpm1_max) *  sqrtf(fabsf(rpm1 - rpm_inflow) / rpm1_max), 0.7f);
+
+    /*
+    Handle case where propeller is producing megative thrust
+    Assume 50% prop efficiency when blades have a negative AoA
+    Tested with THR_MIN = -50, USE_REV_THRUST = 1 and SITL -revthrust argument
+    */
+    if (rpm1 - rpm_inflow < 0.0f) {
+        thrust_scale *= -0.5f;
     }
 
     // scale thrust to newtons
