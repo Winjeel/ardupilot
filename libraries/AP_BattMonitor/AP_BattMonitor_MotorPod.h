@@ -20,4 +20,8 @@ public:
 
 protected:
 
+
+private:
+    uint8_t _missed_samples = 0;
+
 };

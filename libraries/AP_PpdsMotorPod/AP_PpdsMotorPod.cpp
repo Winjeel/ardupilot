@@ -165,7 +165,7 @@ void AP_PpdsMotorPod::update(void) {
                         _adc_data.temperature = adc.temperature;
 
                         _adc_data.consumedAmps += adc.current;
-                        _adc_data.deltaT_us += (adc.timeDelta_us / 1000);
+                        _adc_data.deltaT_us += adc.timeDelta_us;
 
                         _debug_sample(MAV_SEVERITY_DEBUG, "\t\tsequence=%u", adc.sequence);
                         _debug_sample(MAV_SEVERITY_DEBUG, "\t\ttimeDelta=%.3fms", adc.timeDelta_us / 1000.0);
