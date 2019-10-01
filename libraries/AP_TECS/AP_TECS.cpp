@@ -160,7 +160,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: LAND_TCONST
     // @DisplayName: Land controller time constant (sec)
-    // @Description: This is the time constant of the TECS control algorithm when in final landing stage of flight. It should be smaller than TECS_TIME_CONST to allow for faster flare
+    // @Description: This is the time constant of the TECS control algorithm when in final landing stage of flight. It should be smaller than TECS_TIME_CONST to allow for faster flare. Note that when the estimated time to start the flare falls below 2 x TECS_LAND_TCONST, the minimum pitch angle limit will be gradually changed to a value set by LAND_PITCH_CD which can increase overshoot of the landing waypoint.
     // @Range: 1.0 5.0
     // @Increment: 0.2
     // @User: Advanced
