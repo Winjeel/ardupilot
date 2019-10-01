@@ -16,7 +16,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: CLMB_MAX
     // @DisplayName: Maximum Climb Rate (metres/sec)
-    // @Description: Maximum demanded climb rate. Do not set higher than the climb speed at THR_MAX at TRIM_ARSPD_CM when the battery is at low voltage. Reduce value if airspeed cannot be maintained on ascent. Increase value if throttle does not increase significantly to ascend.
+    // @Description: Maximum demanded climb rate. For flight with an air speed sensor set at the climb rate achievable at THR_MAX and an airspeed of TRIM_ARSPD_CM when the battery is at low voltage. Should also be less than the maximum climb rate produced by climbing at an angle of TECS_PITCH_MAX and an airspeed of ARSPD_FBW_MIN. Reduce value if airspeed cannot be maintained on ascent.
     // @Increment: 0.1
     // @Range: 0.1 20.0
     // @User: Standard
@@ -136,11 +136,11 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: PITCH_MAX
     // @DisplayName: Maximum pitch in auto flight
-    // @Description: Overrides LIM_PITCH_MAX in automatic throttle modes to reduce climb rates. Uses LIM_PITCH_MAX if set to 0. For proper TECS tuning, set to the angle that the aircraft can climb at TRIM_ARSPD_CM and THR_MAX.
+    // @Description: Overrides LIM_PITCH_MAX in automatic throttle modes to reduce climb rates. Uses LIM_PITCH_MAX if set to 0. For proper TECS tuning with an airspeed sensor, set to the angle that the aircraft can climb at or above ARSPD_FBW_MIN and THR_MAX. For tuning without an airspeed sensor set it to an angle that maintains airspeed at or above ARSPD_FBW_MIN with throttle at THR_MAX.
     // @Range: 0 45
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("PITCH_MAX", 15, AP_TECS, _pitch_max, 15),
+    AP_GROUPINFO("PITCH_MAX", 15, AP_TECS, _pitch_max, 25),
 
     // @Param: PITCH_MIN
     // @DisplayName: Minimum pitch in auto flight
@@ -148,7 +148,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Range: -45 0
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("PITCH_MIN", 16, AP_TECS, _pitch_min, 0),
+    AP_GROUPINFO("PITCH_MIN", 16, AP_TECS, _pitch_min, -25),
 
     // @Param: LAND_SINK
     // @DisplayName: Sink rate for final landing stage
@@ -257,7 +257,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: PITCH_TRIM
     // @DisplayName: Pitch angle in level flight
-    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle at which throttle will be set to TRIM_THROTTLE. Set to the pitch angle that results in level flight at TRIM_ARSPD_CM. Must be greater than TECS_PITCH_GLIDE and less than TECS_PITCH_MAX
+    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle at which throttle will be set to TRIM_THROTTLE. Set to the pitch angle that results in level flight at or above ARSPD_FBW_MIN. Must be greater than TECS_PITCH_GLIDE and less than TECS_PITCH_MAX
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
@@ -265,11 +265,19 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
 
     // @Param: PITCH_GLIDE
     // @DisplayName: Pitch angle in glide
-    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle below which throttle will be set to zero or interpolated between zero and THR_MIN if THR_MIN is negagive. Set to the pitch angle that causes the aircraft to glide at the airspeed specified by TRIM_ARSPD_CM. Must be greater than TECS_PITCH_MIN
+    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle below which throttle will be set to zero or interpolated between zero and THR_MIN if THR_MIN is negagive. Set to the pitch angle that causes the aircraft to glide at or above the airspeed specified by ARSPD_FBW_MIN. Must be greater than TECS_PITCH_MIN. As general rule it will be approaximately 8 to 10 degress less than TECS_PITCH_TRIM.
     // @Range: -20 0
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("PITCH_GLIDE", 31, AP_TECS, _pitch_glide, -5),
+
+    // @Param: PITCH_REVTH
+    // @DisplayName: Pitch angle for max reverse thrust
+    // @Description: Used in automatic throttle modes when operating without airspeed sensing to set the pitch angle below which throttle will be set to THR_MIN. When using reverse thrust (negative THR_MIN) TECS_PITCH_REVTH should be set to a pitch angle that maintains airspeed at or above ARSPD_FBW_MIN with throttle at THR_MIN. It must be between TECS_PITCH_MIN and TECS_PITCH_GLIDE.
+    // @Range: -45 0
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("PITCH_REVTH", 32, AP_TECS, _pitch_revth, -20),
 
     AP_GROUPEND
 };
@@ -755,23 +763,49 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
     } else { //not landing or not using TECS_LAND_THR parameter
         nomThr = 0.01f * aparm.throttle_cruise;
     }
-    if (_pitch_dem >= _PITCHtrimf && _PITCHmaxf > _PITCHtrimf)
+    if (_pitch_dem >= _PITCHtrimf)
     {
-        // climb with forward throttle
-        _throttle_dem = nomThr + (_THRmaxf - nomThr) * (_pitch_dem - _PITCHtrimf) / (_PITCHmaxf - _PITCHtrimf);
+        if (_PITCHmaxf > _PITCHtrimf) {
+            // climb with forward throttle interpolated between trim and maximum
+            _throttle_dem = nomThr + (_THRmaxf - nomThr) * (_pitch_dem - _PITCHtrimf) / (_PITCHmaxf - _PITCHtrimf);
+        } else {
+            // interpolation not possible - use nominal throttle
+            _throttle_dem = nomThr;
+        }
     }
-    else if (_pitch_dem >= _PITCHglidef && _PITCHtrimf > _PITCHglidef)
-    {   // descent with forward throttle
-        _throttle_dem = nomThr * (_pitch_dem - _PITCHglidef) / (_PITCHtrimf - _PITCHglidef);
-    }
-    else if (_pitch_dem < _PITCHglidef && _PITCHminf < _PITCHglidef)
+    else if (_pitch_dem >= _PITCHglidef)
     {
-        // reverse or zero throttle descent
-        _throttle_dem = _THRminf * (_pitch_dem - _PITCHglidef) / (_PITCHminf - _PITCHglidef);
+        if (_PITCHtrimf > _PITCHglidef) {
+            // descent with forward throttle interpolated between trim and zero
+            _throttle_dem = nomThr * (_pitch_dem - _PITCHglidef) / (_PITCHtrimf - _PITCHglidef);
+        } else {
+            // interpolation not possible - use nominal throttle
+            _throttle_dem = nomThr;
+        }
+    }
+    else if (_pitch_dem >= _PITCHrevthf)
+    {
+        if (_PITCHrevthf < _PITCHglidef && _THRminf < 0.0f) {
+            // descent with throttle interpolated between zero and minimum
+            _throttle_dem = _THRminf * (_pitch_dem - _PITCHglidef) / (_PITCHrevthf - _PITCHglidef);
+        } else {
+            // interpolation not possible - use zero throttle
+            _throttle_dem = 0.0f;
+        }
+    }
+    else if (_pitch_dem < _PITCHrevthf)
+    {
+        if (_PITCHrevthf < _PITCHglidef && _THRminf < 0.0f) {
+            // there has been interpolation to get to minimum throttle so can use it in this region
+            _throttle_dem = _THRminf;
+        } else {
+            // interpolation not possible - use zero throttle to avoid hard switching
+            _throttle_dem = 0.0f;
+        }
     }
     else
     {
-        // error catch
+        // error catch - use throttle with best chance of flying plane
         _throttle_dem = nomThr;
     }
 
@@ -1125,6 +1159,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
     _PITCHtrimf = constrain_float((float)_pitch_trim, 0.0f, _PITCHmaxf);
     _PITCHglidef = constrain_float((float)_pitch_glide, _PITCHminf, 0.0f);
+    _PITCHrevthf = constrain_float((float)_PITCHrevthf, _PITCHminf, _PITCHglidef);
 
     // apply temporary pitch limit and clear
     if (_pitch_max_limit < 90) {

@@ -177,6 +177,7 @@ private:
     AP_Int8  _pitch_max;
     AP_Int8  _pitch_trim;
     AP_Int8  _pitch_glide;
+    AP_Int8  _pitch_revth;
     AP_Int8  _pitch_min;
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
@@ -306,6 +307,7 @@ private:
     float _PITCHmaxf;
     float _PITCHtrimf;
     float _PITCHglidef;
+    float _PITCHrevthf;
     float _PITCHminf;
 
     // Specific energy quantities
