@@ -97,7 +97,6 @@ void AP_PpdsMotorPod::update(void) {
 
     if (num_bytes) {
         _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
-        WITH_SEMAPHORE(_flow_sem);
 
         while (num_bytes-- > 0) {
             int16_t c = uart->read();
@@ -111,6 +110,7 @@ void AP_PpdsMotorPod::update(void) {
             uint8_t dataSz = msg_buffer.getDataSz();
             switch (msg_id) {
                 case OPTICAL_FLOW_STATE: {
+                    WITH_SEMAPHORE(_flow_sem);
 
                     _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
                     if (dataSz >= getOpticalFlowStateMinDataLength()) {
@@ -145,6 +145,8 @@ void AP_PpdsMotorPod::update(void) {
                 }
 
                 case ADC_STATE: {
+                    WITH_SEMAPHORE(_adc_sem);
+
                     _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
                     if (dataSz >= getAdcStateMinDataLength()) {
                         uint8_t tmp[getAdcStateMaxDataLength()];
