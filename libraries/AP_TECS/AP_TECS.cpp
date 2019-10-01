@@ -1159,7 +1159,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
 
     _PITCHtrimf = constrain_float((float)_pitch_trim, 0.0f, _PITCHmaxf);
     _PITCHglidef = constrain_float((float)_pitch_glide, _PITCHminf, 0.0f);
-    _PITCHrevthf = constrain_float((float)_PITCHrevthf, _PITCHminf, _PITCHglidef);
+    _PITCHrevthf = constrain_float((float)_pitch_revth, _PITCHminf, _PITCHglidef);
 
     // apply temporary pitch limit and clear
     if (_pitch_max_limit < 90) {
@@ -1205,6 +1205,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     _PITCHmaxf = radians(_PITCHmaxf);
     _PITCHtrimf = radians(_PITCHtrimf);
     _PITCHglidef = radians(_PITCHglidef);
+    _PITCHrevthf = radians(_PITCHrevthf);
     _PITCHminf = radians(_PITCHminf);
 
     if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
