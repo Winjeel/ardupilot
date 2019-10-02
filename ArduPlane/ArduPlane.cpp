@@ -623,7 +623,13 @@ void Plane::update_alt()
 
     // set default value of airspeed to use when not using an airspeed sensor
     if (!airspeed.use()) {
-        ahrs.set_default_airspeed(SpdHgt_Controller->get_target_airspeed_filt());
+        if (auto_throttle_mode && !throttle_suppressed) {
+            // use the same airspeed the speed height controller is using
+            ahrs.set_default_airspeed(SpdHgt_Controller->get_target_airspeed_filt());
+        } else {
+            // target airspeed is unknown so use cruise value
+            ahrs.set_default_airspeed(0.01f*(float)aparm.airspeed_cruise_cm);
+        }
     }
 }
 
