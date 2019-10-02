@@ -18,7 +18,8 @@ namespace AP {
         return nullptr;
     }
 }
-WEAK bool AP_PpdsMotorPod::getAdcData(AdcState_t * const adc_data) { return false; }
+WEAK bool AP_PpdsMotorPod::getAdcData(AdcData * const adc_data) { return false; }
+WEAK void AP_PpdsMotorPod::clearAdcData(void) { /* empty */ }
 
 
 /// Constructor
@@ -37,20 +38,41 @@ void AP_BattMonitor_MotorPod::read() {
         return;
     }
 
-    AdcState_t adcData;
+    AP_PpdsMotorPod::AdcData adcData;
     bool gotData = AP::motorPod()->getAdcData(&adcData);
 
     // return without updating state if no readings
     if (!gotData) {
-        _state.healthy = false;
-        return;
+        // The MotorPod updates faster than this driver, so we expect data every
+        // time we update. One missed sample is probably just a CRC failure - any
+        // more means there's a problem.
+        uint8_t const kMaxMissedSamples = 2;
+        if (++_missed_samples > kMaxMissedSamples) {
+            _state.healthy = false;
+        }
+    } else {
+        _missed_samples = 0;
+        AP::motorPod()->clearAdcData();
+
+        _state.healthy = true;
+
+        _state.current_amps = (adcData.current * _params._curr_amp_per_volt) + _params._curr_amp_offset;
+        _state.voltage = adcData.voltage * _params._volt_multiplier;
+        _state.temperature = adcData.temperature;
+
+        float const kAmpsToMilliAmps = 1000.0f;
+        float milliAmps = ((adcData.consumedAmps * _params._curr_amp_per_volt) + _params._curr_amp_offset) * kAmpsToMilliAmps;
+        float const kMicrosecondsToHours = (1.0f / (60.0f * 60.0f * 1000.0f * 1000.0f));
+        float milliAmpHours = milliAmps * adcData.deltaT_us * kMicrosecondsToHours;
+
+        _state.consumed_mah += milliAmpHours;
+
+        // _state.voltage_resting_estimate will be the same as _state.voltage, as we don't have _state.resistance set
+        _state.consumed_wh += (milliAmpHours / kAmpsToMilliAmps) * _state.voltage_resting_estimate;
+
+        uint32_t current_time_micros = AP_HAL::micros();
+        _state.last_time_micros = current_time_micros;
+        float const kMicrosToMills = (1.0f / 1000.0f);
+        _state.temperature_time = current_time_micros * kMicrosToMills;
     }
-
-    _state.healthy = true;
-
-    _state.current_amps = adcData.current;
-    _state.voltage = adcData.voltage;
-    _state.temperature = adcData.temperature;
-
-    _state.temperature_time = AP_HAL::millis();
 }

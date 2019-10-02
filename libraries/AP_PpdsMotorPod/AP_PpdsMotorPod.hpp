@@ -20,8 +20,6 @@
 
 #include "CorvoMsgBuffer.hpp"
 
-#include "AdcState.h"
-
 
 #define CORVO_DEBUG (false)
 
@@ -50,6 +48,14 @@ public:
         } delta;
     } FlowData;
 
+    typedef struct {
+        float current;
+        float voltage;
+        float temperature;
+        float consumedAmps;
+        uint32_t deltaT_us;
+    } AdcData;
+
     // Copy the accumulated flow data.
     // Returns true if data is available and has been copied.
     bool getFlowData(FlowData * const flow_data);
@@ -57,7 +63,8 @@ public:
     // Clear the accumulated flow data
     void clearFlowData(void);
 
-    bool getAdcData(AdcState_t * const adc_data);
+    bool getAdcData(AdcData * const adc_data);
+    void clearAdcData(void);
 
     // get singleton instance
     static AP_PpdsMotorPod *get_singleton() {
@@ -76,7 +83,7 @@ private:
     FlowData _flow_data = {};
     HAL_Semaphore _flow_sem;
 
-    AdcState_t _adc_data = {};
+    AdcData _adc_data = {};
     HAL_Semaphore _adc_sem;
 
     static AP_PpdsMotorPod *_singleton;

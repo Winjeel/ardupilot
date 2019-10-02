@@ -19,6 +19,10 @@ void encodeAdcState_t(uint8_t* _pg_data, int* _pg_bytecount, const AdcState_t* _
 {
     int _pg_byteindex = *_pg_bytecount;
 
+    uint8ToBytes(_pg_user->sequence, _pg_data, &_pg_byteindex);
+
+    uint32ToBeBytes(_pg_user->timeDelta_us, _pg_data, &_pg_byteindex);
+
     float32ToBeBytes((float)_pg_user->current, _pg_data, &_pg_byteindex);
 
     float32ToBeBytes((float)_pg_user->voltage, _pg_data, &_pg_byteindex);
@@ -41,6 +45,10 @@ void encodeAdcState_t(uint8_t* _pg_data, int* _pg_bytecount, const AdcState_t* _
 int decodeAdcState_t(const uint8_t* _pg_data, int* _pg_bytecount, AdcState_t* _pg_user)
 {
     int _pg_byteindex = *_pg_bytecount;
+
+    _pg_user->sequence = uint8FromBytes(_pg_data, &_pg_byteindex);
+
+    _pg_user->timeDelta_us = uint32FromBeBytes(_pg_data, &_pg_byteindex);
 
     _pg_user->current = float32FromBeBytes(_pg_data, &_pg_byteindex);
 
@@ -65,6 +73,10 @@ void encodeAdcStatePacketStructure(CorvoPacket* _pg_pkt, const AdcState_t* _pg_u
 {
     uint8_t* _pg_data = getPpdsMotorPodPacketData(_pg_pkt);
     int _pg_byteindex = 0;
+
+    uint8ToBytes(_pg_user->sequence, _pg_data, &_pg_byteindex);
+
+    uint32ToBeBytes(_pg_user->timeDelta_us, _pg_data, &_pg_byteindex);
 
     float32ToBeBytes((float)_pg_user->current, _pg_data, &_pg_byteindex);
 
@@ -101,6 +113,10 @@ int decodeAdcStatePacketStructure(const CorvoPacket* _pg_pkt, AdcState_t* _pg_us
 
     // The raw data from the packet
     _pg_data = getPpdsMotorPodPacketDataConst(_pg_pkt);
+
+    _pg_user->sequence = uint8FromBytes(_pg_data, &_pg_byteindex);
+
+    _pg_user->timeDelta_us = uint32FromBeBytes(_pg_data, &_pg_byteindex);
 
     _pg_user->current = float32FromBeBytes(_pg_data, &_pg_byteindex);
 

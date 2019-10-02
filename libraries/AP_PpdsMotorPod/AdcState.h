@@ -19,9 +19,11 @@ extern "C" {
  */
 typedef struct
 {
-    float current;    
-    float voltage;    
-    float temperature;
+    uint8_t  sequence;    
+    uint32_t timeDelta_us;
+    float    current;     
+    float    voltage;     
+    float    temperature; 
 }AdcState_t;
 
 //! Encode a AdcState_t structure into a byte array
@@ -40,10 +42,10 @@ int decodeAdcStatePacketStructure(const CorvoPacket* pkt, AdcState_t* user);
 #define getAdcStatePacketID() (ADC_STATE)
 
 //! return the minimum encoded length for the AdcState packet
-#define getAdcStateMinDataLength() (12)
+#define getAdcStateMinDataLength() (17)
 
 //! return the maximum encoded length for the AdcState packet
-#define getAdcStateMaxDataLength() (12)
+#define getAdcStateMaxDataLength() (17)
 
 #ifdef __cplusplus
 }

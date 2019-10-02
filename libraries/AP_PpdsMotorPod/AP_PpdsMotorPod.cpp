@@ -17,6 +17,7 @@
 
 #include "autopilot-interface.h"
 #include "OpticalFlowState.h"
+#include "AdcState.h"
 
 // #include <cstring>
 
@@ -96,7 +97,6 @@ void AP_PpdsMotorPod::update(void) {
 
     if (num_bytes) {
         _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
-        WITH_SEMAPHORE(_flow_sem);
 
         while (num_bytes-- > 0) {
             int16_t c = uart->read();
@@ -110,6 +110,7 @@ void AP_PpdsMotorPod::update(void) {
             uint8_t dataSz = msg_buffer.getDataSz();
             switch (msg_id) {
                 case OPTICAL_FLOW_STATE: {
+                    WITH_SEMAPHORE(_flow_sem);
 
                     _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
                     if (dataSz >= getOpticalFlowStateMinDataLength()) {
@@ -144,6 +145,8 @@ void AP_PpdsMotorPod::update(void) {
                 }
 
                 case ADC_STATE: {
+                    WITH_SEMAPHORE(_adc_sem);
+
                     _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
                     if (dataSz >= getAdcStateMinDataLength()) {
                         uint8_t tmp[getAdcStateMaxDataLength()];
@@ -155,12 +158,23 @@ void AP_PpdsMotorPod::update(void) {
                             _debug_sample(MAV_SEVERITY_ERROR, "PMP ADC Bad! sz=%lums", sz);
                         }
 
+                        AdcState_t adc;
                         int idx = 0;
-                        decodeAdcState_t(tmp, &idx, &_adc_data);
+                        decodeAdcState_t(tmp, &idx, &adc);
 
-                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\tcurrent=%f", _adc_data.current);
-                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\tvoltage=%f", _adc_data.voltage);
-                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\ttemp=%f", _adc_data.temperature);
+                        _adc_data.current = adc.current;
+                        _adc_data.voltage = adc.voltage;
+                        _adc_data.temperature = adc.temperature;
+
+                        _adc_data.consumedAmps += adc.current;
+                        _adc_data.deltaT_us += adc.timeDelta_us;
+
+                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\tsequence=%u", adc.sequence);
+                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\ttimeDelta=%.3fms", adc.timeDelta_us / 1000.0);
+                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\tcurrent=%f", adc.current);
+                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\tvoltage=%f", adc.voltage);
+                        _debug_sample(MAV_SEVERITY_DEBUG, "\t\ttemp=%f", adc.temperature);
+
                     }
                     break;
                 }
@@ -235,15 +249,21 @@ void AP_PpdsMotorPod::clearFlowData(void) {
     memset(&_flow_data, 0, sizeof(_flow_data));
 }
 
-bool AP_PpdsMotorPod::getAdcData(AdcState_t * const adc_data) {
+bool AP_PpdsMotorPod::getAdcData(AdcData * const adc_data) {
     WITH_SEMAPHORE(_adc_sem);
-    bool has_data = true; // TBD
+    bool has_data = (_adc_data.deltaT_us > 0);
 
     if (has_data) {
         memcpy(adc_data, &_adc_data, sizeof(*adc_data));
     }
 
     return has_data;
+}
+
+void AP_PpdsMotorPod::clearAdcData(void) {
+    WITH_SEMAPHORE(_adc_sem);
+    _adc_data.consumedAmps = 0.0;
+    _adc_data.deltaT_us = 0;
 }
 
 namespace AP {
