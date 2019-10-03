@@ -73,9 +73,20 @@ public:
         return _vel_dot;
     }
 
-    // return current target airspeed
+    // return current target EAS demand in m/s as used by the TECS control loops which is after application of 
+    // internal filtering and limiting and as used by TECS energy control loops. 
+    float get_target_airspeed_filt(void) const override {
+        if ((AP_HAL::micros64() - _update_speed_last_usec) > 200000) {
+            // If filtered value is stale, use raw input instead
+            return _EAS_dem;
+        } else {
+            return _TAS2EAS * constrain_float(_TAS_dem_adj, aparm.airspeed_min.get(), aparm.airspeed_max.get());
+        }
+    }
+
+    // return current target EAS input demand in m/s
     float get_target_airspeed(void) const override {
-        return _TAS_dem / _ahrs.get_EAS2TAS();
+        return _EAS_dem;
     }
 
     // return maximum climb rate
@@ -164,9 +175,14 @@ private:
     AP_Float _land_sink;
     AP_Float _land_sink_rate_change;
     AP_Int8  _pitch_max;
+    AP_Int8  _pitch_trim;
+    AP_Int8  _pitch_glide;
+    AP_Int8  _pitch_revth;
     AP_Int8  _pitch_min;
     AP_Int8  _land_pitch_max;
     AP_Float _maxSinkRate_approach;
+    AP_Float _dashThrIncr;
+    AP_Float _heightShapeTconstRatio;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
@@ -228,6 +244,10 @@ private:
     // Equivalent airspeed demand
     float _EAS_dem;
 
+    // conversion factors used to go between  TAS and EAS
+    float _EAS2TAS;
+    float _TAS2EAS;
+
     // height demands
     float _hgt_dem;
     float _hgt_dem_in_old;
@@ -285,6 +305,9 @@ private:
 
     // Maximum and minimum floating point pitch limits
     float _PITCHmaxf;
+    float _PITCHtrimf;
+    float _PITCHglidef;
+    float _PITCHrevthf;
     float _PITCHminf;
 
     // Specific energy quantities
@@ -320,13 +343,21 @@ private:
         float SPE_error;
         float SKE_error;
         float SEB_delta;
+        float climb_rate_dem;
     } logging;
 
     AP_Int8 _use_synthetic_airspeed;
     
     // use synthetic airspeed for next loop
     bool _use_synthetic_airspeed_once;
-    
+
+    // pitch error integrator state used when controlling height without an airspeed sensor.
+    float _pitch_err_integ;
+
+    // booleans used to indicate when the pitch rate limiter is active when controlling height without and airspeed sensor
+    bool _on_pos_pitch_rate_limit;
+    bool _on_neg_pitch_rate_limit;
+
     // Update the airspeed internal state using a second order complementary filter
     void _update_speed(float load_factor);
 
@@ -356,6 +387,9 @@ private:
 
     // Update Demanded Pitch Angle
     void _update_pitch(void);
+
+    // Update demanded pitch angle when their is no airspeed sensing
+    void _update_pitch_without_airspeed(void);
 
     // Initialise states and variables
     void _initialise_states(int32_t ptchMinCO_cd, float hgt_afe);

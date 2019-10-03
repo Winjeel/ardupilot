@@ -1,0 +1,404 @@
+<style>
+    body {
+        text-align:justify;
+        max-width: 25cm;
+        margin-left: auto;
+        margin-right: auto;
+        font-family: Georgia;
+        counter-reset: h1counter h2counter  h3counter toc1counter toc2counter toc3counter;
+     }
+
+    table {
+       border: 1px solid #e0e0e0;
+       border-collapse: collapse;
+       margin-bottom: 25px;
+    }
+
+    th, td {
+        border: 1px solid #e0e0e0;
+        font-family: Courier, monospace;
+        font-size: 90%;
+        padding: 2px;
+    }
+
+    /*
+     * Alternate colors for the table, including the heading row
+     */
+    th {
+    background-color: #e0e0e0   
+    }
+    tr:nth-child(even){background-color: #e0e0e0}
+
+    h1, h2, h3, h4, h5 { font-family: Arial; }
+    h1 { font-size:120%; margin-bottom: 25px; }
+    h2 { font-size:110%; margin-bottom: 15px; }
+    h3 { font-size:100%; margin-bottom: 10px;}
+    h4, li { font-size:100%; }
+
+    caption{ font-family:Arial; font-size:85%;}
+
+    code, pre, .codelike {
+        font-family: Courier, monospace;
+        font-size: 100%;
+        color: darkblue;
+    }
+
+    /*
+     * Counters for the main headings
+     */
+
+    h1:before {
+        counter-increment: h1counter;
+        content: counter(h1counter) "\00a0 ";
+    }
+    h1 {
+        counter-reset: h2counter;
+    }
+    
+    h2:before {
+        counter-increment: h2counter;
+        content: counter(h1counter) "." counter(h2counter) "\00a0 ";
+    }
+    h2 {
+        counter-reset: h3counter;
+    }
+    
+    h3:before {
+      counter-increment: h3counter;
+      content: counter(h1counter) "." counter(h2counter) "." counter(h3counter) "\00a0 ";
+    }
+
+    /*
+     * The document title, centered
+     */
+    doctitle {font-family: Arial; font-size:120%; font-weight: bold; margin-bottom:25px; text-align:center; display:block;}
+    titlepagetext {text-align:center; display:block;}
+
+    /*
+     * The table of contents formatting
+     */
+    toctitle {font-family: Arial; font-size:120%; font-weight: bold; margin-bottom:25px; display:block;}
+    toc1, toc2, toc3 {font-family: Arial; font-size:100%; margin-bottom:2px; display:block;}
+    toc1 {text-indent: 0px;}
+    toc2 {text-indent: 15px;}
+    toc3 {text-indent: 30px;}
+    
+    toc1:before {
+        content: counter(toc1counter) "\00a0 ";
+        counter-increment: toc1counter;
+    }
+    toc1 {
+        counter-reset: toc2counter;
+    }
+    
+    toc2:before {
+        content: counter(toc1counter) "." counter(toc2counter) "\00a0 ";
+        counter-increment: toc2counter;
+    }
+    toc2 {
+        counter-reset: toc3counter;
+    }
+
+    toc3:before {
+      content: counter(toc1counter) "." counter(toc2counter) "." counter(toc3counter) "\00a0 ";
+      counter-increment: toc3counter;
+    }
+
+    /* How it looks on a screen, notice the fancy hr blocks and lack of page breaks */
+    @media screen {
+      body {
+        background-color: #f0f0f0;
+      }
+      .page-break { display: none; }
+      hr { 
+        height: 25px; 
+        border-style: solid; 
+        border-color: gray; 
+        border-width: 1px 0 0 0; 
+        border-radius: 10px; 
+      } 
+      hr:before { 
+        display: block; 
+        content: ""; 
+        height: 25px; 
+        margin-top: -26px; 
+        border-style: solid; 
+        border-color: gray; 
+        border-width: 0 0 1px 0; 
+        border-radius: 10px; 
+      }
+    }
+
+    /* How it looks when printed, hr turned off, in favor of page breaks*/
+    @media print {
+      hr {display: none;}
+      body {background-color: white;}
+      .page-break{page-break-before: always;}
+    }
+</style>
+
+<h1 id="externaldefinitionsforppdsmotorpodfirmware">External definitions for PPDS Motor Pod firmware</h1>
+
+<p>This is the external interface for the PPDS Motor Pod firmware, generated with
+ProtoGen.</p>
+
+<p>External definitions for PPDS Motor Pod firmware Protocol version is 0.0.1.b.</p>
+
+<h2 id="packetidentifiers">Packet Identifiers</h2>
+
+<p>The list of packet identifiers.</p>
+
+<p><strong>Description:</strong>
+even more stuff!</p>
+
+<table>
+<caption id="anamepacketidsapacketidentifiersenumeration"><a name="PacketIds"></a>Packet Identifiers enumeration</caption>
+<colgroup>
+<col/>
+<col style="text-align:center;"/>
+<col/>
+</colgroup>
+
+<thead>
+<tr>
+	<th>Name</th>
+	<th style="text-align:center;">Value</th>
+	<th>Description</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td><a href="#OPTICAL_FLOW_STATE">Optical Flow Data</a></td>
+	<td style="text-align:center;">0</td>
+	<td>The data measured by the Optical Flow sensor.</td>
+</tr>
+<tr>
+	<td><a href="#ADC_STATE">ADC Data</a></td>
+	<td style="text-align:center;">1</td>
+	<td>The data measured by the ADC.</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="anameoptical_flow_stateaopticalflowstatepacket"><a name="OPTICAL_FLOW_STATE"></a>OpticalFlowState packet</h2>
+
+<p>Optical Flow state.</p>
+
+<ul>
+<li>packet identifier: <code>OPTICAL_FLOW_STATE</code> : 0</li>
+<li>data length: 11</li>
+</ul>
+
+<table>
+<caption id="opticalflowstatepacketbytes">OpticalFlowState packet bytes</caption>
+<colgroup>
+<col/>
+<col/>
+<col style="text-align:center;"/>
+<col style="text-align:center;"/>
+<col/>
+</colgroup>
+
+<thead>
+<tr>
+	<th>Bytes</th>
+	<th>Name</th>
+	<th style="text-align:center;"><a href="#Enc">Enc</a></th>
+	<th style="text-align:center;">Repeat</th>
+	<th>Description</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td>0</td>
+	<td>1)sequence</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>1&#8230;4</td>
+	<td>2)timeDelta_us</td>
+	<td style="text-align:center;">U32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: microseconds.</td>
+</tr>
+<tr>
+	<td>5</td>
+	<td>3)isMoving</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>6</td>
+	<td>4)surfaceQuality</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td>surface quality.</td>
+</tr>
+<tr>
+	<td>7&#8230;10</td>
+	<td colspan="3">5)flowDelta</td>
+	<td></td>
+</tr>
+<tr>
+	<td>7&#8230;8</td>
+	<td>5.1)x</td>
+	<td style="text-align:center;">I16</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>9&#8230;10</td>
+	<td>5.2)y</td>
+	<td style="text-align:center;">I16</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="anameadc_stateaadcstatepacket"><a name="ADC_STATE"></a>AdcState packet</h2>
+
+<p>ADC state.</p>
+
+<ul>
+<li>packet identifier: <code>ADC_STATE</code> : 1</li>
+<li>data length: 17</li>
+</ul>
+
+<table>
+<caption id="adcstatepacketbytes">AdcState packet bytes</caption>
+<colgroup>
+<col/>
+<col/>
+<col style="text-align:center;"/>
+<col style="text-align:center;"/>
+<col/>
+</colgroup>
+
+<thead>
+<tr>
+	<th>Bytes</th>
+	<th>Name</th>
+	<th style="text-align:center;"><a href="#Enc">Enc</a></th>
+	<th style="text-align:center;">Repeat</th>
+	<th>Description</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td>0</td>
+	<td>1)sequence</td>
+	<td style="text-align:center;">U8</td>
+	<td style="text-align:center;">1</td>
+	<td></td>
+</tr>
+<tr>
+	<td>1&#8230;4</td>
+	<td>2)timeDelta_us</td>
+	<td style="text-align:center;">U32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: microseconds.</td>
+</tr>
+<tr>
+	<td>5&#8230;8</td>
+	<td>3)current</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: amps.</td>
+</tr>
+<tr>
+	<td>9&#8230;12</td>
+	<td>4)voltage</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: volts.</td>
+</tr>
+<tr>
+	<td>13&#8230;16</td>
+	<td>5)temperature</td>
+	<td style="text-align:center;">F32</td>
+	<td style="text-align:center;">1</td>
+	<td><br>Units: degrees.</td>
+</tr>
+</tbody>
+</table>
+
+<div class="page-break"></div>
+
+<hr />
+
+<h1 id="aboutthisicd">About this ICD</h1>
+
+<p>This is the interface control document for data <em>on the wire</em>, not data in memory. This document was automatically generated by the <a href="https://github.com/billvaglienti/ProtoGen">ProtoGen software</a>, version 2.17.b. ProtoGen also generates C source code for doing most of the work of encoding data from memory to the wire, and vice versa.</p>
+
+<h2 id="encodings">Encodings</h2>
+
+<p>Data for this protocol are sent in BIG endian format. Any field larger than one byte is sent with the most signficant byte first, and the least significant byte last.</p>
+
+<p>Data can be encoded as unsigned integers, signed integers (two&#8217;s complement), bitfields, and floating point.</p>
+
+<table>
+<colgroup>
+<col style="text-align:center;"/>
+<col/>
+<col/>
+</colgroup>
+
+<thead>
+<tr>
+	<th style="text-align:center;"><a name="Enc"></a>Encoding</th>
+	<th>Interpretation</th>
+	<th>Notes</th>
+</tr>
+</thead>
+
+<tbody>
+<tr>
+	<td style="text-align:center;">UX</td>
+	<td>Unsigned integer X bits long</td>
+	<td>X must be: 8, 16, 24, 32, 40, 48, 56, or 64</td>
+</tr>
+<tr>
+	<td style="text-align:center;">IX</td>
+	<td>Signed integer X bits long</td>
+	<td>X must be: 8, 16, 24, 32, 40, 48, 56, or 64</td>
+</tr>
+<tr>
+	<td style="text-align:center;">BX</td>
+	<td>Unsigned integer bitfield X bits long</td>
+	<td>X must be greater than 0 and less than 32</td>
+</tr>
+<tr>
+	<td style="text-align:center;">F16:X</td>
+	<td>16 bit float with X significand bits</td>
+	<td>1 sign bit : 15-X exponent bits : X significant bits with implied leading 1</td>
+</tr>
+<tr>
+	<td style="text-align:center;">F24:X</td>
+	<td>24 bit float with X significand bits</td>
+	<td>1 sign bit : 23-X exponent bits : X significant bits with implied leading 1</td>
+</tr>
+<tr>
+	<td style="text-align:center;">F32</td>
+	<td>32 bit float (IEEE&#8211;754)</td>
+	<td>1 sign bit : 8 exponent bits : 23 significant bits with implied leading 1</td>
+</tr>
+<tr>
+	<td style="text-align:center;">F64</td>
+	<td>64 bit float (IEEE&#8211;754)</td>
+	<td>1 sign bit : 11 exponent bits : 52 significant bits with implied leading 1</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="sizeoffields">Size of fields</h2>
+
+<p>The encoding tables give the bytes for each field as X&#8230;Y; where X is the first byte (counting from 0) and Y is the last byte. For example a 4 byte field at the beginning of a packet will give 0&#8230;3. If the field is 1 byte long then only the starting byte is given. Bitfields are more complex, they are displayed as Byte:Bit. A 3-bit bitfield at the beginning of a packet will give 0:7&#8230;0:5, indicating that the bitfield uses bits 7, 6, and 5 of byte 0. Note that the most signficant bit of a byte is 7, and the least signficant bit is 0. If the bitfield is 1 bit long then only the starting bit is given.</p>
+
+<p>The byte count in the encoding tables are based on the maximum length of the field(s). If a field is variable length then the actual byte location of the data may be different depending on the value of the variable field. If the field is a variable length character string this will be indicated in the encoding column of the table. If the field is a variable length array this will be indicated in the repeat column of the encoding table. If the field depends on the non-zero value of another field this will be indicated in the description column of the table.</p>

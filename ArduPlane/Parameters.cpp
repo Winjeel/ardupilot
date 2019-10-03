@@ -85,6 +85,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(stab_pitch_down, "STAB_PITCH_DOWN",   2.0f),
 
+    // @Param: LAUNCH_PITCH_DEG
+    // @DisplayName: Pitch angle of launcher
+    // @Description: This sets the expected pitch angle of the vehicle before launch. If this is set to a positive number, then the vehicle will not arm unless the wings are level and the pitch angle matches this paraemter to an accuracy of +- 5deg. If a ramp or catapult launcher is being used, then this can be used to prevent arming if the AHRS solution is incorrect or the vehicle is  powered when not on the launcher.
+    // @Range: 0 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_pitch_deg, "LAUNCH_PITCH_DEG", 0),
+
     // @Param: GLIDE_SLOPE_MIN
     // @DisplayName: Glide slope minimum
     // @Description: This controls the minimum altitude change for a waypoint before a glide slope will be used instead of an immediate altitude change. The default value is 15 meters, which helps to smooth out waypoint missions where small altitude changes happen near waypoints. If you don't want glide slopes to be used in missions then you can set this to zero, which will disable glide slope calculations. Otherwise you can set it to a minimum number of meters of altitude error to the destination waypoint before a glide slope will be used to change altitude.
@@ -135,6 +144,14 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(takeoff_throttle_min_accel,     "TKOFF_THR_MINACC",  0),
 
+    // @Param: TKOFF_THR_MINDST
+    // @DisplayName: Takeoff throttle min distanvce
+    // @Description: Minimum forward distance in m before arming the ground speed check in auto-takeoff. This is meant to be used for bungee launches. Setting this value to 0 disables the acceleration test which means the ground speed check will always be armed which could allow GPS velocity jumps to start the engine. For bungee launches this should be set to the distance travelled before the cable becomes slack and the bungee releases. The TKOFF_MIN_ACC threshold needs to be set to record the starting position so that the distanve travelled can be measured.   // @Units: m
+    // @Range: 0 30
+    // @Increment: 0.1
+    // @User: User
+    GSCALAR(takeoff_throttle_min_dist,     "TKOFF_THR_MINDST",  0),
+
     // @Param: TKOFF_THR_DELAY
     // @DisplayName: Takeoff throttle delay
     // @Description: This parameter sets the time delay (in 1/10ths of a second) that the ground speed check is delayed after the forward acceleration check controlled by TKOFF_THR_MINACC has passed. For hand launches with pusher propellers it is essential that this is set to a value of no less than 2 (0.2 seconds) to ensure that the aircraft is safely clear of the throwers arm before the motor can start. For bungee launches a larger value can be used (such as 30) to give time for the bungee to release from the aircraft before the motor is started.
@@ -143,6 +160,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @User: User
     GSCALAR(takeoff_throttle_delay,     "TKOFF_THR_DELAY",  2),
+
+    // @Param: TKOFF_ABORT_TOUT
+    // @DisplayName: Takeoff completion citeria timeout delay
+    // @Description: This parameter sets the time delay (in 1/10ths of a second) from detection of launch start to when all completion criteria must have passed before the launch times out.
+    // @Units: ds
+    // @Range: 1 127
+    // @Increment: 1
+    // @User: User
+    GSCALAR(takeoff_criteria_timeout,     "TKOFF_ABORT_TOUT",  1),
 
     // @Param: TKOFF_TDRAG_ELEV
     // @DisplayName: Takeoff tail dragger elevator
@@ -278,6 +304,16 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @User: Standard
     GSCALAR(rtl_radius,             "RTL_RADIUS",  0),
+
+    // @Param: NAV_UNBANK_RATE
+    // @DisplayName: Average roll rate achieved when unbanking.
+    // @Description: Used by the autopilot during tangent loiter exit to exit early to allow for the time required to unbank. Set to zero to disable early exit 
+    // @Units: deg/sec
+    // @Range: 0 128
+    // @User: Advanced
+    GSCALAR(loiter_unbank_rate, "NAV_UNBANK_RATE", 60),
+
+
     
 #if GEOFENCE_ENABLED == ENABLED
     // @Param: FENCE_ACTION
@@ -584,6 +620,22 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: Advanced
     GSCALAR(initial_mode,        "INITIAL_MODE",     Mode::Number::MANUAL),
 
+    // @Param: AUTO_PREFLIGHT
+    // @DisplayName: Enable automatic preflight sequencing
+    // @Description: Set to 1 to enable the aircraft to automatically select AUTO maode, perform control surface movement checks and arm ready for launch. USed where operation without a GCS or handset is required. Use LAUNCH_PITCH_DEG to add checking of launch angle where a ramp or catapult launcher is required. USe ARMING_MIS_ITEMS to ensure that required mission items are present.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Advanced
+    GSCALAR(auto_preflight,        "AUTO_PREFLIGHT",     0),
+
+    // @Param: LAUNCH_ELEVATOR
+    // @DisplayName: Elevator servo deflection when ready for launch.
+    // @Description: When automatic preflight sequencing selected by AUTO_PREFLIGHT is being used, the pitch control surfaces will be set to this angle when all checks have passed and the vehicle is ready for launch. When launch acceleration is detected, surfaces will be immediately be set to the autopilot demands.
+    // @Range: -45 45
+    // @Increment: 1
+    // @Units: deg
+    // @User: Advanced
+    GSCALAR(launch_elevator, "LAUNCH_ELEVATOR", 0),
+
     // @Param: LIM_ROLL_CD
     // @DisplayName: Maximum Bank Angle
     // @Description: Maximum bank angle commanded in modes with stabilized limits. Increase this value for sharper turns, but decrease to prevent accelerated stalls.
@@ -853,7 +905,15 @@ const AP_Param::Info Plane::var_info[] = {
     // @Units: m/s/s
     // @Range: 10 127
     // @User: Advanced
-    GSCALAR(crash_accel_threshold,          "CRASH_ACC_THRESH",   0),
+    GSCALAR(crash_accel_threshold,          "CRASH_ACC_THRESH",   25),
+
+    // @Param: CRASH_FLOW_THRESH
+    // @DisplayName: Crash Optical Flow Threshold
+    // @Description: Y-Axis flow data threshold to notify the crash detector that there is a pending  impact which helps disarm the motor quickly after a crash. Set to zero to disable this check.
+    // @Units: rad/s
+    // @Range: 10 127
+    // @User: Advanced
+    GSCALAR(crash_flow_threshold,          "CRASH_FLOW_THRESH",   15),
 
     // @Param: CRASH_DETECT
     // @DisplayName: Crash Detection
@@ -905,8 +965,8 @@ const AP_Param::Info Plane::var_info[] = {
 
     // @Param: RNGFND_LANDING
     // @DisplayName: Enable rangefinder for landing
-    // @Description: This enables the use of a rangefinder for automatic landing. The rangefinder will be used both on the landing approach and for final flare
-    // @Values: 0:Disabled,1:Enabled
+    // @Description: This enables the use of a rangefinder or EKF terrain estimator. The chosen source will be used both on the landing approach and for final flare
+    // @Values: 0:Disabled,1:Use rangefinder,2:Use EKF
     // @User: Standard
     GSCALAR(rangefinder_landing,    "RNGFND_LANDING",   0),
 
@@ -1233,6 +1293,29 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Increment: 1
     // @User: Advanced
     AP_GROUPINFO("DSPOILER_AILMTCH", 21, ParametersG2, crow_flap_aileron_matching, 100),
+
+    // @Param: BAT_IDX
+    // @DisplayName: Battery compensation index
+    // @Description: Which battery monitor should be used for doing compensation
+    // @Values: 0:First battery, 1:Second battery
+    // @User: Advanced
+    AP_GROUPINFO("BAT_IDX",  22, ParametersG2,  batt_idx, 0),
+
+    // @Param: BAT_VOLT_MAX
+    // @DisplayName: Battery voltage compensation maximum voltage
+    // @Description: Battery voltage compensation maximum voltage (voltage above this will have no additional scaling effect on thrust).  Recommend 4.4 * cell count. Disabled if 0 or > 0.6 x BAT_VOLT_MIN.
+    // @Range: 6 35
+    // @Units: V
+    // @User: Advanced
+    AP_GROUPINFO("BAT_VOLT_MAX", 23, ParametersG2, batt_voltage_max, 0.0f),
+
+    // @Param: BAT_VOLT_MIN
+    // @DisplayName: Battery voltage compensation minimum voltage
+    // @Description: Battery voltage compensation minimum voltage (voltage below this will have no additional scaling effect on thrust).  Recommend 3.5 * cell count. Disabled if 0 or < 0.6 x BAT_VOLT_MAX.
+    // @Range: 6 35
+    // @Units: V
+    // @User: Advanced
+    AP_GROUPINFO("BAT_VOLT_MIN", 24, ParametersG2, batt_voltage_min, 0.0f),
 
     AP_GROUPEND
 };

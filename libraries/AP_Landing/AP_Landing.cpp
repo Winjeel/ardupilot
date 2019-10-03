@@ -43,7 +43,7 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
 
     // @Param: PITCH_CD
     // @DisplayName: Landing Pitch
-    // @Description: Used in autoland to give the minimum pitch in the final stage of landing (after the flare). This parameter can be used to ensure that the final landing attitude is appropriate for the type of undercarriage on the aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate.
+    // @Description: Used in autoland to give the minimum pitch in the final stage of landing (after the flare). This parameter can be used to ensure that the final landing attitude is appropriate for the type of undercarriage on the aircraft. Note that it is a minimum pitch only - the landing code will control pitch above this value to try to achieve the configured landing sink rate. Note that the minimum pitch angle during landing will be progressively moved from the value set by TECS_PITCH_MIN and LIM_PITCH_MIN when the predicted time to start of flare falls below 2 x TECS_LAND_TCONST which can increase overshoot of the landing waypoint 
     // @Units: cdeg
     // @User: Advanced
     AP_GROUPINFO("PITCH_CD", 3, AP_Landing, pitch_cd, 0),

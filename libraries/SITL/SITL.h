@@ -176,8 +176,9 @@ public:
     AP_Int8  odom_enable; // enable visual odomotry data
     AP_Int8  telem_baudlimit_enable; // enable baudrate limiting on links
     AP_Float flow_noise; // optical flow measurement noise (rad/sec)
-
-    // wind control
+    AP_Float launch_elevation; // initial elevation angle of launch (deg)
+ 
+     // wind control
     enum WindType {
         WIND_TYPE_SQRT = 0,
         WIND_TYPE_NO_LIMIT = 1,

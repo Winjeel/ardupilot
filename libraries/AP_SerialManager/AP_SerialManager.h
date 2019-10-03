@@ -63,17 +63,22 @@
 #define AP_SERIALMANAGER_SToRM32_BUFSIZE_RX     128
 #define AP_SERIALMANAGER_SToRM32_BUFSIZE_TX     128
 
-#define AP_SERIALMANAGER_VOLZ_BAUD           115
-#define AP_SERIALMANAGER_VOLZ_BUFSIZE_RX     128
-#define AP_SERIALMANAGER_VOLZ_BUFSIZE_TX     128
+#define AP_SERIALMANAGER_VOLZ_BAUD              115
+#define AP_SERIALMANAGER_VOLZ_BUFSIZE_RX        128
+#define AP_SERIALMANAGER_VOLZ_BUFSIZE_TX        128
 
-#define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_RX  128
-#define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_TX  128
+#define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_RX     128
+#define AP_SERIALMANAGER_ROBOTIS_BUFSIZE_TX     128
+
+#define AP_SERIALMANAGER_CORVO_BAUD             115200
+#define AP_SERIALMANAGER_CORVO_BUFSIZE_RX       128
+#define AP_SERIALMANAGER_CORVO_BUFSIZE_TX       128
 
 // SBUS servo outputs
-#define AP_SERIALMANAGER_SBUS1_BAUD           100000
-#define AP_SERIALMANAGER_SBUS1_BUFSIZE_RX     16
-#define AP_SERIALMANAGER_SBUS1_BUFSIZE_TX     32
+#define AP_SERIALMANAGER_SBUS1_BAUD             100000
+#define AP_SERIALMANAGER_SBUS1_BUFSIZE_RX       16
+#define AP_SERIALMANAGER_SBUS1_BUFSIZE_TX       32
+
 
 class AP_SerialManager {
 public:
@@ -105,13 +110,14 @@ public:
         SerialProtocol_Devo_Telem = 17,
         SerialProtocol_OpticalFlow = 18,
         SerialProtocol_Robotis = 19,
+        SerialProtocol_Corvo = 64, // large number to deconflict with upstream
     };
 
     // get singleton instance
     static AP_SerialManager *get_singleton(void) {
         return _singleton;
     }
-    
+
     // init_console - initialise console at default baud rate
     void init_console();
 
@@ -136,7 +142,7 @@ public:
     // get_mavlink_protocol - provides the specific MAVLink protocol for a
     // given channel, or SerialProtocol_None if not found
     SerialProtocol get_mavlink_protocol(mavlink_channel_t mav_chan) const;
-    
+
     // set_blocking_writes_all - sets block_writes on or off for all serial channels
     void set_blocking_writes_all(bool blocking);
 
@@ -154,7 +160,7 @@ public:
 
 private:
     static AP_SerialManager *_singleton;
-    
+
     // array of uart info
     struct UARTState {
         AP_Int8 protocol;

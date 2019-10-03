@@ -26,14 +26,9 @@ using namespace SITL;
 Plane::Plane(const char *home_str, const char *frame_str) :
     Aircraft(home_str, frame_str)
 {
-    mass = 2.0f;
 
-    /*
-       scaling from motor power to Newtons. Allows the plane to hold
-       vertically against gravity when the motor is at hover_throttle
-    */
-    thrust_scale = (mass * GRAVITY_MSS) / hover_throttle;
     frame_height = 0.1f;
+    mass = 5.0f;
 
     ground_behavior = GROUND_BEHAVIOR_FWD_ONLY;
     
@@ -55,8 +50,8 @@ Plane::Plane(const char *home_str, const char *frame_str) :
     }
     if (strstr(frame_str, "-catapult")) {
         have_launcher = true;
-        launch_accel = 15;
-        launch_time = 2;
+        launch_accel = 25.0f;
+        launch_time = 0.7f;
     }
     if (strstr(frame_str, "-bungee")) {
         have_launcher = true;
@@ -71,7 +66,6 @@ Plane::Plane(const char *home_str, const char *frame_str) :
    if (strstr(frame_str, "-tailsitter")) {
        tailsitter = true;
        ground_behavior = GROUND_BEHAVIOR_TAILSITTER;
-       thrust_scale *= 1.5;
    }
 
     if (strstr(frame_str, "-ice")) {
@@ -295,10 +289,8 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
         throttle = filtered_servo_range(input, 2);
     }
     
-    float thrust     = throttle;
-
     if (ice_engine) {
-        thrust = icengine.update(input);
+        throttle = icengine.update(input);
     }
 
     // calculate angle of attack
@@ -315,39 +307,57 @@ void Plane::calculate_forces(const struct sitl_input &input, Vector3f &rot_accel
     }
     
     Vector3f force = getForce(aileron, elevator, rudder);
-    rot_accel = getTorque(aileron, elevator, rudder, thrust, force);
+    rot_accel = getTorque(aileron, elevator, rudder, throttle, force);
 
     if (have_launcher) {
         /*
           simple simulation of a launcher
          */
-        if (launch_triggered) {
+        if (launch_triggered || throttle > 0.5f) {
             uint64_t now = AP_HAL::millis64();
             if (launch_start_ms == 0) {
                 launch_start_ms = now;
             }
             if (now - launch_start_ms < launch_time*1000) {
-                force.x += launch_accel;
-                force.z += launch_accel/3;
+                force.x += launch_accel * mass;
             }
         } else {
             // allow reset of catapult
             launch_start_ms = 0;
         }
     }
-    
+
+    // calculate thrust from RPM
+    const float pitch = 8.5f * 0.0254f; // assume 14x8.5" prop
+    const float static_thrust_max = 50.0f;
+    const float rpm1_max = 13000; // assume 530Kv motor running on 24.6 volts
+
     // simulate engine RPM
-    rpm1 = thrust * 7000;
-    
+    rpm1 = throttle * rpm1_max;
+
+    // Calculate thrust as a fraction of static thrust
+    // TODO proper model based on propeller CP, CT curves and electric motor physics
+    float rpm_inflow = 60.0f * velocity_air_bf.x / pitch;
+    thrust_scale = powf(fabsf(rpm1 / rpm1_max) *  sqrtf(fabsf(rpm1 - rpm_inflow) / rpm1_max), 0.7f);
+
+    /*
+    Handle case where propeller is producing megative thrust
+    Assume 50% prop efficiency when blades have a negative AoA
+    Tested with THR_MIN = -50, USE_REV_THRUST = 1 and SITL -revthrust argument
+    */
+    if (rpm1 - rpm_inflow < 0.0f) {
+        thrust_scale *= -0.5f;
+    }
+
     // scale thrust to newtons
-    thrust *= thrust_scale;
+    float thrust = thrust_scale * static_thrust_max;
 
     accel_body = Vector3f(thrust, 0, 0) + force;
     accel_body /= mass;
 
     // add some noise
     if (thrust_scale > 0) {
-        add_noise(fabsf(thrust) / thrust_scale);
+        add_noise(fabsf(throttle));
     }
 
     if (on_ground() && !tailsitter) {

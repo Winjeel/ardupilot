@@ -46,8 +46,11 @@ public:
 	// Rate of change of velocity along X body axis in m/s^2
     virtual float get_VXdot(void)=0;
 	
-	// return current target airspeed
+	// return current target airspeed as received by the speed control function 
 	virtual float get_target_airspeed(void) const = 0;
+
+	// return current target airspeed as processed by the speed control function
+	virtual float get_target_airspeed_filt() const = 0;
 
 	// return maximum climb rate
 	virtual float get_max_climbrate(void) const = 0;

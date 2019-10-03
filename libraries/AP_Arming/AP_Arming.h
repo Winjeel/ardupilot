@@ -55,6 +55,8 @@ public:
     // get bitmask of enabled checks
     uint16_t get_enabled_checks();
 
+    bool mission_checks(bool report);
+
     // pre_arm_checks() is virtual so it can be modified in a vehicle specific subclass
     virtual bool pre_arm_checks(bool report);
 
@@ -112,8 +114,6 @@ protected:
     virtual bool rc_calibration_checks(bool report);
 
     bool manual_transmitter_checks(bool report);
-
-    bool mission_checks(bool report);
 
     bool fence_checks(bool report);
 

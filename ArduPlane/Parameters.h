@@ -55,15 +55,15 @@ public:
         k_param_log_bitmask_old,  // unused
         k_param_pitch_trim_cd,
         k_param_mix_mode,
-        k_param_reverse_elevons, // unused
-        k_param_reverse_ch1_elevon, // unused
+        k_param_auto_preflight,
+        k_param_launch_elevator,
         k_param_reverse_ch2_elevon, // unused
         k_param_flap_1_percent,
         k_param_flap_1_speed,
         k_param_flap_2_percent,
         k_param_flap_2_speed,
         k_param_reset_switch_chan,
-        k_param_manual_level, // unused
+        k_param_launch_pitch_deg,
         k_param_land_pitch_cd,  // unused - moved to AP_Landing
         k_param_ins_old,            // *** Deprecated, remove with next eeprom number change
         k_param_stick_mixing,
@@ -77,7 +77,7 @@ public:
         k_param_ins,                // libraries/AP_InertialSensor variables
         k_param_takeoff_throttle_min_speed,
         k_param_takeoff_throttle_min_accel,
-        k_param_takeoff_heading_hold, // unused
+        k_param_takeoff_throttle_min_dist,
         k_param_level_roll_limit,
         k_param_hil_servos,
         k_param_vtail_output, // unused
@@ -88,7 +88,7 @@ public:
         k_param_scheduler,
         k_param_relay,
         k_param_takeoff_throttle_delay,
-        k_param_skip_gyro_cal, // unused
+        k_param_takeoff_criteria_timeout,
         k_param_auto_fbw_steer,
         k_param_waypoint_max_radius,
         k_param_ground_steer_alt,        
@@ -115,7 +115,7 @@ public:
         k_param_rangefinder,
         k_param_terrain,
         k_param_terrain_follow,
-        k_param_stab_pitch_down_cd_old, // deprecated
+        k_param_crash_flow_threshold,
         k_param_glide_slope_min,
         k_param_stab_pitch_down,
         k_param_terrain_lookahead,
@@ -217,8 +217,7 @@ public:
         k_param_RTL_altitude_cm,
         k_param_inverted_flight_ch_unused, // unused
         k_param_min_gndspeed_cm,
-        k_param_crosstrack_use_wind, // unused
-
+        k_param_loiter_unbank_rate,
 
         //
         // Camera and mount parameters
@@ -360,6 +359,7 @@ public:
     AP_Int8  rtl_autoland;
 
     AP_Int8  crash_accel_threshold;
+    AP_Int8  crash_flow_threshold;
 
     // Feed-forward gains
     //
@@ -391,6 +391,7 @@ public:
     AP_Int16 waypoint_radius;
     AP_Int16 waypoint_max_radius;
     AP_Int16 rtl_radius;
+    AP_Int8 loiter_unbank_rate;
 
 #if GEOFENCE_ENABLED == ENABLED
     AP_Int8 fence_action;
@@ -460,7 +461,8 @@ public:
 #if HIL_SUPPORT
     AP_Int8  hil_mode;
 #endif
-
+    AP_Int8 auto_preflight;
+    AP_Int8 launch_elevator;
     AP_Int8 flap_1_percent;
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;
@@ -469,7 +471,9 @@ public:
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;
     AP_Float takeoff_throttle_min_accel;
+    AP_Float takeoff_throttle_min_dist;
     AP_Int8 takeoff_throttle_delay;
+    AP_Int8 takeoff_criteria_timeout;
     AP_Int8 takeoff_tdrag_elevator;
     AP_Float takeoff_tdrag_speed1;
     AP_Float takeoff_rotate_speed;
@@ -492,7 +496,15 @@ public:
 #endif
     AP_Int16 gcs_pid_mask;
     AP_Int8 parachute_channel;
+    AP_Int8 launch_pitch_deg;
 };
+
+// enums used by RNGFND_LANDING parameter
+enum land_hagl_source {
+    NONE = 0,
+    RANGEFINDER = 1,
+    EKF = 2,
+    };
 
 /*
   2nd block of parameters, to avoid going past 256 top level keys
@@ -564,6 +576,11 @@ public:
     AP_Int8 crow_flap_weight_inner;
     AP_Int8 crow_flap_options;
     AP_Int8 crow_flap_aileron_matching;
+
+    // thrust motor voltage and altitude scaling
+    AP_Int8 batt_idx;              // battery index used for compensation
+    AP_Float batt_voltage_max;     // maximum voltage used to scale thrust
+    AP_Float batt_voltage_min;     // minimum voltage used to scale thrust
 };
 
 extern const AP_Param::Info var_info[];

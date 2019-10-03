@@ -59,9 +59,15 @@ void NavEKF2_core::getFlowDebug(float &varFlow, float &gndOffset, float &flowInn
 {
     varFlow = MAX(flowTestRatio[0],flowTestRatio[1]);
     gndOffset = terrainState;
-    flowInnovX = innovOptFlow[0];
-    flowInnovY = innovOptFlow[1];
-    auxInnov = norm(auxFlowObsInnov.x,auxFlowObsInnov.y);
+    if (frontend->_flowUse == FLOW_USE_TERRAIN) {
+        flowInnovX = auxFlowObsInnov.x;
+        flowInnovY = auxFlowObsInnov.y;
+        auxInnov = norm(innovOptFlow[0],innovOptFlow[1]);
+    } else {
+        flowInnovX = innovOptFlow[0];
+        flowInnovY = innovOptFlow[1];
+        auxInnov = norm(auxFlowObsInnov.x,auxFlowObsInnov.y);
+    }
     HAGL = terrainState - stateStruct.position.z;
     rngInnov = innovRng;
     range = rangeDataDelayed.rng;
@@ -195,11 +201,20 @@ uint32_t NavEKF2_core::getLastVelNorthEastReset(Vector2f &vel) const
 }
 
 // return the NED wind speed estimates in m/s (positive is air moving in the direction of the axis)
-void NavEKF2_core::getWind(Vector3f &wind) const
+// returns true if wind state estimation is active
+bool NavEKF2_core::getWind(Vector3f &wind) const
 {
-    wind.x = stateStruct.wind_vel.x;
-    wind.y = stateStruct.wind_vel.y;
-    wind.z = 0.0f; // currently don't estimate this
+    if (!inhibitWindStates) {
+        wind.x = stateStruct.wind_vel.x;
+        wind.y = stateStruct.wind_vel.y;
+        wind.z = 0.0f; // currently don't estimate this
+        return true;
+    } else {
+        wind.x = 0.0f;
+        wind.y = 0.0f;
+        wind.z = 0.0f;
+        return false;
+    }
 }
 
 

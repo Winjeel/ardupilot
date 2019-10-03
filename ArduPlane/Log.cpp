@@ -90,6 +90,7 @@ struct PACKED log_Control_Tuning {
     int16_t rudder_out;
     int16_t throttle_dem;
     float airspeed_estimate;
+    float throttle_scaler;
 };
 
 // Write a control tuning packet. Total length : 22 bytes
@@ -108,7 +109,8 @@ void Plane::Log_Write_Control_Tuning()
         throttle_out    : (int16_t)SRV_Channels::get_output_scaled(SRV_Channel::k_throttle),
         rudder_out      : (int16_t)SRV_Channels::get_output_scaled(SRV_Channel::k_rudder),
         throttle_dem    : (int16_t)SpdHgt_Controller->get_throttle_demand(),
-        airspeed_estimate : est_airspeed
+        airspeed_estimate : est_airspeed,
+        throttle_scaler : throttle_scaler
     };
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
@@ -271,7 +273,7 @@ const struct LogStructure Plane::log_structure[] = {
     { LOG_STARTUP_MSG, sizeof(log_Startup),         
       "STRT", "QBH",         "TimeUS,SType,CTot", "s--", "F--" },
     { LOG_CTUN_MSG, sizeof(log_Control_Tuning),     
-      "CTUN", "Qcccchhhf",    "TimeUS,NavRoll,Roll,NavPitch,Pitch,ThrOut,RdrOut,ThrDem,Aspd", "sdddd---n", "FBBBB---0" },
+      "CTUN", "Qcccchhhff",    "TimeUS,NavRoll,Roll,NavPitch,Pitch,ThOut,RdOut,ThDem,IAS,ThScl", "sdddd---n-", "FBBBB---0-" },
     { LOG_NTUN_MSG, sizeof(log_Nav_Tuning),         
       "NTUN", "QfcccfffLLii",  "TimeUS,Dist,TBrg,NavBrg,AltErr,XT,XTi,AspdE,TLat,TLng,TAlt,TAspd", "smddmmmnDUmn", "F0BBB0B0GGBB" },
     { LOG_SONAR_MSG, sizeof(log_Sonar),             

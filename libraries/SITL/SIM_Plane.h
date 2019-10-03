@@ -48,19 +48,19 @@ protected:
     struct {
         // from last_letter skywalker_2013/aerodynamics.yaml
         // thanks to Georacer!
-        float s = 0.45;
-        float b = 1.88;
-        float c = 0.24;
-        float c_lift_0 = 0.56;
-        float c_lift_deltae = 0;
-        float c_lift_a = 6.9;
+        float s = 0.8;
+        float b = 1.95;
+        float c = 0.42;
+        float c_lift_0 = 0.20;
+        float c_lift_deltae = -1.0;
+        float c_lift_a = 4.5;
         float c_lift_q = 0;
-        float mcoeff = 50;
-        float oswald = 0.9;
-        float alpha_stall = 0.4712;
+        float mcoeff = 15;
+        float oswald = 0.85;
+        float alpha_stall = 0.37;
         float c_drag_q = 0;
         float c_drag_deltae = 0.0;
-        float c_drag_p = 0.1;
+        float c_drag_p = 0.04;
         float c_y_0 = 0;
         float c_y_b = -0.98;
         float c_y_p = 0;
@@ -86,9 +86,7 @@ protected:
         float deltaa_max = 0.3491;
         float deltae_max = 0.3491;
         float deltar_max = 0.3491;
-        // the X CoG offset should be -0.02, but that makes the plane too tail heavy
-        // in manual flight. Adjusted to -0.15 gives reasonable flight
-        Vector3f CGOffset{-0.15, 0, -0.05};
+        Vector3f CGOffset{-0.01, 0, -0.05};
     } coefficient;
 
     float thrust_scale;

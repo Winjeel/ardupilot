@@ -7,25 +7,26 @@
 #include "AP_OpticalFlow_CXOF.h"
 #include "AP_OpticalFlow_MAV.h"
 #include "AP_OpticalFlow_HereFlow.h"
+#include "AP_OpticalFlow_MotorPod.h"
 #include <AP_Logger/AP_Logger.h>
 
 extern const AP_HAL::HAL& hal;
 
 #ifndef OPTICAL_FLOW_TYPE_DEFAULT
- #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_SKYVIPER_F412 || defined(HAL_HAVE_PIXARTFLOW_SPI)
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::PIXART
- #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::BEBOP
- #else
-  #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::NONE
- #endif
+    #if CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_CHIBIOS_SKYVIPER_F412 || defined(HAL_HAVE_PIXARTFLOW_SPI)
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::PIXART
+    #elif CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_BEBOP
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::BEBOP
+    #else
+        #define OPTICAL_FLOW_TYPE_DEFAULT OpticalFlowType::NONE
+    #endif
 #endif
 
 const AP_Param::GroupInfo OpticalFlow::var_info[] = {
     // @Param: _TYPE
     // @DisplayName: Optical flow sensor type
     // @Description: Optical flow sensor type
-    // @Values: 0:None, 1:PX4Flow, 2:Pixart, 3:Bebop, 4:CXOF, 5:MAVLink, 6:UAVCAN
+    // @Values: 0:None, 1:PX4Flow, 2:Pixart, 3:Bebop, 4:CXOF, 5:MAVLink, 6:UAVCAN, 64:MOTOR_POD
     // @User: Standard
     // @RebootRequired: True
     AP_GROUPINFO("_TYPE", 0,  OpticalFlow,    _type,   (int8_t)OPTICAL_FLOW_TYPE_DEFAULT),
@@ -142,6 +143,9 @@ void OpticalFlow::init(uint32_t log_bit)
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         backend = new AP_OpticalFlow_SITL(*this);
 #endif
+        break;
+    case OpticalFlowType::MOTOR_POD:
+        backend = AP_OpticalFlow_MotorPod::detect(*this);
         break;
     }
 

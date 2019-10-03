@@ -96,10 +96,14 @@
 #include <AP_Landing/AP_Landing.h>
 #include <AP_LandingGear/AP_LandingGear.h>     // Landing Gear library
 
+#include <AP_PpdsMotorPod/AP_PpdsMotorPod.hpp>
+
 #include "GCS_Mavlink.h"
 #include "GCS_Plane.h"
 #include "quadplane.h"
 #include "tuning.h"
+
+#include <Filter/Filter.h>                     // Filter library
 
 // Configuration
 #include "config.h"
@@ -308,7 +312,7 @@ private:
 #if OSD_ENABLED == ENABLED
     AP_OSD osd;
 #endif
-    
+
     ModeCircle mode_circle;
     ModeStabilize mode_stabilize;
     ModeTraining mode_training;
@@ -373,10 +377,10 @@ private:
 
         // the time when the last HEARTBEAT message arrived from a GCS
         uint32_t last_heartbeat_ms;
-        
+
         // A timer used to track how long we have been in a "short failsafe" condition due to loss of RC signal
         uint32_t short_timer_ms;
-        
+
         uint32_t last_valid_rc_ms;
 
         //keeps track of the last valid rc as it relates to the AFS system
@@ -463,8 +467,10 @@ private:
         uint8_t accel_event_counter;
         uint32_t accel_event_ms;
         uint32_t start_time_ms;
+        Vector2f position_at_start;
+        bool control_check_inhibit;
     } takeoff_state;
-    
+
     // ground steering controller state
     struct {
         // Direction held during phases of takeoff and landing centidegrees
@@ -472,7 +478,7 @@ private:
         // this is a 0..36000 value, or -1 for disabled
         int32_t hold_course_cd;
 
-        // locked_course and locked_course_cd are used in stabilize mode 
+        // locked_course and locked_course_cd are used in stabilize mode
         // when ground steering is active, and for steering in auto-takeoff
         bool locked_course;
         float locked_course_err;
@@ -523,10 +529,10 @@ private:
         // the highest airspeed we have reached since entering AUTO. Used
         // to control ground takeoff
         float highest_airspeed;
-        
+
         // initial pitch. Used to detect if nose is rising in a tail dragger
         int16_t initial_pitch_cd;
-        
+
         // turn angle for next leg of mission
         float next_turn_angle {90};
 
@@ -535,13 +541,13 @@ private:
 
         // time when we first pass min GPS speed on takeoff
         uint32_t takeoff_speed_time_ms;
-        
+
         // distance to next waypoint
         float wp_distance;
-        
+
         // proportion to next waypoint
         float wp_proportion;
-        
+
         // last time is_flying() returned true in milliseconds
         uint32_t last_flying_ms;
 
@@ -556,7 +562,27 @@ private:
 
         // are we doing loiter mode as a VTOL?
         bool vtol_loiter:1;
+
     } auto_state;
+
+    // Used for control surface movement test
+    struct {
+        // true when control surface checks completed
+        bool control_checks_complete {false};
+
+        // deflection of roll and yaw control servos demanded during preflight test [-4500 ...  +4500]
+        int16_t servo_demand_cd {0};
+
+        // deflection of pitch control servos demanded during preflight test [-4500 ...  +4500]
+        int16_t pitch_servo_demand_cd {0};
+
+        // true when surfaces should be set to launch position
+        bool set_to_launch_position {false};
+
+        // index used to control surface movement
+        uint16_t control_index;
+
+    } surface_test_state;
 
     struct {
         // roll pitch yaw commanded from external controller in centidegrees
@@ -576,7 +602,7 @@ private:
         int8_t last_cmd;
     } gear;
 #endif
-    
+
     struct {
         // on hard landings, only check once after directly a landing so you
         // don't trigger a crash when picking up the aircraft
@@ -596,6 +622,19 @@ private:
 
         // length of time impact_detected has been true. Times out after a few seconds. Used to clip isFlyingProbability
         uint32_t impact_timer_ms;
+
+        // last time ground impact detected during takeoff/launch. Used to check the timing of other failed launch criteria such as grouynd speed and optical flow.
+        uint32_t launch_impact_time_ms;
+
+        // First time that the optical flow sensor value indicates a failing launch
+        uint32_t launch_flow_timer_ms;
+
+        // First time that the GPS horizontal velocity indicates a failed launch
+        uint32_t launch_gps_timer_ms;
+
+        // true when we are about to hit the ground
+        bool ground_impact_pending;
+
     } crash_state;
 
     // true if we are in an auto-throttle mode, which means
@@ -605,13 +644,13 @@ private:
     // true if we are in an auto-navigation mode, which controls whether control input is ignored
     // with STICK_MIXING=0
     bool auto_navigation_mode:1;
-    
+
     // this allows certain flight modes to mix RC input with throttle depending on airspeed_nudge_cm
     bool throttle_allows_nudging:1;
 
     // this controls throttle suppression in auto modes
     bool throttle_suppressed;
-	
+
     // reduce throttle to eliminate battery over-current
     int8_t  throttle_watt_limit_max;
     int8_t  throttle_watt_limit_min; // for reverse thrust
@@ -684,7 +723,7 @@ private:
         // previous target bearing, used to update sum_cd
         int32_t old_target_bearing_cd;
 
-        // Total desired rotation in a loiter.  Used for Loiter Turns commands. 
+        // Total desired rotation in a loiter.  Used for Loiter Turns commands.
         int32_t total_cd;
 
         // total angle completed in the loiter so far
@@ -807,6 +846,8 @@ private:
 
     // support for transmitter tuning
     AP_Tuning_Plane tuning;
+
+    AP_PpdsMotorPod ppds_motor_pod;
 
     static const struct LogStructure log_structure[];
 
@@ -976,6 +1017,7 @@ private:
     void update_control_mode(void);
     void stabilize();
     void set_servos_idle(void);
+    void set_servos_idle_preflight(void);
     void set_servos();
     void set_servos_manual_passthrough(void);
     void set_servos_controlled(void);
@@ -987,6 +1029,7 @@ private:
     void servo_output_mixers(void);
     void servos_output(void);
     void servos_auto_trim(void);
+    float calc_fwd_compensation_gain(void);
     void servos_twin_engine_mix();
     void throttle_watt_limiter(int8_t &min_throttle, int8_t &max_throttle);
     void update_is_flying_5Hz(void);
@@ -1062,6 +1105,10 @@ private:
     bool allow_reverse_thrust(void) const;
     bool have_reverse_thrust(void) const;
     int16_t get_throttle_input(bool no_deadzone=false) const;
+
+    // battery voltage, current and air pressure compensation variables
+    LowPassFilterFloat  _batt_voltage_filt; // filtered battery voltage expressed as a percentage (0 ~ 1.0) of batt_voltage_max
+    float throttle_scaler;
 
     // support for AP_Avoidance custom flight mode, AVOID_ADSB
     bool avoid_adsb_init(bool ignore_checks);
