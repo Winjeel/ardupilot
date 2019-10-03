@@ -1,19 +1,8 @@
 #!/usr/bin/env python
 # encoding: utf-8
-
 def build(bld):
-    vehicle = bld.path.name
-    bld.ap_stlib(
-        name=vehicle + '_libs',
-        ap_vehicle=vehicle,
-        ap_libraries=bld.ap_common_vehicle_libraries() + [
-            # todo: work out what we need...
-            # 'AP_GPS',
-        ],
-    )
-
     bld.ap_program(
+        use='ap',
         program_name='boardtest',
         program_groups=['bin', 'boardtest'],
-        use=vehicle + '_libs',
     )
