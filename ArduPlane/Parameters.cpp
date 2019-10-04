@@ -812,6 +812,24 @@ const AP_Param::Info Plane::var_info[] = {
     // @User: User
     GSCALAR(FBWB_min_altitude_cm,   "ALT_HOLD_FBWCM", ALT_HOLD_FBW_CM),
 
+    // @Param: WAL_START_HGT
+    // @DisplayName: Wind Adaptive landing start height
+    // @Description: Specifies the height that landing will start if auto generating an into-wind landing approach using wind esitmates.
+    // @Units: m
+    // @Increment: 1
+    // @Range: 10 127
+    // @User: User
+    GSCALAR(wal_start_height, "WAL_START_HGT", 25),
+
+    // @Param: WAL_START_GRAD
+    // @DisplayName: Wind Adaptive landing approach gradient percentage
+    // @Description: Specifies the percentage gradient of the landing approach used when auto generating an into-wind landing approach using wind esitmates.
+    // @Units: percent
+    // @Increment: 1
+    // @Range: 5 25
+    // @User: SUser
+    GSCALAR(wal_appraoch_gradient_pct, "WAL_GRAD_PCT", 14),
+
     // @Param: FLAP_IN_CHANNEL
     // @DisplayName: Flap input channel
     // @Description: An RC input channel to use for flaps control. If this is set to a RC channel number then that channel will be used for manual flaps control. When enabled, the percentage of flaps is taken as the percentage travel from the TRIM value of the channel to the MIN value of the channel. A value above the TRIM values will give inverse flaps (spoilers). This option needs to be enabled in conjunction with a FUNCTION setting on an output channel to one of the flap functions. When a FLAP_IN_CHANNEL is combined with auto-flaps the higher of the two flap percentages is taken.
