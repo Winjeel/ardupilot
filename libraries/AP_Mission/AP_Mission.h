@@ -478,6 +478,10 @@ public:
     // returns true if the mission contains the requested items
     bool contains_item(MAV_CMD command) const;
 
+    /// get next MAV_CMD_NAV_LAND - gets next MAV_CMD_NAV_LAND command found at or after start_index
+    ///     returns index if found, -1 if not found
+    int16_t get_next_land_cmd(uint16_t start_index, Mission_Command& cmd);
+
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 

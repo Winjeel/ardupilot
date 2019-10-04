@@ -367,6 +367,28 @@ bool AP_Mission::get_next_nav_cmd(uint16_t start_index, Mission_Command& cmd)
     return false;
 }
 
+/// get next MAV_CMD_NAV_LAND - gets next MAV_CMD_NAV_LAND command found at or after start_index
+///     returns index if found, -1 if not found
+int16_t AP_Mission::get_next_land_cmd(uint16_t start_index, Mission_Command& cmd)
+{
+    // search until the end of the mission command list
+    for (uint16_t cmd_index = start_index; cmd_index < (unsigned)_cmd_total; cmd_index++) {
+        // get next command
+        if (!get_next_cmd(cmd_index, cmd, false)) {
+            // no more commands so return failure
+            return -1;
+        }
+        // if found a "navigation" command then return it
+        if (is_nav_cmd(cmd)) {
+            if (cmd.id == MAV_CMD_NAV_LAND)
+            return cmd_index;
+        }
+    }
+
+    // if we got this far we did not find a navigation command
+    return -1;
+}
+
 /// get the ground course of the next navigation leg in centidegrees
 /// from 0 36000. Return default_angle if next navigation
 /// leg cannot be determined
