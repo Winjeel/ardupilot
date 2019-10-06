@@ -1,9 +1,6 @@
 /*
   Cervello board test
 */
-
-
-
 #include "BoardTest.h"
 
 #if APJ_BOARD_ID != 1688
@@ -23,7 +20,6 @@ static AP_InertialSensor ins;
 
 // Utility classes
 static uint32_t timer;
-//static uint8_t counter;
 static uint32_t sNow_ms = 0;
 
 // initialisation functions
@@ -43,6 +39,7 @@ static void _initialiseCervello(void){
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
+
 };
 
 static void _initialiseConsole(void) {
@@ -62,25 +59,48 @@ static void _initialiseConsole(void) {
 }
 
 static void _initialiseBarometer(void){
-    // function to initialise the barometer
+    // Function to initialise the barometer
+
+    // Initialise the barometer if it has not been initialised, or is not healthy
+    if (barometer.all_healthy()){
+        return;
+    }
+
+    EXPECT_DELAY_MS(sensorInitialisationTimeout);
+
     barometer.init();
     barometer.calibrate();
 };
 
 static void _initialiseCompass(void){
-    // function to initialise the compass
-    compass.init();
+    // Function to initialise the compass
 
+    // Initialise the compass if it has not been initialised, or is not healthy
+    if (compass.healthy()){
+        return;
+    }
+
+    EXPECT_DELAY_MS(sensorInitialisationTimeout);
+    
+    compass.init();
     for (uint8_t i = 0; i < compass.get_count(); i++) {
         compass.set_and_save_offsets(i, Vector3f(0, 0, 0));
     }
-
     compass.set_declination(ToRad(0.0f));
 };
 
-static void _initialiseIMU(void){
-    // function to initialise the IMU
+static void _initialiseINS(void){
+    // Function to initialise the INS
+
+    // Initialise the INS if it has not been initialised, or is not healthy
+    if (ins.get_accel_health_all() && ins.get_gyro_health_all()){
+        return;
+    }
+
+    // Initialise INS if not initialised/not healthy
+    EXPECT_DELAY_MS(sensorInitialisationTimeout);
     ins.init(100);
+
 }
 
 static void _printHeader(void) {
@@ -102,7 +122,7 @@ static void _printHeader(void) {
         hal.console->printf(kHeader[i]);
     }
 
-    hal.console->printf("%65s\n", AP::fwversion().fw_string);
+    hal.console->printf("%57s\n", AP::fwversion().fw_string);
     hal.console->printf("\n------------------------------------------------------------------------------\n\n");
 }
 
@@ -121,11 +141,6 @@ void setup()
     _initialiseCervello();
     _initialiseLED();
     
-    // initialise sensors
-    _initialiseBarometer();
-    _initialiseCompass();
-    _initialiseIMU();
-
     // initialise test console
     _initialiseConsole();
 
@@ -277,343 +292,165 @@ static void _consoleKeypress(void){
     }
 }
 
-// test cases
-static bool _testMS5611_interrogate(void) { // Test 1 - Baro 1, SPI
+static bool _runAllTests_Cervello_Probe(void){
+    // Function to run all probe tests on the Cervello
+    bool summaryTestResult = true;
+    bool testResult;
+
+    EXPECT_DELAY_MS(probeTestTimeout);
+
+    hal.console->printf("Probing MS5611 (Baro - SPI)\n");
+    testResult = _testMS5611_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing ICM20602 (IMU1 - SPI)\n");
+    testResult = _testICM20602_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing ICM20948 (IMU2 - SPI)\n");
+    testResult = _testICM20948_imu_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing ICM20948 (Compass - SPI)\n");
+    testResult = _testICM20948_mag_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing IST8308 (Compass - I2C)\n");
+    testResult = _testIST8308_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
+    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n");
+    return summaryTestResult;
+}
+
+static bool _runAllTests_Cervello_Interactive(void){
+    // function to run all interrogation tests on the Cervello
+    bool summaryTestResult = true;
+    
+    // initialise sensors - 
+    hal.console->printf("Initialising Cervello sensor drivers\n\n");
+    EXPECT_DELAY_MS(sensorInitialisationTimeout);
+    _initialiseCompass();
+    
+    // run the Accelerometer and Gyro tests
+    summaryTestResult &= _interactiveTest_Accel();
+    summaryTestResult &= _interactiveTest_Gyro();
+
+    // run the compass tests
+    summaryTestResult &= _interactiveTest_Compass();
+
+    // run the barometer tests
+    summaryTestResult &= _interactiveTest_Barometer();
+
+    // run the SD Card tests
+    summaryTestResult &= _interactiveTest_SDCard(); // TODO
+    hal.console->printf("TODO - SD card test\n");
+
+    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n");
+    return summaryTestResult;
+}
+
+// test cases - cervello probe
+static bool _testMS5611_probe(void) { // Baro 1, SPI
     bool result = false;
     static AP_Baro_Backend *sMS5611_backend = nullptr;
 
     if (!sMS5611_backend) {
-        // Probe the parometer backend
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
         sMS5611_backend = HAL_BARO_1_PROBE(barometer);
     }
 
     if (sMS5611_backend) {
-        // If the barometer backend exists, test pass
+        HAL_BARO_1_DRIVER &ms5611 = static_cast<HAL_BARO_1_DRIVER&>(*sMS5611_backend); // MS5611 doesn't have a from() function
+        // TODO: what can we run here to check the status?
+        (void)ms5611;
         result = true;
     }
-
-    hal.console->printf("Warning - board may require reset to ensure clean test state");
     return result;
 }
 
-static bool _testICM20602_interrogate(void) { // Test 2 - IMU 1, SPI
+static bool _testICM20602_probe(void) { // IMU 1, SPI
     bool result = false;
     static AP_InertialSensor_Backend *sICM20602_backend = nullptr;
 
     if (!sICM20602_backend) {
-        // Probe the IMU backend
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
         sICM20602_backend = HAL_INS_1_PROBE(ins);
     }
 
     if (sICM20602_backend) {
-        // If the IMU backend exists, test pass
-        result = true;
+        HAL_INS_1_DRIVER &icm20602 = HAL_INS_1_DRIVER::from(*sICM20602_backend);
+        icm20602.start(); // TODO: Any issues if we repeatedly call this?
+        result = icm20602.update();
     }
-
-    hal.console->printf("Warning - board may require reset to ensure clean test state");
     return result;
 }
 
-static bool _testICM20948_imu_interrogate(void) { // Test 3 - IMU 2, SPI
+static bool _testICM20948_imu_probe(void) { // IMU 2, SPI
     bool result = false;
     static AP_InertialSensor_Backend *sICM20948_imu_backend = nullptr;
 
     if (!sICM20948_imu_backend) {
-        // Probe the IMU backend
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
         sICM20948_imu_backend = HAL_INS_2_PROBE(ins);
     }
 
     if (sICM20948_imu_backend) {
-        // If the IMU backend exists, test pass
-        result = true;
+        HAL_INS_2_DRIVER &icm20948 = HAL_INS_2_DRIVER::from(*sICM20948_imu_backend);
+        icm20948.start();
+        result = icm20948.update();
     }
-
-    hal.console->printf("Warning - board may require reset to ensure clean test state");
     return result;
 }
 
-static bool _testICM20948_mag_interrogate(void) { // Test 4 - Compass 1, SPI
+static bool _testICM20948_mag_probe(void) { // Compass 1, SPI
     bool result = false;
     static AP_Compass_Backend *sICM20948_mag_backend = nullptr;
 
     if (!sICM20948_mag_backend) {
-        // Probe the compass backend
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
         sICM20948_mag_backend = HAL_MAG_1_PROBE;
     }
 
     if (sICM20948_mag_backend) {
-        // If the compass backend exists, test pass
+        HAL_MAG_1_DRIVER &icm20948_mag = static_cast<HAL_MAG_1_DRIVER&>(*sICM20948_mag_backend);
+        // TODO: what can we run here to check the status?
+        (void)icm20948_mag;
         result = true;
     }
-
-    hal.console->printf("Warning - board may require reset to ensure clean test state");
     return result;
 }
 
-static bool _testIST8308_interrogate(void) { // Test 5 - Compass 2, I2C
+static bool _testIST8308_probe(void) { // Compass 2, I2C
     bool result = false;
     static AP_Compass_Backend * sIST8308_backend = nullptr;
 
     if (!sIST8308_backend) {
-        // Probe the compass backend
+        // Backends are painful. The probe function runs the init, and if
+        // successful, returns a pointer.
         sIST8308_backend = HAL_MAG_2_PROBE;
     }
 
     if (sIST8308_backend) {
-        // If the compass backend exists, test pass
+        HAL_MAG_2_DRIVER &ist8308 = static_cast<HAL_MAG_2_DRIVER&>(*sIST8308_backend);
+        (void)ist8308;
         result = true;
     }
-
-    hal.console->printf("Warning - board may require reset to ensure clean test state");
     return result;
 }
 
-static bool _testBarometer_sensorData(void){
-
-    if (!barometer.all_healthy()){
-        hal.console->print("Barometer not healthy\n");
-        return false;
-    }
-
-    barometer.accumulate();
-    barometer.update();
-
-    //output barometer readings to console
-    hal.console->printf("Pressure: %.2f Pa\n"
-                        "Temperature: %.2f degC\n"
-                        "Relative Altitude: %.2f m\n",
-                        (double)barometer.get_pressure(),
-                        (double)barometer.get_temperature(),
-                        (double)barometer.get_altitude());
-
-    return barometer.get_pressure()>0;
-}
-
-static bool _testCompass_sensorData(void){
-    bool healthStatus = true;
-    bool magStatus = true;
-
-    // Check all compass sensors are healthy
-    for (uint8_t i = 0; i < compass.get_count(); i++) {
-        healthStatus &= compass.healthy(i);
-    }
-
-    if (!healthStatus){
-        hal.console->print("Compass not healthy\n");
-        return false;
-    }
-
-    // Read measurements from the compass sensors
-    compass.read();
-
-    for (uint8_t i = 0; i < compass.get_count(); i++) {
-        const Vector3f &mag = compass.get_field(i);
-        hal.console->printf("Compass %i - MagX: %.2f MagY: %.2f MagZ: %.2f\n", i, mag.x, mag.y, mag.z);
-        magStatus &= mag.length() > 0;
-    }
-
-    return magStatus;
-}
-
-static bool _testINS_sensorData_accel(void){
-    bool gravityCheck = true;
-
-    // Check all accelerometers sensors are healthy
-    if (!ins.get_accel_health_all()){
-        hal.console->print("Accelerometers not healthy\n");
-        return false;
-    }
-
-    // Update the accelerometers
-    ins.update();
-
-    // Print accelerometer data
-    for (uint8_t i = 0; i < ins.get_accel_count(); i++) {
-        const Vector3f &acc = ins.get_accel(i);
-        hal.console->printf("Accelerometer %i - AccX: %.2f AccY: %.2f AccZ: %.2f\n", i, acc.x, acc.y, acc.z);
-
-        gravityCheck &= abs((double)acc.x) < accelTol;
-        gravityCheck &= abs((double)acc.y) < accelTol;
-        gravityCheck &= (abs((double)acc.z) - 9.81) < accelTol;
-    }
-
-    return gravityCheck;
-}
-
-static bool _testINS_sensorData_gyro(void){
-    bool rotationCheck = true;    
-
-    // Check all gyros sensors are healthy
-    if (!ins.get_gyro_health_all()){
-        hal.console->print("Gyros not healthy\n");
-        return false;
-    }
-
-    // Update the gyros
-    ins.update();
-
-    // Print gyro data
-    for (uint8_t i = 0; i < ins.get_gyro_count(); i++) {
-        const Vector3f &rot = ins.get_gyro(i);
-        hal.console->printf("Gyro %i - RotX: %.2f RotY: %.2f RotZ: %.2f\n", i, rot.x, rot.y, rot.z);
-
-        rotationCheck &= abs((double)rot.x) < gyroTol;
-        rotationCheck &= abs((double)rot.y) < gyroTol;
-        rotationCheck &= abs((double)rot.z) < gyroTol;
-    }
-    return rotationCheck;
-}
-
-static bool _testINS_accel_xAxis(void){
-
-    // Verify that the INS sensors exist before continuing
-    if (ins.get_accel_count() < 1){
-        hal.console->printf("No INS sensors found\n");
-        return false;
-    }
-
-    // Setup variable to track test result
-    std::vector<bool> testResults(ins.get_accel_count());
-    bool summaryTestResult = true;
-
-    // Expect delay based on timeout duration * number of sensors
-    EXPECT_DELAY_MS((int)interactiveTestTimeout * (int)ins.get_accel_count());
-    hal.console->printf("Orient the board with the X axis facing down\n\n");
-
-    // Test each accelerometer
-    for (uint8_t i = 0; i < ins.get_accel_count(); i++) {
-        hal.console->printf("Testing accelerometer %i\n",i);
-        testResults[i] = false;
-
-        // Setup test duration
-        uint32_t testStartTime = AP_HAL::micros();
-        uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
-
-        // Setup variable to track running average
-        float runningAverage = 0;
-
-        // Poll the accelerometer data
-        while(AP_HAL::micros() < testEndTime){
-
-            // Update accelerometer and retrieve data
-            ins.update();
-            const Vector3f &acc = ins.get_accel(i);
-
-            // Update the running average
-            runningAverage = _approxRunningAverage(runningAverage, acc.x);
-
-            // Check if accelerometer is aligned with gravity
-            if (_checkGravityAcceleration(runningAverage)){
-                // If accelerometer is aligned, pass test and continue to the next accelerometer
-                testResults[i] = true;
-                break;
-            }
-            hal.scheduler->delay(5);
-        }
-
-        (testResults[i]) ? hal.console->printf("Accelerometer %i pass\n\n",i) : hal.console->printf("Accelerometer %i fail\n\n",i);
-
-    }
-
-    // Return overall test result across all accelerometers
-    for (int j = 0; j < testResults.size(); j++){
-        summaryTestResult &= testResults[j];
-    }
-
-    return summaryTestResult;
-}
-
-static bool _testINS_gyro_xAxis(void){
-
-    // Verify that the INS sensors exist before continuing
-    if (ins.get_gyro_count() < 1){
-        hal.console->printf("No INS sensors found\n");
-        return false;
-    }
-
-    // Setup variable to track test result
-    std::vector<bool> testResults(ins.get_accel_count());
-    bool summaryTestResult = true;
-
-    // Expect delay based on timeout duration * number of sensors
-    EXPECT_DELAY_MS((int)interactiveTestTimeout * (int)ins.get_accel_count());
-    hal.console->printf("Rotate the board clockwise around the positive X axis\n\n");
-
-    // Test each gyro
-    for (uint8_t i = 0; i < ins.get_gyro_count(); i++) {
-        hal.console->printf("Testing gyro %i\n",i);
-        testResults[i] = false;
-
-        // Setup test duration
-        uint32_t testStartTime = AP_HAL::micros();
-        uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
-
-        // Setup variable to track running average
-        float runningAverage = 0;
-
-        // Poll the gyro data
-        while(AP_HAL::micros() < testEndTime){
-
-            // Update accelerometer and retrieve data
-            ins.update();
-            const Vector3f &rot = ins.get_gyro(i);
-
-            // Update the running average
-            runningAverage = _approxRunningAverage(runningAverage, rot.x);
-
-            // Check if the gyro senses positive rotation
-            if (_checkRotation(runningAverage)){
-                // If positive rotation, pass test and continue to the next gyro
-                testResults[i] = true;
-                break;
-            }
-            hal.scheduler->delay(5);
-        }
-
-        (testResults[i]) ? hal.console->printf("Gyro %i pass\n\n",i) : hal.console->printf("Gyro %i fail\n\n",i);
-
-    }
-
-    // Return overall test result across all gyros
-    for (int j = 0; j < testResults.size(); j++){
-        summaryTestResult &= testResults[j];
-    }
-
-    return summaryTestResult;
-}
-
-bool _checkGravityAcceleration(float acceleration){
-    // This function checks for the reactive force against gravity
-    float accelDelta = acceleration + GRAVITY_MSS;
-
-    return abs(accelDelta) < accelTol;
-}
-
-bool _checkRotation(float rotation){
-    // Function to check for positive rotation from the current gyro axis
-    return rotation > gyroTol;
-}
-
-float _approxRunningAverage(float average, float newSample){
-    average -= average / runningAverageSamples;
-    average += newSample / runningAverageSamples;
-    return average;
-    // https://stackoverflow.com/questions/12636613/how-to-calculate-moving-average-without-keeping-the-count-and-data-total
-
-}
-
-const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
-    AP_GROUPEND
-};
-GCS_Dummy _gcs;
-
-AP_HAL_MAIN();
-
-
-
-
-
-static bool _call_generic_AccelTest(void){
+static bool _interactiveTest_Accel(void){
+    // Initialise the INS
+    _initialiseINS();
 
     // Verify that the INS sensors exist before continuing
     if (ins.get_accel_count() < 1){
@@ -650,7 +487,7 @@ static bool _call_generic_AccelTest(void){
             }
 
             hal.console->printf("Testing accelerometer %i --- ",j);
-            bool testResult =_generic_AccelTest(ptr_to_accel);
+            bool testResult =_interactiveTest_Accel_SingleAxis(ptr_to_accel);
             (testResult) ? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
             summaryTestResult &= testResult;
 
@@ -659,10 +496,58 @@ static bool _call_generic_AccelTest(void){
     } // Axis loop
 
     return summaryTestResult;
-
 }
 
-static bool _generic_AccelTest(const float* accelSensorPtr){
+static bool _interactiveTest_Gyro(void){
+    // Initialise the INS
+    _initialiseINS();
+
+    // Verify that the INS sensors exist before continuing
+    if (ins.get_gyro_count() < 1){
+        hal.console->printf("No INS sensors found\n");
+        return false;
+    }
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+
+    // Loop through each axis - X/Y/Z
+    for (int i = 0; i < 3; i++){
+
+        // Loop through each gyro
+        for (uint8_t j = 0; j < ins.get_gyro_count(); j++) {
+            const float * ptr_to_gyro;
+
+            switch(i){
+                case 0: // X Axis test
+                    if (j==0) {hal.console->printf("Rotate the board clockwise around the positive X axis\n");};
+                    ptr_to_gyro = &ins.get_gyro(j).x;
+                    break;
+
+                case 1: // Y Axis test
+                    if (j==0) {hal.console->printf("Rotate the board clockwise around the positive Y axis\n");};
+                    ptr_to_gyro = &ins.get_gyro(j).y;
+                    break;
+
+                case 2: // Z Axis test
+                    if (j==0) {hal.console->printf("Rotate the board clockwise around the positive Z axis\n");};
+                    ptr_to_gyro = &ins.get_gyro(j).z;
+                    break;
+            }
+
+            hal.console->printf("Testing gyro %i --- ",j);
+            bool testResult =_interactiveTest_Gyro_SingleAxis(ptr_to_gyro);
+            (testResult) ? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
+            summaryTestResult &= testResult;
+
+        } // Gyro loop
+        hal.console->printf("\n");
+    } // Axis loop
+
+    return summaryTestResult;
+}
+
+static bool _interactiveTest_Accel_SingleAxis(const float* accelSensorPtr){
     // Expect delay based on timeout duration;
     EXPECT_DELAY_MS((int)interactiveTestTimeout);
 
@@ -683,14 +568,196 @@ static bool _generic_AccelTest(const float* accelSensorPtr){
         float accelData = *accelSensorPtr;
         runningAverage = _approxRunningAverage(runningAverage, accelData);
 
-//        hal.console->printf("Running average %.2f\n",runningAverage);
-
         // Check if accelerometer is aligned with gravity
         if (_checkGravityAcceleration(runningAverage)){
             // If accelerometer is aligned, pass test and continue
             return true;
         }
-        hal.scheduler->delay(5);
+        hal.scheduler->delay(interactiveTestLoopDelay);
     }
     return false;
 }
+
+static bool _interactiveTest_Gyro_SingleAxis(const float* gyroSensorPtr){
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+
+    // Setup variable to track running average
+    float runningAverage = 0;
+
+    // Poll the gyro data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update accelerometer and retrieve data
+        ins.update();
+
+        // Update the running average
+        float gyroData = *gyroSensorPtr;
+        runningAverage = _approxRunningAverage(runningAverage, gyroData);
+
+        // hal.console->printf("Running average %.2f\n",runningAverage);
+
+        // Check if gyro detects positive rotation
+        if (_checkRotation(runningAverage)){
+            // If accelerometer is aligned, pass test and continue
+            return true;
+        }
+        hal.scheduler->delay(interactiveTestLoopDelay);
+    }
+    return false;
+}
+
+static bool _interactiveTest_Barometer(void){
+    // Initialise the barometer
+    _initialiseBarometer();
+
+    // Verify that the barometers exist before continuing
+    if (barometer.num_instances() < 1){
+        hal.console->printf("No barometer sensors found\n");
+        return false;
+    }
+
+    // verify that the barometer is healthy before continuing
+    if (!barometer.all_healthy()){
+        hal.console->print("Barometer not healthy\n");
+        return false;
+    }
+
+    // setup variable to track test results
+    bool summaryTestResult = true;
+
+    // update the barometer for new sensor information
+    barometer.accumulate();
+    barometer.update();
+
+    // verifying temperature data is within reasonable expected values
+    hal.console->printf("Testing barometer temperature within range %.1fC to %.1fC -- ", baro_temp_expectedMin, baro_temp_expectedMax);
+    bool testResult_checkTempMax = barometer.get_temperature() <= baro_temp_expectedMax;
+    summaryTestResult &= testResult_checkTempMax;
+    bool testResult_checkTempMin = barometer.get_temperature() >= baro_temp_expectedMin;
+    summaryTestResult &= testResult_checkTempMin;
+
+    if (testResult_checkTempMax && testResult_checkTempMin){
+        hal.console->printf("PASS\n");
+    }
+    else if (!testResult_checkTempMax){
+        // If measured temperature is too high
+        hal.console->printf("FAIL\nBarometer temperature too high - %.1fC\n", barometer.get_temperature());
+    }
+    else {
+        // If measured temperature is too low
+        hal.console->printf("FAIL\nBarometer temperature too low - %.1fC\n", barometer.get_temperature());
+    }
+
+    // verifying pressure data is within reasonable expected values
+    hal.console->printf("Testing barometer pressure within range %.1fPa to %.1fPa -- ", baro_pressure_expectedMin, baro_pressure_expectedMax);
+    bool testResult_checkPressureMax = barometer.get_pressure() <= baro_pressure_expectedMax;
+    summaryTestResult &= testResult_checkPressureMax;
+    bool testResult_checkPressureMin = barometer.get_pressure() >= baro_pressure_expectedMin;
+    summaryTestResult &= testResult_checkPressureMin;
+
+    if (testResult_checkPressureMax && testResult_checkPressureMin){
+        hal.console->printf("PASS\n\n");
+    }
+    else if (!testResult_checkPressureMax){
+        // If measured pressure is too high
+        hal.console->printf("FAIL\nBarometer pressure too high - %.1fPa\n\n", barometer.get_pressure());
+    }
+    else {
+        // If measured pressure is too low
+        hal.console->printf("FAIL\nBarometer pressure too low - %.1fPa\n\n", barometer.get_pressure());
+    }
+
+    return summaryTestResult;
+}
+
+static bool _interactiveTest_Compass(void){
+    // Initialise the compass
+    _initialiseCompass();
+
+    // Verify that the compass sensors exist before continuing
+    if (compass.get_count() < 1){
+        hal.console->printf("No compass sensors found\n");
+        return false;
+    }
+
+    // Check all compass sensors are healthy
+    for (uint8_t i = 0; i < compass.get_count(); i++) {
+        if (!compass.healthy(i)){
+            hal.console->printf("Compass %i not healthy\n",i);
+            return false;
+        }
+    }
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+
+    // Loop through each compass
+    hal.console->printf("Orient the board with the X axis facing towards magnetic north\n");
+    for (uint8_t j = 0; j < compass.get_count(); j++) {
+
+        hal.console->printf("Testing compass %i --- ",j);
+        bool testResult =_interactiveTest_Compass_SingleHeading(j);
+        (testResult) ? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
+        summaryTestResult &= testResult;
+
+    } // Compass loop
+    hal.console->printf("\n");
+
+    return summaryTestResult;
+}
+
+static bool _interactiveTest_Compass_SingleHeading(const int i){
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+
+    // Setup variable to track running average
+    float runningAverage = 180; // initialise to nonzero
+
+    // Poll the compass data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update compass and retrieve data
+        compass.read();
+
+        // calculate the heading offset from magnetic north
+        Matrix3f dcm_matrix;
+        dcm_matrix.from_euler(0, 0, 0); // roll pitch yaw 0
+        float heading = ToDeg(compass.calculate_heading(dcm_matrix, i));
+
+        // Update the running average
+        runningAverage = _approxRunningAverage(runningAverage, abs(heading));
+
+        // Check if compass is aligned with magnetic north
+        if (_checkCompassAlignment(runningAverage)){
+            // If compass is aligned, pass test and continue
+            return true;
+        }
+        hal.scheduler->delay(interactiveTestLoopDelay);
+    }
+    return false;
+}
+
+static bool _interactiveTest_SDCard(void){
+
+    return true;
+}
+
+const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
+    AP_GROUPEND
+};
+GCS_Dummy _gcs;
+
+AP_HAL_MAIN();
+
+
+
+
