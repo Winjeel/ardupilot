@@ -544,8 +544,9 @@ bool Plane::create_into_wind_landing_sequence()
         // Check that the waypoint between this and the DO_LAND_START has been previously modified
         // Otherwise respect the original mission plan
         AP_Mission::Mission_Command intermediate_point_cmd = {};
-        if (plane.mission.get_cmd(desired_loiter_index, intermediate_point_cmd) &&
-                intermediate_point_cmd.is_modified) {
+        bool imtermediate_point_exists = plane.mission.get_cmd(desired_loiter_index, intermediate_point_cmd);
+        if ((imtermediate_point_exists && intermediate_point_cmd.is_modified) ||
+                !plane.mission.is_nav_cmd(intermediate_point_cmd)) {
             gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n", desired_loiter_index);
         } else {
             gcs().send_text(MAV_SEVERITY_DEBUG, "IWL respecing loaded approach waypoint\n");
