@@ -47,13 +47,6 @@ void Storage::_storage_open(void)
         return;
     }
 
-#ifdef USE_POSIX
-    // if we have failed filesystem init don't try again
-    if (log_fd == -1) {
-        return;
-    }
-#endif
-
     _dirty_mask.clearall();
 
 #if HAL_WITH_RAMTRON
@@ -61,6 +54,7 @@ void Storage::_storage_open(void)
         if (fram.read(0, _buffer, CH_STORAGE_SIZE) == CH_STORAGE_SIZE) {
             _save_backup();
             _initialisedType = StorageBackend::FRAM;
+            hal.console->printf("Initialised Storage type=%d\n", _initialisedType);
             return;
         }
     }
@@ -70,42 +64,53 @@ void Storage::_storage_open(void)
     #endif
 
     // allow for FMUv3 with no FRAM chip, fall through to flash storage
-#endif
+#endif // HAL_WITH_RAMTRON
 
 #ifdef STORAGE_FLASH_PAGE
-    // load from storage backend
-    _flash_load();
-    _save_backup();
-    _initialisedType = StorageBackend::Flash;
+        // load from storage backend
+        _flash_load();
+        _save_backup();
+        _initialisedType = StorageBackend::Flash;
 #elif defined(USE_POSIX)
-    // allow for fallback to microSD based storage
-    sdcard_retry();
+        // if we have failed filesystem init don't try again
+        if (log_fd == -1) {
+            return;
+        }
 
-    log_fd = open(HAL_STORAGE_FILE, O_RDWR|O_CREAT);
-    if (log_fd == -1) {
-        hal.console->printf("open failed of " HAL_STORAGE_FILE "\n");
-        return;
-    }
-    int ret = read(log_fd, _buffer, CH_STORAGE_SIZE);
-    if (ret < 0) {
-        hal.console->printf("read failed for " HAL_STORAGE_FILE "\n");
-        close(log_fd);
-        log_fd = -1;
-        return;
-    }
-    // pre-fill to full size
-    if (lseek(log_fd, ret, SEEK_SET) != ret ||
-        write(log_fd, &_buffer[ret], CH_STORAGE_SIZE-ret) != CH_STORAGE_SIZE-ret) {
-        hal.console->printf("setup failed for " HAL_STORAGE_FILE "\n");
-        close(log_fd);
-        log_fd = -1;
-        return;
-    }
-    _save_backup();
-    _initialisedType = StorageBackend::SDCard;
+        // allow for fallback to microSD based storage
+        if (sdcard_retry()) {
+            log_fd = open(HAL_STORAGE_FILE, O_RDWR|O_CREAT);
+            if (log_fd == -1) {
+                hal.console->printf("open failed of " HAL_STORAGE_FILE "\n");
+                return;
+            }
+            int ret = read(log_fd, _buffer, CH_STORAGE_SIZE);
+            if (ret < 0) {
+                hal.console->printf("read failed for " HAL_STORAGE_FILE "\n");
+                close(log_fd);
+                log_fd = -1;
+                return;
+            }
+            // pre-fill to full size
+            if (lseek(log_fd, ret, SEEK_SET) != ret ||
+                write(log_fd, &_buffer[ret], CH_STORAGE_SIZE-ret) != CH_STORAGE_SIZE-ret) {
+                hal.console->printf("setup failed for " HAL_STORAGE_FILE "\n");
+                close(log_fd);
+                log_fd = -1;
+                return;
+            }
+            _save_backup();
+            _initialisedType = StorageBackend::SDCard;
+        }
 #elif !HAL_WITH_RAMTRON
-    #error No Storage Backend!
+        #error No Storage Backend defined!
 #endif
+
+    if (_initialisedType != StorageBackend::None) {
+        hal.console->printf("Initialised Storage type=%d\n", _initialisedType);
+    } else {
+        AP_HAL::panic("Unable to init Storage backend");
+    }
 }
 
 /*
