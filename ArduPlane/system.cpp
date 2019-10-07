@@ -514,7 +514,7 @@ bool Plane::disarm_motors(void)
     return true;
 }
 
-// Adds a lotier to altitude waypoint between a DO_AND_START and MAV_CMD_NAV_LAND command in the mission plan
+// Adds a loiter to altitude waypoint between a MAV_CMD_DO_LAND_START and MAV_CMD_NAV_LAND command in the mission plan
 // that lands the plane into wind with an approach entry and glide-slope specified by parameters.
 // Returns true if the landing sequence was updated
 // Returns false if the  landing sequence was not updated
