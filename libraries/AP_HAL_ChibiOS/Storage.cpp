@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #include <AP_HAL/AP_HAL.h>
@@ -43,64 +43,72 @@ extern const AP_HAL::HAL& hal;
 
 void Storage::_storage_open(void)
 {
-    if (_initialised) {
+    if (_initialisedType != StorageBackend::None) {
         return;
     }
 
-#ifdef USE_POSIX
-    // if we have failed filesystem init don't try again
-    if (log_fd == -1) {
-        return;
-    }
-#endif
-        
     _dirty_mask.clearall();
 
 #if HAL_WITH_RAMTRON
-    using_fram = fram.init();
-    if (using_fram) {
-        if (!fram.read(0, _buffer, CH_STORAGE_SIZE)) {
+    if (fram.init()) {
+        if (fram.read(0, _buffer, CH_STORAGE_SIZE) == CH_STORAGE_SIZE) {
+            _save_backup();
+            _initialisedType = StorageBackend::FRAM;
+            hal.console->printf("Initialised Storage type=%d\n", _initialisedType);
             return;
         }
-        _save_backup();
-        _initialised = true;
-        return;
     }
+
+    #if defined(HAL_RAMTRON_NO_FALLBACK) && HAL_RAMTRON_NO_FALLBACK
+        AP_HAL::panic("Unable to init RAMTRON storage");
+    #endif
+
     // allow for FMUv3 with no FRAM chip, fall through to flash storage
-#endif
+#endif // HAL_WITH_RAMTRON
 
 #ifdef STORAGE_FLASH_PAGE
-    // load from storage backend
-    _flash_load();
+        // load from storage backend
+        _flash_load();
+        _save_backup();
+        _initialisedType = StorageBackend::Flash;
 #elif defined(USE_POSIX)
-    // allow for fallback to microSD based storage
-    sdcard_retry();
-    
-    log_fd = open(HAL_STORAGE_FILE, O_RDWR|O_CREAT);
-    if (log_fd == -1) {
-        hal.console->printf("open failed of " HAL_STORAGE_FILE "\n");
-        return;
-    }
-    int ret = read(log_fd, _buffer, CH_STORAGE_SIZE);
-    if (ret < 0) {
-        hal.console->printf("read failed for " HAL_STORAGE_FILE "\n");
-        close(log_fd);
-        log_fd = -1;
-        return;
-    }
-    // pre-fill to full size
-    if (lseek(log_fd, ret, SEEK_SET) != ret ||
-        write(log_fd, &_buffer[ret], CH_STORAGE_SIZE-ret) != CH_STORAGE_SIZE-ret) {
-        hal.console->printf("setup failed for " HAL_STORAGE_FILE "\n");
-        close(log_fd);
-        log_fd = -1;
-        return;        
-    }
-    using_filesystem = true;
+        // if we have failed filesystem init don't try again
+        if (log_fd == -1) {
+            return;
+        }
+
+        // allow for fallback to microSD based storage
+        if (sdcard_retry()) {
+            log_fd = open(HAL_STORAGE_FILE, O_RDWR|O_CREAT);
+            if (log_fd == -1) {
+                hal.console->printf("open failed of " HAL_STORAGE_FILE "\n");
+                return;
+            }
+            int ret = read(log_fd, _buffer, CH_STORAGE_SIZE);
+            if (ret < 0) {
+                hal.console->printf("read failed for " HAL_STORAGE_FILE "\n");
+                close(log_fd);
+                log_fd = -1;
+                return;
+            }
+            // pre-fill to full size
+            if (lseek(log_fd, ret, SEEK_SET) != ret ||
+                write(log_fd, &_buffer[ret], CH_STORAGE_SIZE-ret) != CH_STORAGE_SIZE-ret) {
+                hal.console->printf("setup failed for " HAL_STORAGE_FILE "\n");
+                close(log_fd);
+                log_fd = -1;
+                return;
+            }
+            _save_backup();
+            _initialisedType = StorageBackend::SDCard;
+        }
 #endif
 
-    _save_backup();
-    _initialised = true;
+    if (_initialisedType != StorageBackend::None) {
+        hal.console->printf("Initialised Storage type=%d\n", _initialisedType);
+    } else {
+        AP_HAL::panic("Unable to init Storage backend");
+    }
 }
 
 /*
@@ -112,11 +120,12 @@ void Storage::_save_backup(void)
 {
 #ifdef USE_POSIX
     // allow for fallback to microSD based storage
-    sdcard_retry();
-    int fd = open(HAL_STORAGE_BACKUP_FILE, O_WRONLY|O_CREAT|O_TRUNC);
-    if (fd != -1) {
-        write(fd, _buffer, CH_STORAGE_SIZE);
-        close(fd);
+    if (sdcard_retry()) {
+        int fd = open(HAL_STORAGE_BACKUP_FILE, O_WRONLY|O_CREAT|O_TRUNC);
+        if (fd != -1) {
+            write(fd, _buffer, CH_STORAGE_SIZE);
+            close(fd);
+        }
     }
 #endif
 }
@@ -140,7 +149,7 @@ void Storage::_mark_dirty(uint16_t loc, uint16_t length)
 
 void Storage::read_block(void *dst, uint16_t loc, size_t n)
 {
-    if (loc >= sizeof(_buffer)-(n-1)) {
+    if ((n > sizeof(_buffer)) || (loc > (sizeof(_buffer) - n))) {
         return;
     }
     _storage_open();
@@ -149,7 +158,7 @@ void Storage::read_block(void *dst, uint16_t loc, size_t n)
 
 void Storage::write_block(uint16_t loc, const void *src, size_t n)
 {
-    if (loc >= sizeof(_buffer)-(n-1)) {
+    if ((n > sizeof(_buffer)) || (loc > (sizeof(_buffer) - n))) {
         return;
     }
     if (memcmp(src, &_buffer[loc], n) != 0) {
@@ -161,7 +170,7 @@ void Storage::write_block(uint16_t loc, const void *src, size_t n)
 
 void Storage::_timer_tick(void)
 {
-    if (!_initialised) {
+    if (_initialisedType == StorageBackend::None) {
         return;
     }
     if (_dirty_mask.empty()) {
@@ -183,16 +192,16 @@ void Storage::_timer_tick(void)
     }
 
 #if HAL_WITH_RAMTRON
-    if (using_fram) {
-        if (fram.write(CH_STORAGE_LINE_SIZE*i, &_buffer[CH_STORAGE_LINE_SIZE*i], CH_STORAGE_LINE_SIZE)) {
+    if (_initialisedType == StorageBackend::FRAM) {
+        if (fram.write(CH_STORAGE_LINE_SIZE*i, &_buffer[CH_STORAGE_LINE_SIZE*i], CH_STORAGE_LINE_SIZE) == CH_STORAGE_LINE_SIZE) {
             _dirty_mask.clear(i);
         }
         return;
-    } 
+    }
 #endif
 
 #ifdef USE_POSIX
-    if (using_filesystem && log_fd != -1) {
+    if ((_initialisedType == StorageBackend::SDCard) && log_fd != -1) {
         uint32_t offset = CH_STORAGE_LINE_SIZE*i;
         if (lseek(log_fd, offset, SEEK_SET) != offset) {
             return;
@@ -205,12 +214,14 @@ void Storage::_timer_tick(void)
         }
         _dirty_mask.clear(i);
         return;
-    } 
+    }
 #endif
-    
+
 #ifdef STORAGE_FLASH_PAGE
-    // save to storage backend
-    _flash_write(i);
+    if (_initialisedType == StorageBackend::Flash) {
+        // save to storage backend
+        _flash_write(i);
+    }
 #endif
 }
 
@@ -223,17 +234,17 @@ void Storage::_flash_load(void)
     _flash_page = STORAGE_FLASH_PAGE;
 
     hal.console->printf("Storage: Using flash pages %u and %u\n", _flash_page, _flash_page+1);
-    
+
     if (!_flash.init()) {
-        AP_HAL::panic("unable to init flash storage");
+        AP_HAL::panic("Unable to init flash storage");
     }
 #else
-    AP_HAL::panic("unable to init storage");
+    AP_HAL::panic("Unable to init storage");
 #endif
 }
 
 /*
-  write one storage line. This also updates _dirty_mask. 
+  write one storage line. This also updates _dirty_mask.
 */
 void Storage::_flash_write(uint16_t line)
 {
@@ -280,10 +291,14 @@ bool Storage::_flash_write_data(uint8_t sector, uint32_t offset, const uint8_t *
  */
 bool Storage::_flash_read_data(uint8_t sector, uint32_t offset, uint8_t *data, uint16_t length)
 {
+#ifdef STORAGE_FLASH_PAGE
     size_t base_address = hal.flash->getpageaddr(_flash_page+sector);
     const uint8_t *b = ((const uint8_t *)base_address)+offset;
     memcpy(data, b, length);
     return true;
+#else
+    return false;
+#endif
 }
 
 /*
@@ -291,6 +306,7 @@ bool Storage::_flash_read_data(uint8_t sector, uint32_t offset, uint8_t *data, u
  */
 bool Storage::_flash_erase_sector(uint8_t sector)
 {
+#ifdef STORAGE_FLASH_PAGE
     for (uint8_t i=0; i<STORAGE_FLASH_RETRIES; i++) {
         if (hal.flash->erasepage(_flash_page+sector)) {
             return true;
@@ -298,6 +314,9 @@ bool Storage::_flash_erase_sector(uint8_t sector)
         hal.scheduler->delay(1);
     }
     return false;
+#else
+    return false;
+#endif
 }
 
 /*
@@ -315,7 +334,8 @@ bool Storage::_flash_erase_ok(void)
  */
 bool Storage::healthy(void)
 {
-    return _initialised && AP_HAL::millis() - _last_empty_ms < 2000;
+    return ((_initialisedType != StorageBackend::None) &&
+            (AP_HAL::millis() - (_last_empty_ms < 2000)));
 }
 
 #endif // HAL_USE_EMPTY_STORAGE

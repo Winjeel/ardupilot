@@ -372,7 +372,7 @@ public:
                                  const char *name, float value);
 
     // load default values for all scalars in the main sketch. This
-    // does not recurse into the sub-objects    
+    // does not recurse into the sub-objects
     static void         setup_sketch_defaults(void);
 
     // find an old parameter and return it.
@@ -444,15 +444,15 @@ public:
     static void         show_all(AP_HAL::BetterStream *port, bool showKeyValues=false);
 
     /// print the value of one variable
-    static void         show(const AP_Param *param, 
+    static void         show(const AP_Param *param,
                              const char *name,
-                             enum ap_var_type ptype, 
+                             enum ap_var_type ptype,
                              AP_HAL::BetterStream *port);
 
     /// print the value of one variable
-    static void         show(const AP_Param *param, 
+    static void         show(const AP_Param *param,
                              const ParamToken &token,
-                             enum ap_var_type ptype, 
+                             enum ap_var_type ptype,
                              AP_HAL::BetterStream *port);
 #endif // AP_PARAM_KEY_DUMP
 
@@ -466,7 +466,8 @@ private:
         uint8_t magic[2];
         uint8_t revision;
         uint8_t spare;
-    };
+    } PACKED;
+    static_assert(sizeof(struct EEPROM_header) == 4, "Bad EEPROM_header size!");
 
 /* This header is prepended to a variable stored in EEPROM.
  *  The meaning is as follows:
@@ -486,7 +487,8 @@ private:
         uint32_t type : 5;
         uint32_t key_high : 1;
         uint32_t group_element : 18;
-    };
+    } PACKED;
+    static_assert(sizeof(struct Param_header) == 4, "Bad Param_header size!");
 
     // number of bits in each level of nesting of groups
     static const uint8_t        _group_level_shift = 6;
@@ -511,7 +513,7 @@ private:
     static const param_defaults_struct param_defaults_data;
 
 
-    static bool                 check_group_info(const struct GroupInfo *group_info, uint16_t *total_size, 
+    static bool                 check_group_info(const struct GroupInfo *group_info, uint16_t *total_size,
                                                  uint8_t max_bits, uint8_t prefix_length);
     static bool                 duplicate_key(uint16_t vindex, uint16_t key);
 
@@ -577,7 +579,7 @@ private:
                                     uint16_t ofs,
                                     uint8_t size);
     static AP_Param *           next_group(
-                                    uint16_t vindex, 
+                                    uint16_t vindex,
                                     const struct GroupInfo *group_info,
                                     bool *found_current,
                                     uint32_t group_base,
