@@ -379,10 +379,8 @@ int16_t AP_Mission::get_next_land_cmd(uint16_t start_index, Mission_Command& cmd
             return -1;
         }
         // if found a "navigation" command then return it
-        if (is_nav_cmd(cmd)) {
-            if (cmd.id == MAV_CMD_NAV_LAND) {
-                return cmd_index;
-            }
+        if (cmd.id == MAV_CMD_NAV_LAND) {
+            return cmd_index;
         }
     }
 
