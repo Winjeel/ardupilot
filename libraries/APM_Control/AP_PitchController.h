@@ -31,6 +31,8 @@ public:
     void autotune_start(void) { autotune.start(); }
     void autotune_restore(void) { autotune.stop(); }
 
+    void doing_flare(void) { _flare_active_time_ms = AP_HAL::millis(); }
+
     const AP_Logger::PID_Info& get_pid_info(void) const { return _pid_info; }
 
 	static const struct AP_Param::GroupInfo var_info[];
@@ -63,5 +65,10 @@ private:
     float _D_gain_modifier = 1.0f;          // Gain modifier applied to the angular rate feedback to prevent excessive slew rate
     AP_Float _slew_rate_max;                // Maximum permitted angular rate control feedback servo slew rate (deg/sec)
     AP_Float _slew_rate_tau;                // Time constant used to recover gain after a slew rate exceedance (sec)
+
+    // flare gain management
+    bool _flare_active_time_ms = 0;
+    AP_Float _flare_gain_scaler_max;        // Maximum gain factor applied to feedback loops during flare
+    float _flare_gain_scaler = 1.0f;
 
 };

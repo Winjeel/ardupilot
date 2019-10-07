@@ -116,6 +116,15 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SRTAU", 10, AP_PitchController, _slew_rate_tau, 0.5f),
 
+	// @Param: FGAIN
+    // @DisplayName: Gain multiplier used during flare
+    // @Description: When the flare flag is set true, deedback gains will be multipied by this factor. The gain multiplier applied will be incresaed over a time constant of PTCH2SRV_TCONST.
+    // @Units: deg/sec
+    // @Range: 1.0 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("FGAIN", 11, AP_PitchController, _flare_gain_scaler_max, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -143,6 +152,18 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	
 	// Get body rate vector (radians/sec)
 	float omega_y = _ahrs.get_gyro().y;
+
+	// apply the additional gain scaler used during flare
+	if (AP_HAL::millis() - _flare_active_time_ms < 100) {
+		if (_flare_gain_scaler < _flare_gain_scaler_max) {
+			_flare_gain_scaler += (_flare_gain_scaler - _flare_gain_scaler_max) * (delta_time / gains.tau);
+		} else {
+			_flare_gain_scaler = _flare_gain_scaler_max;
+		}
+		scaler *= _flare_gain_scaler;
+	} else {
+		_flare_gain_scaler = 1.0f;
+	}
 	
 	// Calculate the pitch rate error (deg/sec) and scale
     float achieved_rate = ToDeg(omega_y);
