@@ -518,7 +518,7 @@ bool Plane::disarm_motors(void)
 // that lands the plane into wind with an approach entry and glide-slope specified by parameters.
 // Returns true if the landing sequence was updated
 // Returns false if the  landing sequence was not updated
-bool Plane::create_landing_sequence()
+bool Plane::create_into_wind_landing_sequence()
 {
 
     // Basic check that there is a DO_LAND_START followed by a MAV_CMD_LAND waypoint

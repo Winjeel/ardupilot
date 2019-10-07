@@ -131,7 +131,7 @@ bool Plane::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 
     case MAV_CMD_DO_LAND_START:
-        plane.create_landing_sequence();
+        plane.create_into_wind_landing_sequence();
         break;
 
     case MAV_CMD_DO_FENCE_ENABLE:
