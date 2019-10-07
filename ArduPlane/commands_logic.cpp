@@ -1065,9 +1065,17 @@ bool Plane::verify_loiter_heading(bool init)
 
     //Get the lat/lon of next Nav waypoint after this one:
     AP_Mission::Mission_Command next_nav_cmd;
-    if (! mission.get_next_nav_cmd(mission.get_current_nav_index() + 1,
-                                   next_nav_cmd)) {
-        //no next waypoint to shoot for -- go ahead and break out of loiter
+    if (!mission.get_next_nav_cmd(mission.get_current_nav_index() + 1, next_nav_cmd)) {
+        // no next waypoint to shoot for -- go ahead and break out of loiter
+        return true;
+    }
+
+    // If the next waypoint is a DO_LAND_START with zero lat/lng, then skip heading verify
+    AP_Mission::Mission_Command next_cmd;
+    if (mission.get_cmd(mission.get_current_nav_index() + 1, next_cmd) &&
+            next_cmd.id == MAV_CMD_DO_LAND_START &&
+            next_cmd.content.location.lat == 0 &&
+            next_cmd.content.location.lng == 0) {
         return true;
     }
 
