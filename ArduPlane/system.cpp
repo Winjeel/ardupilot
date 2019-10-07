@@ -541,7 +541,16 @@ bool Plane::create_landing_sequence()
     if (land_point_index == desired_loiter_index) {
         gcs().send_text(MAV_SEVERITY_DEBUG, "IWL creating approach waypoint %i\n", desired_loiter_index);
     } else if (land_point_index == desired_land_index) {
-        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n", desired_loiter_index);
+        // Check that the waypoint between this and the DO_LAND_START has been previously modified
+        // Otherwise respect the original mission plan
+        AP_Mission::Mission_Command intermediate_point_cmd = {};
+        if (plane.mission.get_cmd(desired_loiter_index, intermediate_point_cmd) &&
+                intermediate_point_cmd.is_modified) {
+            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n", desired_loiter_index);
+        } else {
+            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL respecing loaded approach waypoint\n");
+            return false;
+        }
     } else {
         gcs().send_text(MAV_SEVERITY_DEBUG, "IWL land point index invalid\n");
         return false;
@@ -579,6 +588,7 @@ bool Plane::create_landing_sequence()
     land_loiter_cmd.p1 = fabsf(turn_radius); // radius in metres
     land_loiter_cmd.content.location.loiter_ccw = turn_radius < 0;
     land_loiter_cmd.content.location.loiter_xtrack = 1; // xtrack from tangent exit location
+    land_loiter_cmd.is_modified = true;
 
     // move the location to set up the correct approach path
     land_loiter_cmd.content.location.offset(offsetNE.x, offsetNE.y);
