@@ -535,17 +535,15 @@ bool Plane::create_landing_sequence()
 
     // Check that a MAV_CMD_NAV_LAND command either immediately follows the MAV_CMD_DO_LAND_START command
     // indicating which indicates that an an approach entry waypoint needs to be generated or is located at
-    // the next index, indicating that the previously generated appraoch entry needs to be recalculated.
-    bool create_landing = false;
-    //bool not_updated_recently =  AP_HAL::millis() - plane.mission.last_change_time_ms() > 100
-    if (land_point_index == landing_start_index + 1) {
-        create_landing = true;
-        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL creating approach waypoint %i\n",landing_start_index+1);
-    } else if (land_point_index == landing_start_index + 2) {
-        create_landing = true;
-        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n",landing_start_index+1);
+    // the next index, indicating that the previously generated approach entry needs to be recalculated.
+    uint16_t const desired_loiter_index = landing_start_index + 1;
+    uint16_t const desired_land_index = landing_start_index + 2;
+    if (land_point_index == desired_loiter_index) {
+        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL creating approach waypoint %i\n", desired_loiter_index);
+    } else if (land_point_index == desired_land_index) {
+        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n", desired_loiter_index);
     } else {
-        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL land point invalid index\n");
+        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL land point index invalid\n");
         return false;
     }
 
@@ -556,16 +554,22 @@ bool Plane::create_landing_sequence()
 
     // calculate offset from landing point to centre of a loiter to altitude waypoint that feeds the aircraft into the approach
     const float turn_radius = (float)aparm.loiter_radius; // positive is CW
-    const float approach_length = 100.0f * (float)plane.g.wal_start_height / (float)MAX(plane.g.wal_appraoch_gradient_pct, 5);
+    const float approach_length = 100.0f * (float)plane.g.wal_start_height / (float)MAX(plane.g.wal_approach_gradient_pct, 5);
     Vector2f offsetNE;
     offsetNE.x = approach_length * windUnitVec.x + turn_radius * windUnitVec.y;
     offsetNE.y = approach_length * windUnitVec.y - turn_radius * windUnitVec.x;
 
     // write the land waypoint with space for one intermediate waypoint between it and the DO_LAND_START
-    if (landing_start_index + 3 > plane.mission.num_commands()) {
-        plane.mission.add_cmd(land_point_cmd);
+    if (desired_land_index >= plane.mission.num_commands()) {
+        if (!plane.mission.add_cmd(land_point_cmd)) {
+            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL land point write failed\n");
+            return false;
+        }
     } else {
-        plane.mission.replace_cmd(landing_start_index + 2, land_point_cmd);
+        if (!plane.mission.replace_cmd(desired_land_index, land_point_cmd)) {
+            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL land point write failed\n");
+            return false;
+        }
     }
 
     // create an intermediate loiter to altitude command
@@ -578,12 +582,15 @@ bool Plane::create_landing_sequence()
 
     // move the location to set up the correct approach path
     land_loiter_cmd.content.location.offset(offsetNE.x, offsetNE.y);
-    plane.mission.replace_cmd(landing_start_index + 1, land_loiter_cmd);
+    if (!plane.mission.replace_cmd(desired_loiter_index, land_loiter_cmd)) {
+        gcs().send_text(MAV_SEVERITY_DEBUG, "IWL approach point write failed\n");
+        return false;
+    }
 
     // set index and restart command
     plane.mission.set_current_cmd(landing_start_index+1);
 
     gcs().send_text(MAV_SEVERITY_ALERT, "IWL from %d m and %d deg\n", (int)approach_length, (int)degrees(atan2f(windUnitVec.y,windUnitVec.x)));
 
-    return create_landing;
+    return true;
 }

@@ -71,7 +71,7 @@ public:
         k_param_land_flare_alt, // unused - moved to AP_Landing
         k_param_land_flare_sec, // unused - moved to AP_Landing
         k_param_wal_start_height,
-        k_param_wal_appraoch_gradient_pct,
+        k_param_wal_approach_gradient_pct,
         k_param_throttle_nudge,
         k_param_alt_offset,
         k_param_ins,                // libraries/AP_InertialSensor variables
@@ -455,7 +455,7 @@ public:
     AP_Int8 reset_switch_chan;
     AP_Int8 reset_mission_chan;
     AP_Int8 wal_start_height;
-    AP_Int8 wal_appraoch_gradient_pct;
+    AP_Int8 wal_approach_gradient_pct;
     AP_Int32 RTL_altitude_cm;
     AP_Int16 pitch_trim_cd;
     AP_Int16 FBWB_min_altitude_cm;

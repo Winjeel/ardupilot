@@ -828,7 +828,7 @@ const AP_Param::Info Plane::var_info[] = {
     // @Increment: 1
     // @Range: 5 25
     // @User: SUser
-    GSCALAR(wal_appraoch_gradient_pct, "WAL_GRAD_PCT", 14),
+    GSCALAR(wal_approach_gradient_pct, "WAL_GRAD_PCT", 14),
 
     // @Param: FLAP_IN_CHANNEL
     // @DisplayName: Flap input channel
