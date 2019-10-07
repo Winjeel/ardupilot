@@ -482,6 +482,10 @@ public:
     ///     returns index if found, -1 if not found
     int16_t get_next_land_cmd(uint16_t start_index, Mission_Command& cmd);
 
+    /// get command at the specified index regardless of type
+    /// returns false if no command found at that index
+    bool get_cmd(uint16_t index, Mission_Command& cmd);
+
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 

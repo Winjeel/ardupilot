@@ -1594,6 +1594,14 @@ void AP_Mission::advance_current_do_cmd()
     start_command(_do_cmd);
 }
 
+/// get command at the specified index regardless of type
+/// returns false if no command found at that index
+bool AP_Mission::get_cmd(uint16_t index, Mission_Command& cmd)
+{
+    Mission_Command temp_cmd;
+    return read_cmd_from_storage(index, cmd);
+}
+
 /// get_next_cmd - gets next command found at or after start_index
 ///     returns true if found, false if not found (i.e. mission complete)
 ///     accounts for do_jump commands
