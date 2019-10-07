@@ -11,7 +11,7 @@
  *
  * You should have received a copy of the GNU General Public License along
  * with this program.  If not, see <http://www.gnu.org/licenses/>.
- * 
+ *
  * Code by Andrew Tridgell and Siddharth Bharat Purohit
  */
 #pragma once
@@ -44,7 +44,13 @@ public:
     bool healthy(void) override;
 
 private:
-    volatile bool _initialised;
+    enum StorageBackend {
+        None,
+        FRAM,
+        Flash,
+        SDCard,
+    };
+    volatile enum StorageBackend _initialisedType = StorageBackend::None;
     void _storage_create(void);
     void _storage_open(void);
     void _save_backup(void);
@@ -69,16 +75,14 @@ private:
             FUNCTOR_BIND_MEMBER(&Storage::_flash_erase_sector, bool, uint8_t),
             FUNCTOR_BIND_MEMBER(&Storage::_flash_erase_ok, bool)};
 #endif
-    
+
     void _flash_load(void);
     void _flash_write(uint16_t line);
 
 #if HAL_WITH_RAMTRON
     AP_RAMTRON fram;
-    bool using_fram;
 #endif
 #ifdef USE_POSIX
-    bool using_filesystem;
     int log_fd;
 #endif
 };
