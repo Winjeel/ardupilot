@@ -363,7 +363,8 @@ void Plane::do_land(const AP_Mission::Mission_Command& cmd)
 
     // configure abort altitude and pitch
     // if NAV_LAND has an abort altitude then use it, else use last takeoff, else use 50m
-    if (cmd.p1 > 0) {
+    // handle special case where p1 is being used to store approach sector data as indicated by loiter_xtrack being set
+    if (cmd.p1 > 0 && !cmd.content.location.loiter_xtrack) {
         auto_state.takeoff_altitude_rel_cm = (int16_t)cmd.p1 * 100;
     } else if (auto_state.takeoff_altitude_rel_cm <= 0) {
         auto_state.takeoff_altitude_rel_cm = 3000;
