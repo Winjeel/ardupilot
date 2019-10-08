@@ -782,7 +782,19 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
         break;
 
     case MAV_CMD_NAV_LAND:                              // MAV ID: 21
-        cmd.p1 = packet.param1;                         // abort target altitude(m)  (plane only)
+        if (packet.param3 > 0) {
+            // This is a special case where the p1 parameter is used to store data specifying the sector that a landing approach can be flown
+            // The incoming param3 is used to enable this special case and specity the +- angular width of the sector centred around the angle specified by param1
+            // This enables the landing approach direction to adapt to wind conditions whilst staying within a prescribed arc.
+            // See Plane::create_into_wind_landing_sequence() for more information on how the adaptive approach angle is calculated.
+            cmd.content.location.loiter_xtrack = 1; // The loiter_xtrack flag (normally only used by loiter waypoint types) is used to indicate when p1 contains angle sector and not abort height information.
+            uint16_t nominal_yaw_deg = (uint16_t)round(wrap_360(packet.param1)); // param1 is nominal yaw angle in degrees
+            uint16_t tolerance_deg = MIN((int)packet.param3,180); // param 3 is angular tolerance in degrees
+            cmd.p1 = ((tolerance_deg/2)<<9) | (nominal_yaw_deg & 0x01FF);   // store tolerance in high 7 bits of p1, nominal in low 9 bits of p1
+        } else {
+            cmd.p1 = packet.param1;                         // abort target altitude(m)  (plane only)
+            cmd.content.location.loiter_xtrack = 0;
+        }
         cmd.content.location.loiter_ccw = is_negative(packet.param4); // yaw direction, (plane deepstall only)
         break;
 
@@ -1217,7 +1229,13 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         break;
 
     case MAV_CMD_NAV_LAND:                              // MAV ID: 21
-        packet.param1 = cmd.p1;                        // abort target altitude(m)  (plane only)
+        if (cmd.content.location.loiter_xtrack > 0) {
+            // This is a special case where the p1 parameter is used to store data specifying the sector that a landing approach can be flown
+            // The loiter_xtrack flag (normally only used by loiter waypoint types) is used to indicate when p1 contains angle sector and not abort height information.            packet.param1 = cmd.p1 & 0x01FF;    // yaw angle demand is held in low 9 bits of p1
+            packet.param3 = (cmd.p1 >> 9) * 2;  // yaw angle tolerance is held in high 7 bits of p1
+        } else {
+            packet.param1 = cmd.p1;                        // abort target altitude(m) or approach heaading angle if param3 is non zero (plane only)
+        }
         packet.param4 = cmd.content.location.loiter_ccw ? -1 : 1; // yaw direction, (plane deepstall only)
         break;
 
