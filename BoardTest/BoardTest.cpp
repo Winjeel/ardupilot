@@ -13,6 +13,12 @@ const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
 
+AP_Int32 log_bitmask;
+AP_Logger logger{log_bitmask};
+
+static const struct LogStructure log_structure[256] = {
+    };
+
 // Sensor classes
 static AP_Baro barometer;
 static Compass compass;
@@ -101,6 +107,22 @@ static void _initialiseINS(void){
     EXPECT_DELAY_MS(sensorInitialisationTimeout);
     ins.init(100);
 
+}
+
+static void _initialiseLogger(void){
+    // Function to initialise the logging system
+
+    // Initialise the logging system if it has not been initialised
+    if (!logger.WritesEnabled()){
+        log_bitmask = (uint32_t)-1;
+        logger.Init(log_structure, 0);
+
+        logger.EraseAll();
+        // Removes all existing log files, however throws debug
+        // message in console: Unable to fetch Log File Size: ENOENT
+
+        hal.scheduler->delay(sdCardActivityDelay);
+    }
 }
 
 static void _printHeader(void) {
@@ -332,11 +354,6 @@ static bool _runAllTests_Cervello_Interactive(void){
     // function to run all interrogation tests on the Cervello
     bool summaryTestResult = true;
     
-    // initialise sensors - 
-    hal.console->printf("Initialising Cervello sensor drivers\n\n");
-    EXPECT_DELAY_MS(sensorInitialisationTimeout);
-    _initialiseCompass();
-    
     // run the Accelerometer and Gyro tests
     summaryTestResult &= _interactiveTest_Accel();
     summaryTestResult &= _interactiveTest_Gyro();
@@ -348,8 +365,7 @@ static bool _runAllTests_Cervello_Interactive(void){
     summaryTestResult &= _interactiveTest_Barometer();
 
     // run the SD Card tests
-    summaryTestResult &= _interactiveTest_SDCard(); // TODO
-    hal.console->printf("TODO - SD card test\n");
+    summaryTestResult &= _interactiveTest_SDCard();
 
     hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n");
     return summaryTestResult;
@@ -368,7 +384,6 @@ static bool _testMS5611_probe(void) { // Baro 1, SPI
 
     if (sMS5611_backend) {
         HAL_BARO_1_DRIVER &ms5611 = static_cast<HAL_BARO_1_DRIVER&>(*sMS5611_backend); // MS5611 doesn't have a from() function
-        // TODO: what can we run here to check the status?
         (void)ms5611;
         result = true;
     }
@@ -387,7 +402,7 @@ static bool _testICM20602_probe(void) { // IMU 1, SPI
 
     if (sICM20602_backend) {
         HAL_INS_1_DRIVER &icm20602 = HAL_INS_1_DRIVER::from(*sICM20602_backend);
-        icm20602.start(); // TODO: Any issues if we repeatedly call this?
+        icm20602.start();
         result = icm20602.update();
     }
     return result;
@@ -423,7 +438,6 @@ static bool _testICM20948_mag_probe(void) { // Compass 1, SPI
 
     if (sICM20948_mag_backend) {
         HAL_MAG_1_DRIVER &icm20948_mag = static_cast<HAL_MAG_1_DRIVER&>(*sICM20948_mag_backend);
-        // TODO: what can we run here to check the status?
         (void)icm20948_mag;
         result = true;
     }
@@ -747,8 +761,39 @@ static bool _interactiveTest_Compass_SingleHeading(const int i){
 }
 
 static bool _interactiveTest_SDCard(void){
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)interactiveTestTimeout);
 
-    return true;
+    // Initialise the logging system
+    _initialiseLogger();
+
+    // Verify an SD Card has been detected
+    if (!logger.CardInserted()){
+        hal.console->printf("Could not find SD Card\n");
+        return false;
+    }
+
+    // Retrieve the current number of logfiles
+    const int initialNumLogFiles = logger.get_num_logs();
+
+    // Arm the vehicle to create a new log file
+    logger.set_vehicle_armed(true);
+    hal.scheduler->delay(sdCardActivityDelay);
+
+    // Write a sample message
+    logger.Write_Message("Cervello SD Card Test");
+    hal.scheduler->delay(sdCardActivityDelay);
+
+    // Disarm the vehicle to close the log file
+    logger.set_vehicle_armed(false);
+    logger.StopLogging();
+    hal.scheduler->delay(sdCardActivityDelay);
+
+    // Retrieve the new number of logfiles
+    const int finalNumLogFiles = logger.get_num_logs();
+
+    // Test pass if the logfile was written
+    return finalNumLogFiles > initialNumLogFiles;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
@@ -757,7 +802,3 @@ const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
 GCS_Dummy _gcs;
 
 AP_HAL_MAIN();
-
-
-
-

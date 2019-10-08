@@ -7,6 +7,7 @@
 #define interactiveTestTimeout 10000000 // 10 seconds
 #define probeTestTimeout 5000000 // 5 seconds
 #define interactiveTestLoopDelay 5 // 5 microseconds
+#define sdCardActivityDelay 500 // 500 microseconds
 
 // moving average samples
 #define runningAverageSamples 50

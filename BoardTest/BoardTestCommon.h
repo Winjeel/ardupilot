@@ -5,8 +5,11 @@
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Common/AP_FWVersion.h>
 #include "AP_HAL/AP_HAL.h"
-#include "hwdef.h"
 #include <GCS_MAVLink/GCS_Dummy.h>
+#include <AP_Logger/AP_Logger.h>
+
+// Cervello hardware definition
+#include "hwdef.h"
 
 // Sensor includes
 #include <AP_Baro/AP_Baro_MS5611.h> // Baro 1, SPI
