@@ -562,6 +562,31 @@ bool Plane::create_into_wind_landing_sequence()
     windUnitVec.z = 0.0f;
     windUnitVec.normalize();
 
+    // Get desired approach heading and constrain if necessary
+    // During landing loiter_xtrack is used to indicate if heding constraint data is avaialble
+    // The desired approach heading and tolerance are held in the p1 parameter
+    if (land_point_cmd.content.location.loiter_xtrack > 0) {
+        uint16_t approach_hdg_tol_deg = (land_point_cmd.p1 >> 9) * 2; // yaw angle tolerance is held in high 7 bits of p1
+        if (approach_hdg_tol_deg < 180) {
+            float approach_hdg_dem_deg = land_point_cmd.p1 & 0x01FF; // yaw angle demand is held in low 9 bits of p1
+            approach_hdg_dem_deg = wrap_180(approach_hdg_dem_deg);
+            float approach_iwl_hdg_rad = atan2f(-windUnitVec.y,-windUnitVec.x);
+            float approach_hdg_min_rad = radians(approach_hdg_dem_deg - (float)approach_hdg_tol_deg);
+            float approach_hdg_max_rad = radians(approach_hdg_dem_deg + (float)approach_hdg_tol_deg);
+            approach_hdg_min_rad = wrap_PI(approach_hdg_min_rad);
+            approach_hdg_max_rad = wrap_PI(approach_hdg_max_rad);
+            if (wrap_PI(approach_iwl_hdg_rad - approach_hdg_max_rad) > 0) {
+                // clip to upper limit
+                windUnitVec.x = -cosf(approach_hdg_max_rad);
+                windUnitVec.y = -sinf(approach_hdg_max_rad);
+            } else if (wrap_PI(approach_iwl_hdg_rad - approach_hdg_min_rad) < 0) {
+                // clip to lower limit
+                windUnitVec.x = -cosf(approach_hdg_min_rad);
+                windUnitVec.y = -sinf(approach_hdg_min_rad);
+            }
+        }
+    }
+
     // calculate offset from landing point to centre of a loiter to altitude waypoint that feeds the aircraft into the approach
     const float turn_radius = (float)aparm.loiter_radius; // positive is CW
     const float approach_length = 100.0f * (float)MAX(plane.g.wal_start_height, 10) / (float)MAX(plane.g.wal_approach_gradient_pct, 5);
