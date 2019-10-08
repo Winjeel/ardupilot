@@ -118,8 +118,7 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 
 	// @Param: FGAIN
     // @DisplayName: Gain multiplier used during flare
-    // @Description: When the flare flag is set true, deedback gains will be multipied by this factor. The gain multiplier applied will be incresaed over a time constant of PTCH2SRV_TCONST.
-    // @Units: deg/sec
+    // @Description: When the landing flare manoeuvre commences, autopilot gain will be multipied by a gain factor that increases from a starting value of 1 to a maximum value set by PTCH2SRV_FGAIN over a time constant of PTCH2SRV_TCONST. 
     // @Range: 1.0 2.0
     // @Increment: 0.1
     // @User: Advanced

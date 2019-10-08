@@ -31,6 +31,9 @@ public:
     void autotune_start(void) { autotune.start(); }
     void autotune_restore(void) { autotune.stop(); }
 
+    // When called, this function causes the autopilot gain to be increased by the amount set by PTCH2SRV_FGAIN
+    // with the gain increase being applied over a time constant of PTCH2SRV_TCONST. The Command times out after
+    // 100msec so it should be called on every frame of the attitude controller.
     void doing_flare(void) { _flare_active_time_ms = AP_HAL::millis(); }
 
     const AP_Logger::PID_Info& get_pid_info(void) const { return _pid_info; }
