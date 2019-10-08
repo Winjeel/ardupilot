@@ -549,7 +549,7 @@ bool Plane::create_into_wind_landing_sequence()
                 !plane.mission.is_nav_cmd(intermediate_point_cmd)) {
             gcs().send_text(MAV_SEVERITY_DEBUG, "IWL updating approach waypoint %i\n", desired_loiter_index);
         } else {
-            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL respecing loaded approach waypoint\n");
+            gcs().send_text(MAV_SEVERITY_DEBUG, "IWL respecting loaded approach waypoint\n");
             return false;
         }
     } else {
