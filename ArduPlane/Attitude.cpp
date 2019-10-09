@@ -362,8 +362,8 @@ void Plane::stabilize()
     }
     float speed_scaler = get_speed_scaler();
 
-    // Pitch contrtoller can use higher gains during flare to improve sink rate control
-    // Refer to PTCH2SRV_FGAIN parameter
+    // Pitch controller can use higher gains during flare to improve sink rate control
+    // Refer to PTCH2SRV_FGS_MAX parameter
     if (landing.is_flaring()) {
         pitchController.doing_flare();
     }
