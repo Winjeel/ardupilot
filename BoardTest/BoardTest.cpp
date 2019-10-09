@@ -346,7 +346,7 @@ static bool _runAllTests_Cervello_Probe(void){
     (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
     summaryTestResult &= testResult;
 
-    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n");
+    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n\n");
     return summaryTestResult;
 }
 
@@ -367,7 +367,7 @@ static bool _runAllTests_Cervello_Interactive(void){
     // run the SD Card tests
     summaryTestResult &= _interactiveTest_SDCard();
 
-    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n");
+    hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n\n");
     return summaryTestResult;
 }
 
@@ -787,13 +787,16 @@ static bool _interactiveTest_SDCard(void){
     // Disarm the vehicle to close the log file
     logger.set_vehicle_armed(false);
     logger.StopLogging();
+    hal.console->printf("Testing SD Card --- ");
     hal.scheduler->delay(sdCardActivityDelay);
 
     // Retrieve the new number of logfiles
     const int finalNumLogFiles = logger.get_num_logs();
 
     // Test pass if the logfile was written
-    return finalNumLogFiles > initialNumLogFiles;
+    static bool testResult = finalNumLogFiles > initialNumLogFiles;
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    return testResult;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {

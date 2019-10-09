@@ -1,4 +1,14 @@
 #include "GCS.h"
+#include <AP_Common/AP_FWVersion.h>
+
+WEAK const AP_FWVersion AP_FWVersion::fwver
+{
+    major: 3,
+    minor: 1,
+    patch: 4,
+    fw_type: FIRMWARE_VERSION_TYPE_DEV,
+    fw_string: "Dummy GCS"
+};
 
 const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] {};
 
