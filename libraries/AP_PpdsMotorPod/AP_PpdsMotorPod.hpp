@@ -52,7 +52,6 @@ public:
         float current;
         float voltage;
         float temperature;
-        float consumedAmps;
         uint32_t deltaT_us;
     } AdcData;
 
