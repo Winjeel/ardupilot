@@ -1597,7 +1597,6 @@ void AP_Mission::advance_current_do_cmd()
 /// returns false if no command found at that index
 bool AP_Mission::get_cmd(uint16_t index, Mission_Command& cmd)
 {
-    Mission_Command temp_cmd;
     return read_cmd_from_storage(index, cmd);
 }
 
