@@ -70,8 +70,8 @@ private:
     AP_Float _slew_rate_tau;                // Time constant used to recover gain after a slew rate exceedance (sec)
 
     // flare gain management
-    bool _flare_active_time_ms = 0;
+    uint32_t _flare_active_time_ms = 0;
     AP_Float _flare_gain_scaler_max;        // Maximum gain factor applied to feedback loops during flare
-    uint32_t _flare_gain_scaler = 1.0f;     // gain scaler applied during flare manoeuvre
+    float _flare_gain_scaler = 1.0f;     // gain scaler applied during flare manoeuvre
 
 };
