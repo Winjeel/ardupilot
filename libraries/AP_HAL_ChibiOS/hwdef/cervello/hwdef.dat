@@ -206,6 +206,8 @@ define HAL_HAVE_SAFETY_SWITCH 1
 
 # Enable RAMTROM parameter storage.
 define HAL_WITH_RAMTRON 1
+# Don't allow system to fall back to other NVM if RAMTRON is not working
+define HAL_RAMTRON_NO_FALLBACK 1
 
 # Enable FAT filesystem support (needs a microSD defined via SDIO).
 define HAL_OS_FATFS_IO 1
