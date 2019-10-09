@@ -564,7 +564,7 @@ bool Plane::create_into_wind_landing_sequence()
 
     // calculate offset from landing point to centre of a loiter to altitude waypoint that feeds the aircraft into the approach
     const float turn_radius = (float)aparm.loiter_radius; // positive is CW
-    const float approach_length = 100.0f * (float)plane.g.wal_start_height / (float)MAX(plane.g.wal_approach_gradient_pct, 5);
+    const float approach_length = 100.0f * (float)MAX(plane.g.wal_start_height, 10) / (float)MAX(plane.g.wal_approach_gradient_pct, 5);
     Vector2f offsetNE;
     offsetNE.x = approach_length * windUnitVec.x + turn_radius * windUnitVec.y;
     offsetNE.y = approach_length * windUnitVec.y - turn_radius * windUnitVec.x;
