@@ -1,5 +1,4 @@
 #include "BoardTestUtility.h"
-#include <algorithm>
 
 bool _checkGravityAcceleration(float acceleration){
     // This function checks for the reactive force against gravity
@@ -25,8 +24,8 @@ float _approxRunningAverage(float average, float newSample){
     // https://stackoverflow.com/questions/12636613/how-to-calculate-moving-average-without-keeping-the-count-and-data-total
 }
 
-void _initialiseRandomNumberGenerator(int seed){
-    std::srand(seed);
+void _initialiseRandomNumberGenerator(void){
+    std::srand(rngSeed);
 }
 
 std::vector<int> _createIndexArray(int size, bool jumble){
@@ -38,7 +37,11 @@ std::vector<int> _createIndexArray(int size, bool jumble){
     }
 
     if (jumble){
-        std::random_shuffle(indexArray.begin(), indexArray.end());
+        
+        for (int j = 0; j < size; j++){
+            int k = j + rand() % (size - j);
+            std::swap(indexArray[j], indexArray[k]);
+        }
     }
 
     return indexArray;

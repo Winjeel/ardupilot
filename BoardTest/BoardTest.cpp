@@ -823,7 +823,7 @@ static bool _interactiveTest_RAMTRON(void){
     _initialiseRAMTRON();
 
     // Initialise the random number generator
-    _initialiseRandomNumberGenerator(rngSeed);
+    _initialiseRandomNumberGenerator();
 
     // Setup variable to track test result
     bool summaryTestResult = true;
