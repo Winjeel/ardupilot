@@ -563,7 +563,7 @@ bool Plane::create_into_wind_landing_sequence()
     windUnitVec.normalize();
 
     // Get desired approach heading and constrain if necessary
-    // During landing loiter_xtrack is used to indicate if heding constraint data is avaialble
+    // During landing loiter_xtrack is used to indicate if heading constraint data is available
     // The desired approach heading and tolerance are held in the p1 parameter
     if (land_point_cmd.content.location.loiter_xtrack > 0) {
         uint16_t approach_hdg_tol_deg = (land_point_cmd.p1 >> 9) * 2; // yaw angle tolerance is held in high 7 bits of p1
