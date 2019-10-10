@@ -116,6 +116,14 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("SRTAU", 10, AP_PitchController, _slew_rate_tau, 0.5f),
 
+	// @Param: FGS_MAX
+    // @DisplayName: Flare gain scaler maximum used during flare
+    // @Description: When the landing flare manoeuvre commences, autopilot gain will be multipied by a gain factor that increases from a starting value of 1 to a maximum value set by PTCH2SRV_FGS_MAX over a time constant of PTCH2SRV_TCONST. 
+    // @Range: 1.0 2.0
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("FGS_MAX", 11, AP_PitchController, _flare_gain_scaler_max, 1.0f),
+
     AP_GROUPEND
 };
 
@@ -143,6 +151,19 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	
 	// Get body rate vector (radians/sec)
 	float omega_y = _ahrs.get_gyro().y;
+
+	// apply the additional gain scaler used during flare
+	const float _flare_gain_scaler_max_limited = constrain_float(_flare_gain_scaler_max, 1.0f, 2.0f);
+	if (AP_HAL::millis() - _flare_active_time_ms < 100 && delta_time > 0) {
+		if (_flare_gain_scaler < _flare_gain_scaler_max_limited) {
+			_flare_gain_scaler += (_flare_gain_scaler_max_limited - _flare_gain_scaler) * (delta_time / MIN(gains.tau, delta_time));
+		} else {
+			_flare_gain_scaler = _flare_gain_scaler_max_limited;
+		}
+		scaler *= _flare_gain_scaler;
+	} else {
+		_flare_gain_scaler = 1.0f;
+	}
 	
 	// Calculate the pitch rate error (deg/sec) and scale
     float achieved_rate = ToDeg(omega_y);

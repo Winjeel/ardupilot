@@ -162,11 +162,21 @@ void AP_PpdsMotorPod::update(void) {
                         int idx = 0;
                         decodeAdcState_t(tmp, &idx, &adc);
 
-                        _adc_data.current = adc.current;
-                        _adc_data.voltage = adc.voltage;
-                        _adc_data.temperature = adc.temperature;
+                        if (_adc_data.deltaT_us == 0 || adc.timeDelta_us == 0) {
+                            // use instantaneous values
+                            _adc_data.current = adc.current;
+                            _adc_data.voltage = adc.voltage;
+                            _adc_data.temperature = adc.temperature;
+                        } else {
+                            // calculate running average
+                            _adc_data.current = ((adc.current * adc.timeDelta_us) + (_adc_data.current * _adc_data.deltaT_us)) /
+                                                 (adc.timeDelta_us + _adc_data.deltaT_us);
+                            _adc_data.voltage = ((adc.voltage * adc.timeDelta_us) + (_adc_data.voltage * _adc_data.deltaT_us)) /
+                                                 (adc.timeDelta_us + _adc_data.deltaT_us);
+                            _adc_data.temperature = ((adc.temperature * adc.timeDelta_us) + (_adc_data.temperature * _adc_data.deltaT_us)) /
+                                                     (adc.timeDelta_us + _adc_data.deltaT_us);
+                        }
 
-                        _adc_data.consumedAmps += adc.current;
                         _adc_data.deltaT_us += adc.timeDelta_us;
 
                         _debug_sample(MAV_SEVERITY_DEBUG, "\t\tsequence=%u", adc.sequence);
@@ -262,7 +272,6 @@ bool AP_PpdsMotorPod::getAdcData(AdcData * const adc_data) {
 
 void AP_PpdsMotorPod::clearAdcData(void) {
     WITH_SEMAPHORE(_adc_sem);
-    _adc_data.consumedAmps = 0.0;
     _adc_data.deltaT_us = 0;
 }
 
