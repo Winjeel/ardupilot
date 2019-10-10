@@ -265,6 +265,7 @@ public:
         uint16_t index;             // this commands position in the command list
         uint16_t id;                // mavlink command id
         uint16_t p1;                // general purpose parameter 1
+        bool is_modified;           // true if the uploaded value has been modified - not saved to eeprom
         Content content;
 
         // return a human-readable interpretation of the ID stored in this command
@@ -477,6 +478,14 @@ public:
 
     // returns true if the mission contains the requested items
     bool contains_item(MAV_CMD command) const;
+
+    /// get next MAV_CMD_NAV_LAND - gets next MAV_CMD_NAV_LAND command found at or after start_index
+    ///     returns index if found, -1 if not found
+    int16_t get_next_land_cmd(uint16_t start_index, Mission_Command& cmd);
+
+    /// get command at the specified index regardless of type
+    /// returns false if no command found at that index
+    bool get_cmd(uint16_t index, Mission_Command& cmd);
 
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];

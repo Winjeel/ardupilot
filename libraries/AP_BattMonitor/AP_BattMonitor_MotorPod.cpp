@@ -61,7 +61,7 @@ void AP_BattMonitor_MotorPod::read() {
         _state.temperature = adcData.temperature;
 
         float const kAmpsToMilliAmps = 1000.0f;
-        float milliAmps = ((adcData.consumedAmps * _params._curr_amp_per_volt) + _params._curr_amp_offset) * kAmpsToMilliAmps;
+        float milliAmps = _state.current_amps * kAmpsToMilliAmps;
         float const kMicrosecondsToHours = (1.0f / (60.0f * 60.0f * 1000.0f * 1000.0f));
         float milliAmpHours = milliAmps * adcData.deltaT_us * kMicrosecondsToHours;
 
