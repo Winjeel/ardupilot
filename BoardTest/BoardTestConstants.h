@@ -2,6 +2,9 @@
 
 // board test constants
 
+// random number generator seed
+#define rngSeed 123
+
 // test timeouts
 #define sensorInitialisationTimeout 5000000 // 5 seconds
 #define interactiveTestTimeout 10000000 // 10 seconds

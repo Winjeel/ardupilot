@@ -58,6 +58,7 @@ static bool _testICM20602_probe(void);
 static bool _testICM20948_imu_probe(void);
 static bool _testICM20948_mag_probe(void);
 static bool _testIST8308_probe(void);
+static bool _testRamtron_probe(void);
 
 // interactive test cases - forward declare
 static bool _runAllTests_Cervello_Interactive(void);
@@ -69,6 +70,8 @@ static bool _interactiveTest_Compass(void);
 static bool _interactiveTest_Compass_SingleHeading(const int);
 static bool _interactiveTest_Barometer(void);
 static bool _interactiveTest_SDCard(void);
+static bool _interactiveTest_RAMTRON(void);
+static bool _interactiveTest_RAMTRON_writeValue(uint8_t, bool, bool);
 
 // test items
 const Test kTestItem[] = {
@@ -86,6 +89,7 @@ const Test kTestItem[] = {
     { '5', "Cervello compass tests",        _interactiveTest_Compass,               "Cervello - Test compass.", },
     { '6', "Cervello barometer tests",      _interactiveTest_Barometer,             "Cervello - Test barometer.", },
     { '7', "Cervello SD Card tests",        _interactiveTest_SDCard,                "Cervello - Test SD Card.", },
+    { '8', "Cervello RAMTRON tests",        _interactiveTest_RAMTRON,               "Cervello - Test RAMTRON.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);

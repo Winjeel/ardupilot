@@ -13,16 +13,15 @@ const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
 
-AP_Int32 log_bitmask;
-AP_Logger logger{log_bitmask};
-
-static const struct LogStructure log_structure[256] = {
-    };
-
 // Sensor classes
 static AP_Baro barometer;
 static Compass compass;
 static AP_InertialSensor ins;
+
+// On-board memory classes
+AP_RAMTRON ramtron;
+AP_Int32 log_bitmask;
+AP_Logger logger{log_bitmask};
 
 // Utility classes
 static uint32_t timer;
@@ -123,6 +122,14 @@ static void _initialiseLogger(void){
 
         hal.scheduler->delay(sdCardActivityDelay);
     }
+}
+
+static bool _initialiseRAMTRON(void){
+    bool ramtronStatus = ramtron.init();
+    if (ramtronStatus){
+        hal.console->printf("RAMTRON Memory: %uKB\n", (uint)ramtron.get_size());
+    }
+    return ramtronStatus;
 }
 
 static void _printHeader(void) {
@@ -346,6 +353,11 @@ static bool _runAllTests_Cervello_Probe(void){
     (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
     summaryTestResult &= testResult;
 
+    hal.console->printf("Probing RAMTRON\n");
+    testResult = _testRamtron_probe();
+    (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
+    summaryTestResult &= testResult;
+
     hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n\n");
     return summaryTestResult;
 }
@@ -366,6 +378,9 @@ static bool _runAllTests_Cervello_Interactive(void){
 
     // run the SD Card tests
     summaryTestResult &= _interactiveTest_SDCard();
+
+    // run the RAMTRON tests
+    summaryTestResult &= _interactiveTest_RAMTRON();
 
     hal.console->printf("WARNING - Cervello requires reset to cleanup dirty driver state\n\n");
     return summaryTestResult;
@@ -462,6 +477,10 @@ static bool _testIST8308_probe(void) { // Compass 2, I2C
     return result;
 }
 
+static bool _testRamtron_probe(void){ // RAMTRON
+    return ramtron.init();
+}
+
 static bool _interactiveTest_Accel(void){
     // Initialise the INS
     _initialiseINS();
@@ -494,7 +513,7 @@ static bool _interactiveTest_Accel(void){
                     ptr_to_accel = &ins.get_accel(j).y;
                     break;
 
-                case 2: // Z Axis test
+                default: // Z Axis test
                     if (j==0) {hal.console->printf("Orient the board with the Z axis facing down\n");};
                     ptr_to_accel = &ins.get_accel(j).z;
                     break;
@@ -543,7 +562,7 @@ static bool _interactiveTest_Gyro(void){
                     ptr_to_gyro = &ins.get_gyro(j).y;
                     break;
 
-                case 2: // Z Axis test
+                default: // Z Axis test
                     if (j==0) {hal.console->printf("Rotate the board clockwise around the positive Z axis\n");};
                     ptr_to_gyro = &ins.get_gyro(j).z;
                     break;
@@ -797,6 +816,99 @@ static bool _interactiveTest_SDCard(void){
     static bool testResult = finalNumLogFiles > initialNumLogFiles;
     (testResult) ? hal.console->printf("PASS\n\n") : hal.console->printf("FAIL\n\n");
     return testResult;
+}
+
+static bool _interactiveTest_RAMTRON(void){
+    // Initialise the RAMTRON
+    _initialiseRAMTRON();
+
+    // Initialise the random number generator
+    _initialiseRandomNumberGenerator(rngSeed);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+
+    // Test writing min uint8_t (zero) sequentually
+    uint8_t testValue = 0;
+    hal.console->printf("Testing RAMTRON sequential write/read with value of %u --- ", testValue);
+    summaryTestResult &= _interactiveTest_RAMTRON_writeValue(testValue, false, false);
+    (summaryTestResult)? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
+
+    // Test writing max uint8_t (255) randomly
+    testValue = 256-1;
+    hal.console->printf("Testing RAMTRON random write/read with value of %u --- ", testValue);
+    summaryTestResult &= _interactiveTest_RAMTRON_writeValue(testValue, true, false);
+    (summaryTestResult)? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
+
+    // Test writing random numbers in random order
+    hal.console->printf("Testing RAMTRON random write/read with random numbers -- ");
+    summaryTestResult &= _interactiveTest_RAMTRON_writeValue(0, true, true);
+    (summaryTestResult)? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
+
+    // Write all zeros to reset RAMTRON to a known state
+    _interactiveTest_RAMTRON_writeValue(0, false, false);
+
+    return summaryTestResult;
+}
+
+static bool _interactiveTest_RAMTRON_writeValue(uint8_t valueToWrite, bool randomWrite, bool writeRandomValues){
+
+    // Generate the offsets in RAMTRON memory (either sequential or random) to write data to
+    int ramtronSize = ramtron.get_size();
+    std::vector<int> writeIndexes = _createIndexArray(ramtronSize, randomWrite);
+
+    // Generate test data
+    std::vector<uint8_t> testData;
+    testData.reserve(ramtronSize);
+    for (int i = 0; i < ramtronSize; i++){
+
+        if(writeRandomValues){
+            testData.push_back((uint8_t)rand());
+        }
+        else {
+            testData.push_back(valueToWrite);
+        }       
+    }
+
+    // Write test data to RAMTRON
+    EXPECT_DELAY_MS(interactiveTestTimeout);
+
+    for (int j = 0; j < ramtronSize; j++){
+        uint8_t writeSuccess = ramtron.write(writeIndexes[j], &testData[j], sizeof(uint8_t));
+
+        // Verify data was successfully written
+        if (writeSuccess==0){
+            hal.console->printf("Write failure at index %u --- ",(uint)writeIndexes[j]);
+            return false;
+        }
+    }
+
+    // Read data back from RAMTRON,
+    std::vector<uint8_t> readbackData;
+    readbackData.reserve(ramtronSize);
+    
+    for (int k = 0; k < ramtronSize; k++){
+        uint8_t readSuccess = ramtron.read(writeIndexes[k], &readbackData[k], sizeof(uint8_t));
+
+        // Verify data was successfully read
+        if (readSuccess==0){
+            hal.console->printf("Read failure at index %i --- ", writeIndexes[k]);
+            return false;
+        }
+    }
+
+    // Compare the values of the written data to the read data
+    for (int l = 0; l < ramtronSize; l++){
+
+        //hal.console->printf("index %i - Written Value: %u Read Value %u \n", l, testData[l], readbackData[l]);
+
+        if (testData[l] != readbackData[l]){
+            hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", l, testData[l], readbackData[l]);
+            return false;                    
+        }
+    }
+
+    return true;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
