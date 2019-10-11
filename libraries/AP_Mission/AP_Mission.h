@@ -272,6 +272,9 @@ public:
         const char *type() const;
     };
 
+    static bool isAngleSectorLanding(const AP_Mission::Mission_Command& cmd) {
+        return cmd.id == MAV_CMD_NAV_LAND && cmd.content.location.loiter_xtrack > 0;
+    }
 
     // main program function pointers
     FUNCTOR_TYPEDEF(mission_cmd_fn_t, bool, const Mission_Command&);

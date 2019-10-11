@@ -1229,7 +1229,7 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         break;
 
     case MAV_CMD_NAV_LAND:                              // MAV ID: 21
-        if (cmd.content.location.loiter_xtrack > 0) {
+        if (isAngleSectorLanding(cmd)) {
             // This is a special case where the p1 parameter is used to store data specifying the sector that a landing approach can be flown
             // The loiter_xtrack flag (normally only used by loiter waypoint types) is used to indicate when p1 contains angle sector and not abort height information.            packet.param1 = cmd.p1 & 0x01FF;    // yaw angle demand is held in low 9 bits of p1
             packet.param3 = (cmd.p1 >> 9) * 2;  // yaw angle tolerance is held in high 7 bits of p1
