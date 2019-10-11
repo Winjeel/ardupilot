@@ -276,6 +276,10 @@ public:
         return cmd.id == MAV_CMD_NAV_LAND && cmd.content.location.loiter_xtrack > 0;
     }
 
+    // packs and unpacks landing approach sector data in and out of the Mission_Command p1 parameter
+    static uint16_t packAngleSectorParam(uint16_t const nominal_yaw_deg, uint16_t const tolerance_deg);
+    static void unpackAngleSectorParam(uint16_t const param, uint16_t& nominal_yaw_deg, uint16_t& tolerance_deg);
+
     // main program function pointers
     FUNCTOR_TYPEDEF(mission_cmd_fn_t, bool, const Mission_Command&);
     FUNCTOR_TYPEDEF(mission_complete_fn_t, void);
@@ -596,6 +600,13 @@ private:
     bool start_command_do_servorelayevents(const AP_Mission::Mission_Command& cmd);
     bool start_command_camera(const AP_Mission::Mission_Command& cmd);
     bool start_command_parachute(const AP_Mission::Mission_Command& cmd);
+
+    // definitions used to retrieve and store data landing approach sector data
+    #define TOLERANCE_BITS (7)
+    #define TOLERANCE_RESOLUTION (2)
+    #define NOMINAL_YAW_BITS (9)
+    static const uint16_t NOMINAL_YAW_MASK = ((1 << NOMINAL_YAW_BITS ) - 1);
+
 };
 
 namespace AP {
