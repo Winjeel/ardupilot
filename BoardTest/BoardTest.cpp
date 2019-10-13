@@ -321,13 +321,11 @@ static void _consoleKeypress(void){
     }
 }
 
-static uint16_t ATECC608_crc16(const uint8_t data[], size_t length)
+static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0)
 {
     if (data == NULL || length == 0) {
         return 0;
     }
-
-    uint16_t crc = 0;
 
     for (size_t i = 0; i < length; i++) {
         for (uint8_t shift = 0x01; shift > 0x00; shift <<= 1) {
@@ -355,37 +353,44 @@ static bool _hasATECC608(void) {
         return false;
     }
 
+    enum class ATECC608_Reg : uint8_t {
+        Command = 0x03,
+    };
+
+    enum class ATECC608_Opcode : uint8_t {
+        Info = 0x30,
+    };
+
     typedef struct {
-        uint8_t reg;
-        uint8_t cnt;
-        uint8_t opcode;
+        enum ATECC608_Reg reg;
+        uint8_t sz;
+        enum ATECC608_Opcode opcode;
         uint8_t param1;
         uint16_t param2;
         // TODO: optional data goes here
         uint16_t crc;
-
     } PACKED ATECC608_Command;
 
     ATECC608_Command command = {
-        0x03, // Command Register
+        ATECC608_Reg::Command,
         7,    // number of bytes
-        0x30, // Info opcode
+        ATECC608_Opcode::Info,
         0,    // param 1 -> Get Chip Revision
         0,    // param 2 -> unused
         0,    // CRC
     };
 
     // TODO: check endianness of CRC
-    command.crc = ATECC608_crc16(&command.cnt, 8 - 3);
+    command.crc = ATECC608_crc16(&command.sz, 8 - 3);
 
     typedef struct {
-        uint8_t cnt;
+        uint8_t sz;
         uint8_t data[4];
         uint16_t crc;
-    } PACKED Response;
-    Response info;
+    } PACKED ATECC608_Response;
+    ATECC608_Response info;
 
-    if (!dev->transfer(&command.reg, sizeof(command), &info.cnt, sizeof(info))) {
+    if (!dev->transfer((uint8_t * const)&command.reg, sizeof(command), &info.sz, sizeof(info))) {
         hal.console->printf("    Couldn't transfer data to/from ATECC608 device.\n");
         return false;
     }
@@ -393,12 +398,12 @@ static bool _hasATECC608(void) {
     hal.console->printf("    Got ATECC608 Revision = [0x%02x 0x%02x 0x%02x 0x%02x]\n",
                         info.data[0], info.data[1], info.data[2], info.data[3]); // expect [0x00 0x00, 0x50, 0x00]
 
-    if (info.cnt != command.cnt) {
+    if (info.sz != command.sz) {
         hal.console->printf("    ...but the size was wrong!\n");
         return false;
     }
 
-    if (info.crc != ATECC608_crc16(&info.cnt, 5)) {
+    if (info.crc != ATECC608_crc16(&info.sz, 5)) {
         hal.console->printf("    ...but the CRC was wrong!\n");
         return false;
     }
