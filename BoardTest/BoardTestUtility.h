@@ -4,10 +4,9 @@
 #include <AP_Math/definitions.h> // GRAVITY_MSS
 #include <vector>
 
-bool _checkGravityAcceleration(float);
-bool _checkRotation(float);
-bool _checkCompassAlignment(float);
-float _approxRunningAverage(float, float);
+bool _checkGravityAcceleration(float acceleration);
+bool _checkRotation(float rotation);
+bool _checkCompassAlignment(float headingDeg);
+float _approxRunningAverage(float average, float newSample);
 
 void _initialiseRandomNumberGenerator(void);
-std::vector<int> _createIndexArray(int, bool);

@@ -3,7 +3,7 @@
 // board test constants
 
 // random number generator seed
-#define rngSeed 123
+#define rngSeed 1234
 
 // test timeouts
 #define sensorInitialisationTimeout 5000000 // 5 seconds
@@ -28,3 +28,5 @@
 // cervello compass constants
 #define compass_northPointing_tol (float)10 // Degrees
 
+// cervello RAMTRON size
+#define cervelloRamtronSize 16384

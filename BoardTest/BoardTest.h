@@ -3,7 +3,7 @@
 #include "BoardTestCommon.h"
 #include "BoardTestUtility.h"
 
-// RGB class
+// RGB structs
 struct RGB {
     uint8_t r;
     uint8_t g;
@@ -21,7 +21,7 @@ struct RGB rgb[] = {
     { 1, 1, 1, }, // white
 };
 
-// Test classes
+// Test structs
 typedef bool (*TestFn)(void);
 
 typedef struct {
@@ -31,13 +31,18 @@ typedef struct {
     char const * const description;
 } Test;
 
+char const * kResultStr[]  = {
+    "FAIL\n",
+    "PASS\n",
+};
+
 // main functions - forward declare
 void setup();
 void loop();
 
 // LED functions - forward declare
 static void _initialiseLED(void);
-static void _setLED_RGB(struct RGB);
+static void _setLED_RGB(struct RGB rgb);
 void _updateLED(void);
 
 // test functions - forward declare
@@ -45,33 +50,35 @@ static bool _reboot(void);
 static bool _runAll(void);
 static bool _executeTest(Test const * const);
 static bool _testNotImplemented(void);
-static char const * _getResultStr(bool);
+static char const * _getResultStr(bool result);
 static void _consoleKeypress(void);
 
 static void _printHeader(void);
 static bool _printInstructions(void);
+static void _printDriverWarning(void);
 
 // cervello probe test cases - forward declare
-static bool _runAllTests_Cervello_Probe(void);
-static bool _testMS5611_probe(void);
-static bool _testICM20602_probe(void);
-static bool _testICM20948_imu_probe(void);
-static bool _testICM20948_mag_probe(void);
-static bool _testIST8308_probe(void);
-static bool _testRamtron_probe(void);
+static bool _cervello_runAllProbeTests(void);
+static bool _cervello_probeMS5611(void);
+static bool _cervello_probeICM20602(void);
+static bool _cervello_probeICM20948imu(void);
+static bool _cervello_probeICM20948mag(void);
+static bool _cervello_probeIST8308(void);
+static bool _cervello_probeRAMTRON(void);
 
-// interactive test cases - forward declare
-static bool _runAllTests_Cervello_Interactive(void);
-static bool _interactiveTest_Accel(void);
-static bool _interactiveTest_Gyro(void);
-static bool _interactiveTest_Accel_SingleAxis(const float*);
-static bool _interactiveTest_Gyro_SingleAxis(const float*);
-static bool _interactiveTest_Compass(void);
-static bool _interactiveTest_Compass_SingleHeading(const int);
-static bool _interactiveTest_Barometer(void);
-static bool _interactiveTest_SDCard(void);
-static bool _interactiveTest_RAMTRON(void);
-static bool _interactiveTest_RAMTRON_writeValue(uint8_t, bool, bool);
+// cervello interactive test cases - forward declare
+static bool _cervello_runAllInteractiveTests(void);
+static bool _cervello_interactiveAccel(void);
+static bool _cervello_interactiveGyro(void);
+static bool _cervello_interactiveAccel_SingleAxis(float const * const accelSensor);
+static bool _cervello_interactiveGyro_SingleAxis(float const * const gyroSensor);
+static bool _cervello_interactiveCompass(void);
+static bool _cervello_interactiveCompass_SingleHeading(const int i);
+static bool _cervello_interactiveBarometer(void);
+static bool _cervello_interactiveSDCard(void);
+static bool _cervello_interactiveRAMTRON(void);
+static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite);
+static bool _cervello_interactiveRAMTRON_writeRandom(void);
 
 // test items
 const Test kTestItem[] = {
@@ -80,16 +87,16 @@ const Test kTestItem[] = {
     { 'a', nullptr,              _runAll,            "Run all tests.", },
 
     // All cervello tests
-    { '1', "Cervello probe tests",          _runAllTests_Cervello_Probe,            "Cervello - Test if all sensors can be discovered.", },
-    { '2', "Cervello interactive tests",    _runAllTests_Cervello_Interactive,      "Cervello - Verify data from all sensors.", },
+    { '1', "Cervello probe tests",          _cervello_runAllProbeTests,            "Cervello - Test if all sensors can be discovered.", },
+    { '2', "Cervello interactive tests",    _cervello_runAllInteractiveTests,      "Cervello - Verify data from all sensors.", },
 
-    // Interactive tests
-    { '3', "Cervello accelerometer tests",  _interactiveTest_Accel,                 "Cervello - Test accelerometers.", },
-    { '4', "Cervello gyro tests",           _interactiveTest_Gyro,                  "Cervello - Test gyros.", },
-    { '5', "Cervello compass tests",        _interactiveTest_Compass,               "Cervello - Test compass.", },
-    { '6', "Cervello barometer tests",      _interactiveTest_Barometer,             "Cervello - Test barometer.", },
-    { '7', "Cervello SD Card tests",        _interactiveTest_SDCard,                "Cervello - Test SD Card.", },
-    { '8', "Cervello RAMTRON tests",        _interactiveTest_RAMTRON,               "Cervello - Test RAMTRON.", },
+    // Cervallo interactive tests
+    { '3', "Cervello accelerometer tests",  _cervello_interactiveAccel,                 "Cervello - Test accelerometers.", },
+    { '4', "Cervello gyro tests",           _cervello_interactiveGyro,                  "Cervello - Test gyros.", },
+    { '5', "Cervello compass tests",        _cervello_interactiveCompass,               "Cervello - Test compass.", },
+    { '6', "Cervello barometer tests",      _cervello_interactiveBarometer,             "Cervello - Test barometer.", },
+    { '7', "Cervello SD Card tests",        _cervello_interactiveSDCard,                "Cervello - Test SD Card.", },
+    { '8', "Cervello RAMTRON tests",        _cervello_interactiveRAMTRON,               "Cervello - Test RAMTRON.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
