@@ -6,7 +6,6 @@
 
 bool _checkGravityAcceleration(float acceleration);
 bool _checkRotation(float rotation);
-bool _checkCompassAlignment(float headingDeg);
 float _approxRunningAverage(float average, float newSample);
 
 void _initialiseRandomNumberGenerator(void);

@@ -26,7 +26,7 @@
 #define baro_pressure_expectedMax (float)104000 // Pascals
 
 // cervello compass constants
-#define compass_northPointing_tol (float)10 // Degrees
+#define compassRotationTolerance (float)90 // Degrees
 
 // cervello RAMTRON size
 #define cervelloRamtronSize 16384

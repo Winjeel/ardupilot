@@ -12,11 +12,6 @@ bool _checkRotation(float rotation){
     return rotation > ins_gyro_tol;
 }
 
-bool _checkCompassAlignment(float headingDeg){
-    // This function checks for if the compass is aligned with magnetic north
-    return abs(headingDeg) < compass_northPointing_tol;
-}
-
 float _approxRunningAverage(float average, float newSample){
     average -= average / runningAverageSamples;
     average += newSample / runningAverageSamples;

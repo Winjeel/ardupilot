@@ -656,7 +656,7 @@ static bool _cervello_interactiveBarometer(void){
     barometer.update();
 
     // verifying temperature data is within reasonable expected values
-    hal.console->printf("Testing barometer temperature within range %.1fC to %.1fC -- ", baro_temp_expectedMin, baro_temp_expectedMax);
+    hal.console->printf("Testing barometer temperature within range %.1fC to %.1fC -- Baro temperature: %.1fC -- ", baro_temp_expectedMin, baro_temp_expectedMax,barometer.get_temperature());
     bool testResult_checkTempMax = barometer.get_temperature() <= baro_temp_expectedMax;
     summaryTestResult &= testResult_checkTempMax;
     bool testResult_checkTempMin = barometer.get_temperature() >= baro_temp_expectedMin;
@@ -675,7 +675,7 @@ static bool _cervello_interactiveBarometer(void){
     }
 
     // verifying pressure data is within reasonable expected values
-    hal.console->printf("Testing barometer pressure within range %.1fPa to %.1fPa -- ", baro_pressure_expectedMin, baro_pressure_expectedMax);
+    hal.console->printf("Testing barometer pressure within range %.1fPa to %.1fPa -- Baro pressure: %.1fPa -- ", baro_pressure_expectedMin, baro_pressure_expectedMax, barometer.get_pressure());
     bool testResult_checkPressureMax = barometer.get_pressure() <= baro_pressure_expectedMax;
     summaryTestResult &= testResult_checkPressureMax;
     bool testResult_checkPressureMin = barometer.get_pressure() >= baro_pressure_expectedMin;
@@ -718,7 +718,7 @@ static bool _cervello_interactiveCompass(void){
     bool summaryTestResult = true;
 
     // Loop through each compass
-    hal.console->printf("Orient the board with the X axis facing towards magnetic north\n");
+    hal.console->printf("Rotate the board %.0f Degrees around the Z axis\n", compassRotationTolerance);
     for (uint8_t j = 0; j < compass.get_count(); j++) {
 
         hal.console->printf("Testing compass %i --- ",j);
@@ -740,8 +740,12 @@ static bool _cervello_interactiveCompass_SingleHeading(const int i){
     uint32_t testStartTime = AP_HAL::micros();
     uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
 
-    // Setup variable to track running average
-    float runningAverage = 180; // initialise to nonzero
+    // Calculate a reference compass heading
+    compass.read();
+    Matrix3f dcm_matrix;
+    dcm_matrix.from_euler(0, 0, 0); // roll pitch yaw 0
+    float referenceHeading = ToDeg(compass.calculate_heading(dcm_matrix, i));
+    // NOTE: this may not be the magnetic heading as that the compass may not have been calibrated
 
     // Poll the compass data
     while(AP_HAL::micros() < testEndTime){
@@ -749,17 +753,12 @@ static bool _cervello_interactiveCompass_SingleHeading(const int i){
         // Update compass and retrieve data
         compass.read();
 
-        // calculate the heading offset from magnetic north
-        Matrix3f dcm_matrix;
-        dcm_matrix.from_euler(0, 0, 0); // roll pitch yaw 0
-        float heading = ToDeg(compass.calculate_heading(dcm_matrix, i));
+        // calculate the new heading
+        float newHeading = ToDeg(compass.calculate_heading(dcm_matrix, i));
 
-        // Update the running average
-        runningAverage = _approxRunningAverage(runningAverage, abs(heading));
-
-        // Check if compass is aligned with magnetic north
-        if (_checkCompassAlignment(runningAverage)){
-            // If compass is aligned, pass test and continue
+        // Check if compass has been rotated
+        if (abs(referenceHeading - newHeading) >= compassRotationTolerance){
+            // If compass has detected a rotation, pass test and continue
             return true;
         }
         hal.scheduler->delay(interactiveTestLoopDelay);
