@@ -99,7 +99,6 @@ GTAGS
 config.mk
 *.apj
 .gdbinit
-/.vscode
 Parameters.html
 Parameters.md
 Parameters.rst
@@ -112,7 +111,7 @@ parameters.edn
 cmake-build-*/
 /reports/
 /GCOV_*.log
-
+/.vscode/
 # ignore test executables
 /libraries/*/test/test_*
 # don't ignore source files

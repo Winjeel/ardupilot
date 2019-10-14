@@ -129,7 +129,7 @@ def get_alt_function(mcu, pin, function):
     if function.endswith('_TXINV') or function.endswith('_RXINV'):
         # RXINV and TXINV are special labels for inversion pins, not alt-functions
         return None
-    
+
     if hasattr(lib, "AltFunction_map"):
         alt_map = lib.AltFunction_map
     else:
@@ -467,7 +467,7 @@ def get_config(name, column=0, required=True, default=None, type=None, spaces=Fa
         ret = ' '.join(config[name][column:])
     else:
         ret = config[name][column]
-    
+
     if type is not None:
         if type == int and ret.startswith('0x'):
             try:
@@ -536,7 +536,7 @@ def write_mcu_config(f):
          f.write('#define HAL_USE_MMC_SPI TRUE\n')
          f.write('#define HAL_USE_SDC FALSE\n')
          f.write('#define HAL_SDCARD_SPI_HOOK TRUE\n')
-         build_flags.append('USE_FATFS=yes') 
+         build_flags.append('USE_FATFS=yes')
     else:
         f.write('#define HAL_USE_SDC FALSE\n')
         build_flags.append('USE_FATFS=no')
@@ -599,7 +599,7 @@ def write_mcu_config(f):
     build_info = lib.build
 
     if mcu_series == "STM32F100":
-        cortex = "cortex-m3"        
+        cortex = "cortex-m3"
         env_vars['CPU_FLAGS'] = ["-mcpu=%s" % cortex]
         build_info['MCU'] = cortex
     else:
@@ -616,7 +616,7 @@ def write_mcu_config(f):
     # setup for bootloader build
     if args.bootloader:
         f.write('''
-#define HAL_BOOTLOADER_BUILD TRUE        
+#define HAL_BOOTLOADER_BUILD TRUE
 #define HAL_USE_ADC FALSE
 #define HAL_USE_EXT FALSE
 #define HAL_NO_UARTDRIVER
@@ -631,7 +631,7 @@ def write_mcu_config(f):
 #define CH_CFG_USE_OBJ_FIFOS FALSE
 #define CH_DBG_FILL_THREADS FALSE
 #define CH_CFG_USE_SEMAPHORES FALSE
-#define CH_CFG_USE_HEAP FALSE        
+#define CH_CFG_USE_HEAP FALSE
 #define CH_CFG_USE_MUTEXES FALSE
 #define CH_CFG_USE_CONDVARS FALSE
 #define CH_CFG_USE_CONDVARS_TIMEOUT FALSE
@@ -764,12 +764,16 @@ def write_SPI_config(f):
     f.write('#define HAL_SPI_BUS_LIST %s\n\n' % ','.join(devlist))
     write_SPI_table(f)
 
-def parse_spi_device(dev):
-    '''parse a SPI:xxx device item'''
+def get_spi_device_name(dev):
+    '''get name from a SPI:xxx device item'''
     a = dev.split(':')
     if len(a) != 2:
         error("Bad SPI device: %s" % dev)
-    return 'hal.spi->get_device("%s")' % a[1]
+    return a[1]
+
+def generate_spi_get_device(dev):
+    '''parse a SPI:xxx device item'''
+    return 'hal.spi->get_device("%s")' % get_spi_device_name(dev)
 
 def parse_i2c_device(dev):
     '''parse a I2C:xxx:xxx device item'''
@@ -777,39 +781,60 @@ def parse_i2c_device(dev):
     if len(a) != 3:
         error("Bad I2C device: %s" % dev)
     busaddr = int(a[2],base=0)
+    strict = get_config('DEVICE_TEST_CODE', type=int, required=False)
+
     if a[1] == 'ALL_EXTERNAL':
+        if strict:
+            error("Expected specific I2C device, got %s" % a[1])
         return ('FOREACH_I2C_EXTERNAL(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
     elif a[1] == 'ALL_INTERNAL':
+        if strict:
+            error("Expected specific I2C device, got %s" % a[1])
         return ('FOREACH_I2C_INTERNAL(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
     elif a[1] == 'ALL':
+        if strict:
+            error("Expected specific I2C device, got %s" % a[1])
         return ('FOREACH_I2C(b)', 'hal.i2c_mgr->get_device(b,0x%02x)' % (busaddr))
-    busnum = int(a[1])
-    return ('', 'hal.i2c_mgr->get_device(%u,0x%02x)' % (busnum, busaddr))
+    else:
+        busnum = int(a[1])
+        return ('', 'hal.i2c_mgr->get_device(%u,0x%02x)' % (busnum, busaddr))
 
 def write_IMU_config(f):
     '''write IMU config defines'''
     global imu_list
-    devlist = []
+    probe_list = []
     wrapper = ''
+    n = 1
+    gen_test_code = get_config('DEVICE_TEST_CODE', type=int, required=False)
     for dev in imu_list:
         driver = dev[0]
         for i in range(1,len(dev)):
             if dev[i].startswith("SPI:"):
-                dev[i] = parse_spi_device(dev[i])
+                dev[i] = generate_spi_get_device(dev[i])
             elif dev[i].startswith("I2C:"):
                 (wrapper, dev[i]) = parse_i2c_device(dev[i])
-        n = len(devlist)+1
-        devlist.append('HAL_INS_PROBE%u' % n)
+        backend_def = 'HAL_INS_%u_ADD_BACKEND' % n
+        if gen_test_code:
+            f.write(
+                '#define HAL_INS_%u_DRIVER AP_InertialSensor_%s\n'
+                % (n, driver))
         f.write(
-            '#define HAL_INS_PROBE%u %s ADD_BACKEND(AP_InertialSensor_%s::probe(*this,%s))\n'
-            % (n, wrapper, driver, ','.join(dev[1:])))
-    if len(devlist) > 0:
-        f.write('#define HAL_INS_PROBE_LIST %s\n\n' % ';'.join(devlist))
+            '#define HAL_INS_%u_PROBE(frontend) AP_InertialSensor_%s::probe(frontend, %s)\n'
+            % (n, driver, ', '.join(dev[1:])))
+        f.write(
+            '#define %s %s ADD_BACKEND(HAL_INS_%u_PROBE(*this))\n'
+            % (backend_def, wrapper, n))
+        probe_list.append(backend_def)
+        n = n + 1
+    if len(probe_list) > 0:
+        f.write('#define HAL_INS_PROBE_LIST %s\n\n' % ';'.join(probe_list))
 
 def write_MAG_config(f):
-    '''write IMU config defines'''
+    '''write MAG config defines'''
     global compass_list
-    devlist = []
+    probe_list = []
+    n = 1
+    gen_test_code = get_config('DEVICE_TEST_CODE', type=int, required=False)
     for dev in compass_list:
         driver = dev[0]
         probe = 'probe'
@@ -820,21 +845,31 @@ def write_MAG_config(f):
             probe = a[1]
         for i in range(1,len(dev)):
             if dev[i].startswith("SPI:"):
-                dev[i] = parse_spi_device(dev[i])
+                dev[i] = generate_spi_get_device(dev[i])
             elif dev[i].startswith("I2C:"):
                 (wrapper, dev[i]) = parse_i2c_device(dev[i])
-        n = len(devlist)+1
-        devlist.append('HAL_MAG_PROBE%u' % n)
+        backend_def = 'HAL_MAG_%u_ADD_BACKEND' % n
+        if gen_test_code:
+            f.write(
+                '#define HAL_MAG_%u_DRIVER AP_Compass_%s\n'
+                % (n, driver))
         f.write(
-            '#define HAL_MAG_PROBE%u %s ADD_BACKEND(DRIVER_%s, AP_Compass_%s::%s(%s))\n'
-            % (n, wrapper, driver, driver, probe, ','.join(dev[1:])))
-    if len(devlist) > 0:
-        f.write('#define HAL_MAG_PROBE_LIST %s\n\n' % ';'.join(devlist))
+            '#define HAL_MAG_%u_PROBE AP_Compass_%s::%s(%s)\n'
+            % (n, driver, probe, ', '.join(dev[1:])))
+        f.write(
+            '#define %s %s ADD_BACKEND(DRIVER_%s, HAL_MAG_%u_PROBE)\n'
+            % (backend_def, wrapper, driver, n))
+        probe_list.append(backend_def)
+        n = n + 1
+    if len(probe_list) > 0:
+        f.write('#define HAL_MAG_PROBE_LIST %s\n\n' % ';'.join(probe_list))
 
 def write_BARO_config(f):
     '''write barometer config defines'''
     global baro_list
-    devlist = []
+    probe_list = []
+    n = 1
+    gen_test_code = get_config('DEVICE_TEST_CODE', type=int, required=False)
     for dev in baro_list:
         driver = dev[0]
         probe = 'probe'
@@ -845,19 +880,27 @@ def write_BARO_config(f):
             probe = a[1]
         for i in range(1,len(dev)):
             if dev[i].startswith("SPI:"):
-                dev[i] = parse_spi_device(dev[i])
+                dev[i] = generate_spi_get_device(dev[i])
             elif dev[i].startswith("I2C:"):
                 (wrapper, dev[i]) = parse_i2c_device(dev[i])
                 if dev[i].startswith('hal.i2c_mgr'):
                     dev[i] = 'std::move(%s)' % dev[i]
-        n = len(devlist)+1
-        devlist.append('HAL_BARO_PROBE%u' % n)
+        backend_def = 'HAL_BARO_%u_ADD_BACKEND' % n
+        if gen_test_code:
+            f.write(
+                '#define HAL_BARO_%u_DRIVER AP_Baro_%s\n'
+                % (n, driver))
         f.write(
-            '#define HAL_BARO_PROBE%u %s ADD_BACKEND(AP_Baro_%s::%s(*this,%s))\n'
-            % (n, wrapper, driver, probe, ','.join(dev[1:])))
-    if len(devlist) > 0:
-        f.write('#define HAL_BARO_PROBE_LIST %s\n\n' % ';'.join(devlist))
-    
+            '#define HAL_BARO_%u_PROBE(frontend) AP_Baro_%s::%s(frontend, %s)\n'
+            % (n, driver, probe, ','.join(dev[1:])))
+        f.write(
+            '#define %s %s ADD_BACKEND(HAL_BARO_%u_PROBE(*this))\n'
+            % (backend_def, wrapper, n))
+        probe_list.append(backend_def)
+        n = n + 1
+    if len(probe_list) > 0:
+        f.write('#define HAL_BARO_PROBE_LIST %s\n\n' % ';'.join(probe_list))
+
 def get_gpio_bylabel(label):
     '''get GPIO(n) setting on a pin label, or -1'''
     p = bylabel.get(label)
@@ -1018,7 +1061,7 @@ def parse_timer(str):
         return (tim, chan, compl)
     else:
         error("Bad timer definition %s" % str)
- 
+
 def write_PWM_config(f):
     '''write PWM config defines'''
     rc_in = None
@@ -1048,7 +1091,7 @@ def write_PWM_config(f):
 #define HAL_USE_PWM FALSE
 #endif
 ''')
-        
+
     if rc_in is not None:
         (n, chan, compl) = parse_timer(rc_in.label)
         if compl:
@@ -1065,11 +1108,11 @@ def write_PWM_config(f):
         f.write('#define STM32_RCIN_DMA_STREAM STM32_TIM_TIM%u_CH%u_DMA_STREAM\n' % (n, chan))
         f.write('#define STM32_RCIN_DMA_CHANNEL STM32_TIM_TIM%u_CH%u_DMA_CHAN\n' % (n, chan))
         f.write('\n')
-        
+
     if rc_in_int is not None:
         (n, chan, compl) = parse_timer(rc_in_int.label)
         if compl:
-            error('Complementary channel is not supported for RCININT %s' % rc_in_int.label)        
+            error('Complementary channel is not supported for RCININT %s' % rc_in_int.label)
         f.write('// RC input config\n')
         f.write('#define HAL_USE_EICU TRUE\n')
         f.write('#define STM32_EICU_USE_TIM%u TRUE\n' % n)
@@ -1080,7 +1123,7 @@ def write_PWM_config(f):
     if alarm is not None:
         (n, chan, compl) = parse_timer(alarm.label)
         if compl:
-            error("Complementary channel is not supported for ALARM %s" % alarm.label)        
+            error("Complementary channel is not supported for ALARM %s" % alarm.label)
         f.write('\n')
         f.write('// Alarm PWM output config\n')
         f.write('#define STM32_PWM_USE_TIM%u TRUE\n' % n)
@@ -1378,11 +1421,11 @@ def write_hwdef_header(outfilename):
  */
 #define PIN_MODE_OUTPUT_PP(n)         (0 << (((n) & 7) * 4))
 #define PIN_MODE_OUTPUT_OD(n)         (4 << (((n) & 7) * 4))
-#define PIN_MODE_AF_PP(n)             (8 << (((n) & 7) * 4)) 
+#define PIN_MODE_AF_PP(n)             (8 << (((n) & 7) * 4))
 #define PIN_MODE_AF_OD(n)             (12 << (((n) & 7) * 4))
 #define PIN_MODE_ANALOG(n)            (0 << (((n) & 7) * 4))
 #define PIN_MODE_NOPULL(n)            (4 << (((n) & 7) * 4))
-#define PIN_MODE_PUD(n)               (8 << (((n) & 7) * 4)) 
+#define PIN_MODE_PUD(n)               (8 << (((n) & 7) * 4))
 #define PIN_SPEED_MEDIUM(n)           (1 << (((n) & 7) * 4))
 #define PIN_SPEED_LOW(n)              (2 << (((n) & 7) * 4))
 #define PIN_SPEED_HIGH(n)             (3 << (((n) & 7) * 4))
@@ -1472,7 +1515,7 @@ def build_peripheral_list():
                     bylabel[ptx] = p
                 if not prx in bylabel:
                     bylabel[prx] = p
-                
+
         if type.startswith('ADC'):
             peripherals.append(type)
         if type.startswith('SDIO') or type.startswith('SDMMC'):
@@ -1517,7 +1560,7 @@ def romfs_wildcard(pattern):
     for f in os.listdir(os.path.join(base_path, pattern_dir)):
         if fnmatch.fnmatch(f, pattern):
             romfs[f] = os.path.join(pattern_dir, f)
-    
+
 def process_line(line):
     '''process one line of pin definition file'''
     global allpins, imu_list, compass_list, baro_list
@@ -1527,7 +1570,7 @@ def process_line(line):
 
     if a[0].startswith('P') and a[0][1] in ports and a[0] in config:
         error("Pin %s redefined" % a[0])
-    
+
     config[a[0]] = a[1:]
     if a[0] == 'MCU':
         global mcu_type, mcu_series

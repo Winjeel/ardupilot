@@ -1,7 +1,7 @@
 #include "GCS.h"
 #include <AP_Common/AP_FWVersion.h>
 
-const AP_FWVersion AP_FWVersion::fwver
+WEAK const AP_FWVersion AP_FWVersion::fwver
 {
     major: 3,
     minor: 1,
