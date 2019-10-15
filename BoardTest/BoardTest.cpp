@@ -420,18 +420,28 @@ static bool _PPDSCarrier_runAllTests(void){
     // SERIAL5	TELEM4 (J14-5, J14-7)	UART8
     // SERIAL6	MOTOR_POD (J14-6)	USART1 Receive (RX) Only
 
-    int serialDeviceA = 1; // J5 - TELEM1 - UART 2 - SERIAL1
-    int serialDeviceB = 2; // J6 - TELEM2 - UART 3 - SERIAL2
-    hal.console->printf("Testing PPDS Carrier crosstalk between serial devices %i and %i --- ", serialDeviceA, serialDeviceB);
+    // UART communication tests
+    const int serialDeviceA = 1; // J5 - TELEM1 - UART 2 - SERIAL1
+    const int serialDeviceB = 2; // J6 - TELEM2 - UART 3 - SERIAL2
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", serialDeviceA, serialDeviceB);
     testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceA, serialDeviceB, false);
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
-    hal.console->printf("Testing PPDS Carrier hardware control flow between serial devices %i and %i --- ", serialDeviceA, serialDeviceB);
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", serialDeviceB, serialDeviceA);
+    testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceB, serialDeviceA, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Testing PPDS Carrier hardware control from serial device %i to %i --- ", serialDeviceA, serialDeviceB);
     testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceA, serialDeviceB, true);
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
+    hal.console->printf("Testing PPDS Carrier hardware control from serial device %i to %i --- ", serialDeviceB, serialDeviceA);
+    testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceB, serialDeviceA, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
     hal.console->printf("Testing PPDS Carrier Buzzer --- ");
     testResult &= _PPDSCarrier_buzzerTest();
     hal.console->printf(kResultStr[testResult]);
@@ -973,6 +983,7 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void){
     return true;
 }
 
+// test cases - PPDS Carrier Board
 static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
     // Test verifying communication between two serial devices, using a crosstalk cable
 
@@ -1006,9 +1017,14 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
     SerialDevice[0]->write(tx_buffer, (size_t)sizeof(tx_buffer));
     hal.scheduler->delay(UARTwriteDelay);
 
-    // Read data using Serial Device #2
+    // Verify that bytes exist in the read buffer
     size_t nBytes = SerialDevice[1]->available();
+    if (nBytes < 1){
+        hal.console->printf("No bytes found in read buffer --- ");
+        return false;
+    }
 
+    // Read data using Serial Device #2
     std::vector<uint8_t> rx_buffer;
     rx_buffer.reserve(nBytes);
     if (nBytes) {
@@ -1018,6 +1034,7 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
          }
     }
 
+    // Verify that the send and received message matches the original test message
     for (int i = 0; i < rx_buffer.size(); i++){
         if (tx_buffer[i] != rx_buffer[i]){
             hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
