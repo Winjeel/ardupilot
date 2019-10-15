@@ -433,12 +433,12 @@ static bool _PPDSCarrier_runAllTests(void){
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
-    hal.console->printf("Testing PPDS Carrier hardware control from serial device %i to %i --- ", serialDeviceA, serialDeviceB);
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", serialDeviceA, serialDeviceB);
     testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceA, serialDeviceB, true);
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
-    hal.console->printf("Testing PPDS Carrier hardware control from serial device %i to %i --- ", serialDeviceB, serialDeviceA);
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", serialDeviceB, serialDeviceA);
     testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceB, serialDeviceA, true);
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
