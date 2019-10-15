@@ -11,6 +11,7 @@
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
+static AP_Notify notify;
 
 // Sensor classes
 static AP_Baro barometer;
@@ -42,6 +43,9 @@ static void _initialiseCervello(void){
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
+
+    // initialisation notification system
+    notify.init();    
 };
 
 static void _initialiseConsole(void) {
@@ -428,6 +432,11 @@ static bool _PPDSCarrier_runAllTests(void){
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
+    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
+    testResult &= _PPDSCarrier_buzzerTest();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+   
     return summaryTestResult;
 }
 
@@ -1014,6 +1023,19 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
     return true;
 }
 
+static bool _PPDSCarrier_buzzerTest(void){
+    // Test to verify that the Buzzer on the PPDS Carrier Board is functional
+      
+    if (!notify.buzzer_enabled()){
+        hal.console->printf("Buzzer not enabled ");
+        return false;
+    }
+    
+    // Tunes defined in ToneAlarm.cpp
+    AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+
+    return true;
+}
 
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {

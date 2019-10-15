@@ -6,6 +6,7 @@
 #include <AP_Common/AP_FWVersion.h>
 #include "AP_HAL/AP_HAL.h"
 #include <GCS_MAVLink/GCS_Dummy.h>
+#include <AP_Notify/ToneAlarm.h>
 
 // Cervello hardware definition
 #include "hwdef.h"
