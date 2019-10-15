@@ -403,6 +403,34 @@ static bool _cervello_runAllInteractiveTests(void){
     return summaryTestResult;
 }
 
+static bool _PPDSCarrier_runAllTests(void){
+    // function to run all tests on the PPDS Carrier
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // SERIAL0	USB	OTG
+    // SERIAL1	SERIAL1 (J5)	USART2
+    // SERIAL2	SERIAL2 (J6)	USART3
+    // SERIAL3	GPS (J13)	UART4
+    // SERIAL4	TELEM3 (J4)	UART7
+    // SERIAL5	TELEM4 (J14-5, J14-7)	UART8
+    // SERIAL6	MOTOR_POD (J14-6)	USART1 Receive (RX) Only
+
+    int serialDeviceA = 1; // J5 - TELEM1 - UART 2 - SERIAL1
+    int serialDeviceB = 2; // J6 - TELEM2 - UART 3 - SERIAL2
+    hal.console->printf("Testing PPDS Carrier crosstalk between serial devices %i and %i --- ", serialDeviceA, serialDeviceB);
+    testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceA, serialDeviceB, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Testing PPDS Carrier hardware control flow between serial devices %i and %i --- ", serialDeviceA, serialDeviceB);
+    testResult = _PPDSCarrier_serialCommunicationTest(serialDeviceA, serialDeviceB, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    return summaryTestResult;
+}
+
 // test cases - cervello probe
 static bool _cervello_probeMS5611(void) { // Baro 1, SPI
     bool result = false;
@@ -930,6 +958,63 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void){
     }
     return true;
 }
+
+static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
+    // Test verifying communication between two serial devices, using a crosstalk cable
+
+    // Setup serial devices
+    std::vector<int> serialDeviceIDs = {serialDevice1, serialDevice2};
+
+    AP_HAL::UARTDriver* SerialDevice[serialDeviceIDs.size()];
+    for (int i = 0; i < serialDeviceIDs.size(); i++){
+        int deviceID = serialDeviceIDs[i];
+
+        // Retrieve device driver
+        SerialDevice[i] = serialManager.get_serial_by_id(deviceID);
+
+        // Begin device
+        SerialDevice[i]->begin((uint32_t)UARTbaud);
+        SerialDevice[i]->flush();
+
+        // Set flow control
+        if (enabledHardwareControlFlow) {
+            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_ENABLE);
+        }
+        else {
+            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+        }
+    }
+ 
+    // Generate test message
+    uint8_t tx_buffer[] = {12, 34};
+
+    // Write data using Serial Device #1
+    SerialDevice[0]->write(tx_buffer, (size_t)sizeof(tx_buffer));
+    hal.scheduler->delay(UARTwriteDelay);
+
+    // Read data using Serial Device #2
+    size_t nBytes = SerialDevice[1]->available();
+
+    std::vector<uint8_t> rx_buffer;
+    rx_buffer.reserve(nBytes);
+    if (nBytes) {
+        while (nBytes-- > 0) {
+            uint8_t c = (uint8_t)SerialDevice[1]->read();
+            rx_buffer.push_back(c);
+         }
+    }
+
+    for (int i = 0; i < rx_buffer.size(); i++){
+        if (tx_buffer[i] != rx_buffer[i]){
+            hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
+            return false;           
+        }
+    }
+ 
+    return true;
+}
+
+
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
     AP_GROUPEND

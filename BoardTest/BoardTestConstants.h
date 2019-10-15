@@ -30,3 +30,7 @@
 
 // cervello RAMTRON size
 #define cervelloRamtronSize 16384
+
+// UART constants
+#define UARTbaud 5600
+#define UARTwriteDelay 20

@@ -80,13 +80,17 @@ static bool _cervello_interactiveRAMTRON(void);
 static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite);
 static bool _cervello_interactiveRAMTRON_writeRandom(void);
 
+// PPDS Carrier test cases - forward declare
+static bool _PPDSCarrier_runAllTests(void);
+static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
+
 // test items
 const Test kTestItem[] = {
     { '?', nullptr,              _printInstructions, "Print these instructions.", },
     { '!', nullptr,              _reboot,            "Reboot.", },
     { 'a', nullptr,              _runAll,            "Run all tests.", },
 
-    // All cervello tests
+    // All Cervello tests
     { '1', "Cervello probe tests",          _cervello_runAllProbeTests,            "Cervello - Test if all sensors can be discovered.", },
     { '2', "Cervello interactive tests",    _cervello_runAllInteractiveTests,      "Cervello - Verify data from all sensors.", },
 
@@ -97,6 +101,9 @@ const Test kTestItem[] = {
     { '6', "Cervello barometer tests",      _cervello_interactiveBarometer,             "Cervello - Test barometer.", },
     { '7', "Cervello SD Card tests",        _cervello_interactiveSDCard,                "Cervello - Test SD Card.", },
     { '8', "Cervello RAMTRON tests",        _cervello_interactiveRAMTRON,               "Cervello - Test RAMTRON.", },
+
+    // All PPDS Carrier Tests
+    { '9', "PPDS Carrier Tests",            _PPDSCarrier_runAllTests,                   "PPDS Carrier - Run all tests.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
