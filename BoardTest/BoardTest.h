@@ -84,6 +84,7 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void);
 static bool _PPDSCarrier_runAllTests(void);
 static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
 static bool _PPDSCarrier_buzzerTest(void);
+static bool _PPDSCarrier_safetySwitchTest(void);
 
 // test items
 const Test kTestItem[] = {

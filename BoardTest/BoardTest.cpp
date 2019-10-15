@@ -436,6 +436,11 @@ static bool _PPDSCarrier_runAllTests(void){
     testResult &= _PPDSCarrier_buzzerTest();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
+
+    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
+    testResult &= _PPDSCarrier_safetySwitchTest();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
    
     return summaryTestResult;
 }
@@ -1032,11 +1037,38 @@ static bool _PPDSCarrier_buzzerTest(void){
     }
     
     // Tunes defined in ToneAlarm.cpp
+    hal.console->printf("Buzzer generating tone --- ");
     AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
 
     return true;
 }
 
+static bool _PPDSCarrier_safetySwitchTest(void){
+    // Test to verify that the safety switch on the PPDS Carrier Board is functional
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+
+    // Get the current switch state
+    int originalSwitchState = hal.util->safety_switch_state();
+
+    // Wait for the user to activate the safety switch
+    hal.console->printf("Waiting for switch to be activated --- ");
+    while(AP_HAL::micros() < testEndTime){
+
+        // Check if the switch has been actuated
+        if (hal.util->safety_switch_state() != originalSwitchState){
+            return true;
+        }
+
+        hal.scheduler->delay(interactiveTestLoopDelay);
+    }
+    return false;
+}
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
     AP_GROUPEND
