@@ -12,11 +12,6 @@ bool _checkRotation(float rotation){
     return rotation > ins_gyro_tol;
 }
 
-bool _checkCompassAlignment(float headingDeg){
-    // This function checks for if the compass is aligned with magnetic north
-    return abs(headingDeg) < compass_northPointing_tol;
-}
-
 float _approxRunningAverage(float average, float newSample){
     average -= average / runningAverageSamples;
     average += newSample / runningAverageSamples;
@@ -26,23 +21,4 @@ float _approxRunningAverage(float average, float newSample){
 
 void _initialiseRandomNumberGenerator(void){
     std::srand(rngSeed);
-}
-
-std::vector<int> _createIndexArray(int size, bool jumble){
-    std::vector<int> indexArray;
-    indexArray.reserve(size);
-
-    for (int i = 0; i < size; i++){
-        indexArray.push_back(i);
-    }
-
-    if (jumble){
-        
-        for (int j = 0; j < size; j++){
-            int k = j + rand() % (size - j);
-            std::swap(indexArray[j], indexArray[k]);
-        }
-    }
-
-    return indexArray;
 }

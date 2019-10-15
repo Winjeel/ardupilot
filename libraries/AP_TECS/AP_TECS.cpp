@@ -517,27 +517,26 @@ void AP_TECS::_update_height_demand(void)
     // be kinematically consistent with the height rate.
     if (_landing.is_flaring()) {
         _integSEB_state = 0;
-        if (_flare_counter == 0) {
+        if (!_flare_started) {
             _hgt_rate_dem = _climb_rate;
             _land_hgt_dem = _hgt_dem_adj;
+            _flare_started = true;
         }
 
-        // adjust the flare sink rate to increase/decrease as your travel further beyond the land wp
+        // adjust the flare sink rate to increase/decrease for travel further beyond the land wp
         float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
 
-        // bring it in over 1s to prevent overshoot
-        if (_flare_counter < 10) {
-            alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
-            _hgt_rate_dem = _hgt_rate_dem * (1.0f - alpha_coef) - alpha_coef * land_sink_rate_adj;
-            _flare_counter++;
-        } else {
-            _hgt_rate_dem = - land_sink_rate_adj;
-        }
+        // bring flare sink rate in using a 0.5 second time constant to reduce overshoot
+        alpha_coef = constrain_float(2.0f * _DT, 0.0f, 1.0f);
+        _hgt_rate_dem = _hgt_rate_dem * (1.0f - alpha_coef) - alpha_coef * land_sink_rate_adj;
+
+        // keep height demand kinematically consistent
         _land_hgt_dem += _DT * _hgt_rate_dem;
         _hgt_dem_adj = _land_hgt_dem;
+
     } else {
         _hgt_rate_dem = (_hgt_dem_adj - _hgt_dem_adj_last) / _DT;
-        _flare_counter = 0;
+        _flare_started = false;
     }
 
     // For landing approach we will predict ahead by the lag produced by the input shaping filter.
@@ -909,15 +908,6 @@ void AP_TECS::_update_pitch(void)
         integSEB_input = MAX(integSEB_input, _PITCHminf - _pitch_dem);
     }
     float integSEB_delta = integSEB_input * _DT;
-
-#if 0
-    if (_landing.is_flaring() && fabsf(_climb_rate) > 0.2f) {
-        ::printf("_hgt_rate_dem=%.1f _hgt_dem_adj=%.1f climb=%.1f _flare_counter=%u _pitch_dem=%.1f SEB_dem=%.2f SEBdot_dem=%.2f SEB_error=%.2f SEBdot_error=%.2f\n",
-                 _hgt_rate_dem, _hgt_dem_adj, _climb_rate, _flare_counter, degrees(_pitch_dem),
-                 SEB_dem, SEBdot_dem, SEB_error, SEBdot_error);
-    }
-#endif
-
 
     // Apply max and min values for integrator state that will allow for no more than
     // 5deg of saturation. This allows for some pitch variation due to gusts before the
