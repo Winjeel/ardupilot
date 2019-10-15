@@ -360,6 +360,40 @@ static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16
     return crc;
 }
 
+/** \This function calculates a 16-bit CRC.
+ * \param[in] count number of bytes in data buffer
+ * \param[in] data pointer to data
+ * \param[out] crc pointer to calculated CRC (high byte at crc[0])
+ */
+static void CalculateCrc(uint8_t length, uint8_t *data, uint8_t *crc) {
+    uint8_t counter;
+    uint8_t crcLow = 0, crcHigh = 0, crcCarry;
+    uint8_t polyLow = 0x05, polyHigh = 0x80;
+    uint8_t shiftRegister;
+    uint8_t dataBit, crcBit;
+
+    for (counter = 0; counter < length; counter++) {
+        for (shiftRegister = 0x80; shiftRegister > 0x00; shiftRegister >>= 1) {
+            dataBit = (data[counter] & shiftRegister) ? 1 : 0;
+            crcBit = crcHigh >> 7;
+
+            // Shift CRC to the left by 1.
+            crcCarry = crcLow >> 7;
+            crcLow <<= 1;
+            crcHigh <<= 1;
+            crcHigh |= crcCarry;
+
+            if ((dataBit ^ crcBit) != 0) {
+                crcLow ^= polyLow;
+                crcHigh ^= polyHigh;
+            }
+        }
+    }
+
+    crc[0] = crcHigh;
+    crc[1] = crcLow;
+}
+
 static bool _hasATECC608(void) {
     uint8_t const k608Bus  = 2;
     uint8_t const k608Addr = 0xC0;
@@ -428,6 +462,93 @@ static bool _hasATECC608(void) {
     return true;
 }
 
+static bool _hasATAES132A(void) {
+    AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev = hal.spi->get_device("ATAES132A_ext");
+    if (!dev) {
+        hal.console->printf("    Couldn't create device on SPI bus\n");
+        return false;
+    }
+
+    enum class ATAES132A_Opcode : uint8_t {
+        Info = 0x0C,
+    };
+
+    enum class ATAES132A_InfoRegister : uint16_t {
+        DeviceNum = 0x0006,
+    };
+
+    typedef struct {
+        uint8_t count;
+        enum ATAES132A_Opcode opcode;
+        uint8_t mode;
+        uint16_t param1;
+        uint16_t param2;
+        // TODO: optional data goes here
+        uint16_t crc;
+    } PACKED ATAES132A_Command;
+
+    // names as per datasheet
+    enum class ATAES132A_ReturnCode : uint8_t {
+        Success       = 0x00,
+        BoundaryError = 0x02,
+        RWConfig      = 0x04,
+        BadAddr       = 0x08,
+        CountErr      = 0x10,
+        NonceError    = 0x20,
+        MacError      = 0x40,
+        ParseError    = 0x50,
+        DataMatch     = 0x60,
+        LockError     = 0x70,
+        KeyErr        = 0x80,
+    };
+
+    typedef struct {
+        uint8_t count;
+        ATAES132A_ReturnCode result;
+        uint8_t deviceCode;
+        uint8_t deviceRevision;
+        uint16_t crc;
+    } PACKED ATAES132A_InfoResult;
+
+    ATAES132A_Command command = {
+        7, // count
+        ATAES132A_Opcode::Info,
+        0x00, // mode
+        (uint16_t)ATAES132A_InfoRegister::DeviceNum, // param1
+        0x00, // param2
+        0, // CRC
+    };
+    CalculateCrc(command.count - 2, &command.count, (uint8_t *)&command.crc);
+
+    ATAES132A_InfoResult info = { 0, };
+
+    if (!dev->transfer(&command.count, sizeof(command), &info.count, sizeof(info))) {
+        hal.console->printf("    Couldn't transfer data to/from ATAES132A device.\n");
+        return false;
+    }
+
+    if (info.count < 4) {
+        hal.console->printf("    ATAES132A device didn't return enough bytes (expected 4+, got %u).\n", info.count);
+        return false;
+    }
+
+    if (info.result != ATAES132A_ReturnCode::Success) {
+        hal.console->printf("    ATAES132A device returned error code: 0x%02x\n", info.result);
+        return false;
+    }
+
+    uint16_t expectedCRC = ~info.crc;
+    CalculateCrc(info.count - 2, (uint8_t *)&info, (uint8_t *)&expectedCRC);
+    if (info.crc != expectedCRC) {
+        hal.console->printf("    ATAES132A CRC (0x%04x) doesn't match expected (0x%04x).\n", info.crc, expectedCRC);
+        return false;
+    }
+
+    hal.console->printf("    Successfully found ATAES132A device: Device=0x%02x Revision=0x%02x\n", info.deviceCode, info.deviceRevision);
+
+    return true;
+}
+
 static bool _cervello_runAllProbeTests(void){
     // Function to run all probe tests on the Cervello
     bool summaryTestResult = true;
@@ -467,6 +588,11 @@ static bool _cervello_runAllProbeTests(void){
 
     hal.console->printf("Probing ATECC608 on I2C\n");
     testResult = _hasATECC608();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing ATAES132A on SPI\n");
+    testResult = _hasATAES132A();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
