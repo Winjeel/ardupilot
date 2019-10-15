@@ -341,7 +341,7 @@ static void _consoleKeypress(void){
 
 static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0) {
     if (data == NULL || length == 0) {
-        return 0;
+        return crc;
     }
 
     for (size_t i = 0; i < length; i++) {
@@ -360,38 +360,37 @@ static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16
     return crc;
 }
 
-/** \This function calculates a 16-bit CRC.
- * \param[in] count number of bytes in data buffer
- * \param[in] data pointer to data
- * \param[out] crc pointer to calculated CRC (high byte at crc[0])
- */
-static void CalculateCrc(uint8_t length, uint8_t *data, uint8_t *crc) {
-    uint8_t counter;
-    uint8_t crcLow = 0, crcHigh = 0, crcCarry;
-    uint8_t polyLow = 0x05, polyHigh = 0x80;
-    uint8_t shiftRegister;
-    uint8_t dataBit, crcBit;
 
-    for (counter = 0; counter < length; counter++) {
-        for (shiftRegister = 0x80; shiftRegister > 0x00; shiftRegister >>= 1) {
-            dataBit = (data[counter] & shiftRegister) ? 1 : 0;
-            crcBit = crcHigh >> 7;
+static uint16_t ATAES132A_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0) {
+    if (data == NULL || length == 0) {
+        return crc;
+    }
+
+    uint8_t crcLSB = (crc & 0x00FF);
+    uint8_t crcMSB = (crc >> 8);
+    uint8_t polyLSB = 0x05;
+    uint8_t polyMSB = 0x80;
+
+    for (size_t counter = 0; counter < length; counter++) {
+        for (uint8_t shiftRegister = 0x80; shiftRegister > 0x00; shiftRegister >>= 1) {
+            uint8_t dataBit = (data[counter] & shiftRegister) ? 1 : 0;
+            uint8_t crcBit = crcMSB >> 7;
 
             // Shift CRC to the left by 1.
-            crcCarry = crcLow >> 7;
-            crcLow <<= 1;
-            crcHigh <<= 1;
-            crcHigh |= crcCarry;
+            uint8_t crcCarry = crcLSB >> 7;
+            crcLSB <<= 1;
+            crcMSB <<= 1;
+            crcMSB |= crcCarry;
 
             if ((dataBit ^ crcBit) != 0) {
-                crcLow ^= polyLow;
-                crcHigh ^= polyHigh;
+                crcLSB ^= polyLSB;
+                crcMSB ^= polyMSB;
             }
         }
     }
 
-    crc[0] = crcHigh;
-    crc[1] = crcLow;
+    uint16_t result = (crcMSB & 0x00FF) | (crcLSB << 8);
+    return result;
 }
 
 static bool _hasATECC608(void) {
@@ -518,7 +517,7 @@ static bool _hasATAES132A(void) {
         0x00, // param2
         0, // CRC
     };
-    CalculateCrc(command.count - 2, &command.count, (uint8_t *)&command.crc);
+    command.crc = ATAES132A_crc16((uint8_t *)&command, command.count - 2);
 
     ATAES132A_InfoResult info = { 0, };
 
@@ -537,8 +536,7 @@ static bool _hasATAES132A(void) {
         return false;
     }
 
-    uint16_t expectedCRC = ~info.crc;
-    CalculateCrc(info.count - 2, (uint8_t *)&info, (uint8_t *)&expectedCRC);
+    uint16_t expectedCRC = ATAES132A_crc16((uint8_t *)&info, info.count - 2);
     if (info.crc != expectedCRC) {
         hal.console->printf("    ATAES132A CRC (0x%04x) doesn't match expected (0x%04x).\n", info.crc, expectedCRC);
         return false;
