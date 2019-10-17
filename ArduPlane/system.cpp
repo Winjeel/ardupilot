@@ -566,24 +566,24 @@ bool Plane::create_into_wind_landing_sequence()
     // During landing loiter_xtrack is used to indicate if heading constraint data is available
     // The desired approach heading and tolerance are held in the p1 parameter
     if (plane.mission.isAngleSectorLanding(land_point_cmd)) {
-        uint16_t nominal_yaw_deg_uint;
+        uint16_t sector_yaw_deg_uint;
         uint16_t tolerance_deg_uint;
-        plane.mission.unpackAngleSectorParam(land_point_cmd.p1,  nominal_yaw_deg_uint, tolerance_deg_uint);
+        plane.mission.unpackAngleSectorParam(land_point_cmd.p1,  sector_yaw_deg_uint, tolerance_deg_uint);
         if (tolerance_deg_uint < 180) {
-            float nominal_yaw_deg = wrap_180((float)nominal_yaw_deg_uint);
+            float sector_yaw_deg = wrap_180((float)sector_yaw_deg_uint);
+            float sector_yaw_rad = radians(sector_yaw_deg);
             float approach_iwl_hdg_rad = atan2f(-windUnitVec.y,-windUnitVec.x);
-            float approach_hdg_min_rad = radians(nominal_yaw_deg - (float)tolerance_deg_uint);
-            float approach_hdg_max_rad = radians(nominal_yaw_deg + (float)tolerance_deg_uint);
-            approach_hdg_min_rad = wrap_PI(approach_hdg_min_rad);
-            approach_hdg_max_rad = wrap_PI(approach_hdg_max_rad);
-            if (wrap_PI(approach_iwl_hdg_rad - approach_hdg_max_rad) > 0) {
+            float approach_hdg_tol_rad = radians((float)tolerance_deg_uint);
+            if (wrap_PI(approach_iwl_hdg_rad - sector_yaw_rad) > approach_hdg_tol_rad) {
                 // clip to upper limit
-                windUnitVec.x = -cosf(approach_hdg_max_rad);
-                windUnitVec.y = -sinf(approach_hdg_max_rad);
-            } else if (wrap_PI(approach_iwl_hdg_rad - approach_hdg_min_rad) < 0) {
+                approach_iwl_hdg_rad = sector_yaw_rad + approach_hdg_tol_rad;
+                windUnitVec.x = -cosf(approach_iwl_hdg_rad);
+                windUnitVec.y = -sinf(approach_iwl_hdg_rad);
+            } else if (wrap_PI(approach_iwl_hdg_rad - sector_yaw_rad) < -approach_hdg_tol_rad) {
                 // clip to lower limit
-                windUnitVec.x = -cosf(approach_hdg_min_rad);
-                windUnitVec.y = -sinf(approach_hdg_min_rad);
+                approach_iwl_hdg_rad = sector_yaw_rad - approach_hdg_tol_rad;
+                windUnitVec.x = -cosf(approach_iwl_hdg_rad);
+                windUnitVec.y = -sinf(approach_iwl_hdg_rad);
             }
         }
     }
