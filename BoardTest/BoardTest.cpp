@@ -1019,9 +1019,8 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
         // Retrieve device driver
         SerialDevice[i] = serialManager.get_serial_by_id(deviceID);
 
-        // Begin device
+        // Begin device/Flush RX & TX buffers
         SerialDevice[i]->begin((uint32_t)UARTbaud);
-        SerialDevice[i]->flush();
 
         // Set flow control
         if (enabledHardwareControlFlow) {
