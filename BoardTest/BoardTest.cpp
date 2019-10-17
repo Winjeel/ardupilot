@@ -462,10 +462,9 @@ static bool _PPDSCarrier_runAllTests(void){
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult; hal.console->printf("\n");
 
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
+    // Test Buzzer
     hal.console->printf("Testing PPDS Carrier Buzzer --- ");
-    testResult &= _PPDSCarrier_buzzerTest();
+    testResult = _PPDSCarrier_buzzerTest();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
