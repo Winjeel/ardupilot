@@ -565,6 +565,7 @@ bool Plane::create_into_wind_landing_sequence()
     // Get desired approach heading and constrain if necessary
     // During landing loiter_xtrack is used to indicate if heading constraint data is available
     // The desired approach heading and tolerance are held in the p1 parameter
+    float turn_radius = (float)aparm.loiter_radius; // positive is CW
     if (plane.mission.isAngleSectorLanding(land_point_cmd)) {
         uint16_t sector_yaw_deg_uint;
         uint16_t tolerance_deg_uint;
@@ -585,11 +586,24 @@ bool Plane::create_into_wind_landing_sequence()
                 windUnitVec.x = -cosf(approach_iwl_hdg_rad);
                 windUnitVec.y = -sinf(approach_iwl_hdg_rad);
             }
+
+            // Set turn direction based on which side of the approach sector we are using
+            // to minimise excusion outside the sector when turning onto final approach
+            if (wrap_PI(approach_iwl_hdg_rad - sector_yaw_rad) > 0.0f) {
+                // approaching from the left side of the sector, so use a right turn onto final (positive radius)
+                if (turn_radius < 0.0f) {
+                    turn_radius = -turn_radius;
+                }
+            } else {
+                // approaching from the right side of the sector, so use a left  turn onto final (negative radius)
+                if (turn_radius > 0.0f) {
+                    turn_radius = -turn_radius;
+                }
+            }
         }
     }
 
     // calculate offset from landing point to centre of a loiter to altitude waypoint that feeds the aircraft into the approach
-    const float turn_radius = (float)aparm.loiter_radius; // positive is CW
     const float approach_length = 100.0f * (float)MAX(plane.g.wal_start_height, 10) / (float)MAX(plane.g.wal_approach_gradient_pct, 5);
     Vector2f offsetNE;
     offsetNE.x = approach_length * windUnitVec.x + turn_radius * windUnitVec.y;
