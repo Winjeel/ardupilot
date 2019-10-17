@@ -468,11 +468,12 @@ static bool _PPDSCarrier_runAllTests(void){
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
+    // Test safety switch
     hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
-    testResult &= _PPDSCarrier_safetySwitchTest();
+    testResult = _PPDSCarrier_safetySwitchTest();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
-   
+
     return summaryTestResult;
 }
 
