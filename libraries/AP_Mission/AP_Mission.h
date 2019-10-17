@@ -277,8 +277,8 @@ public:
     }
 
     // packs and unpacks landing approach sector data in and out of the Mission_Command p1 parameter
-    static uint16_t packAngleSectorParam(uint16_t const nominal_yaw_deg, uint16_t const tolerance_deg);
-    static void unpackAngleSectorParam(uint16_t const param, uint16_t& nominal_yaw_deg, uint16_t& tolerance_deg);
+    static uint16_t packAngleSectorParam(uint16_t const sector_yaw_deg, uint16_t const tolerance_deg);
+    static void unpackAngleSectorParam(uint16_t const param, uint16_t& sector_yaw_deg, uint16_t& tolerance_deg);
 
     // main program function pointers
     FUNCTOR_TYPEDEF(mission_cmd_fn_t, bool, const Mission_Command&);
