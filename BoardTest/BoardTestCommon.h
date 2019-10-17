@@ -1,7 +1,8 @@
 #pragma once
 
 // Board Includes
-#include <AP_BoardConfig/AP_BoardConfig.h>
+#include "AP_BoardConfig/AP_BoardConfig.h"
+
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Common/AP_FWVersion.h>
 #include "AP_HAL/AP_HAL.h"
