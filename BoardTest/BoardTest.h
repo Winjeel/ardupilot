@@ -65,19 +65,19 @@ static bool _cervello_probeICM20948mag(void);
 static bool _cervello_probeIST8308(void);
 static bool _cervello_probeRAMTRON(void);
 
-// cervello interactive test cases - forward declare
-static bool _cervello_runAllInteractiveTests(void);
-static bool _cervello_interactiveAccel(void);
-static bool _cervello_interactiveGyro(void);
-static bool _cervello_interactiveAccel_SingleAxis(float const * const accelSensor);
-static bool _cervello_interactiveGyro_SingleAxis(float const * const gyroSensor);
-static bool _cervello_interactiveCompass(void);
-static bool _cervello_interactiveCompass_SingleHeading(const int i);
-static bool _cervello_interactiveBarometer(void);
-static bool _cervello_interactiveSDCard(void);
-static bool _cervello_interactiveRAMTRON(void);
-static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite);
-static bool _cervello_interactiveRAMTRON_writeRandom(void);
+// cervello  test cases - forward declare
+static bool _cervello_runAllTests(void);
+static bool _cervello_AccelTest(void);
+static bool _cervello_GyroTest(void);
+static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor);
+static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor);
+static bool _cervello_CompassTest(void);
+static bool _cervello_CompassTest_SingleHeading(const int i);
+static bool _cervello_BarometerTest(void);
+static bool _cervello_SDCardTest(void);
+static bool _cervello_RAMTRONTest(void);
+static bool _cervello_RAMTRONTest_writeValue(uint8_t valueToWrite);
+static bool _cervello_RAMTRONTest_writeRandom(void);
 
 // PPDS Carrier test cases - forward declare
 static bool _PPDSCarrier_runAllTests(void);
@@ -91,16 +91,16 @@ const Test kTestItem[] = {
     { '!', nullptr,              _reboot,            "Reboot.", },
 
     // All Cervello tests
-    { '1', "Cervello probe tests",          _cervello_runAllProbeTests,            "Cervello - Test if all sensors can be discovered.", },
-    { '2', "Cervello interactive tests",    _cervello_runAllInteractiveTests,      "Cervello - Verify data from all sensors.", },
+    { '1', "Cervello probe tests",          _cervello_runAllProbeTests,      "Cervello - Test if all sensors can be discovered.", },
+    { '2', "Cervello all  tests",           _cervello_runAllTests,           "Cervello - Run all tests.", },
 
-    // Cervallo interactive tests
-    { '3', "Cervello accelerometer tests",  _cervello_interactiveAccel,                 "Cervello - Test accelerometers.", },
-    { '4', "Cervello gyro tests",           _cervello_interactiveGyro,                  "Cervello - Test gyros.", },
-    { '5', "Cervello compass tests",        _cervello_interactiveCompass,               "Cervello - Test compass.", },
-    { '6', "Cervello barometer tests",      _cervello_interactiveBarometer,             "Cervello - Test barometer.", },
-    { '7', "Cervello SD Card tests",        _cervello_interactiveSDCard,                "Cervello - Test SD Card.", },
-    { '8', "Cervello RAMTRON tests",        _cervello_interactiveRAMTRON,               "Cervello - Test RAMTRON.", },
+    // Cervello individual tests
+    { '3', "Cervello accelerometer tests",  _cervello_AccelTest,                 "Cervello - Run accelerometer test.", },
+    { '4', "Cervello gyro tests",           _cervello_GyroTest,                  "Cervello - Run gyro test.", },
+    { '5', "Cervello compass tests",        _cervello_CompassTest,               "Cervello - Run compass test.", },
+    { '6', "Cervello barometer tests",      _cervello_BarometerTest,             "Cervello - Run barometer test.", },
+    { '7', "Cervello SD Card tests",        _cervello_SDCardTest,                "Cervello - Run SD Card test.", },
+    { '8', "Cervello RAMTRON tests",        _cervello_RAMTRONTest,               "Cervello - Run RAMTRON test.", },
 
     // All PPDS Carrier Tests
     { '9', "PPDS Carrier Tests",            _PPDSCarrier_runAllTests,                   "PPDS Carrier - Run all tests.", },
