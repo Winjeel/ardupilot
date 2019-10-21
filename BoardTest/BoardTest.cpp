@@ -28,7 +28,7 @@ bool dirtyDriverState = false;
 // initialisation functions
 static void _initialiseCervello(void){
     // function to initialise the Cervello
-    
+
     // initialise serial port
     serialManager.init_console();
 
@@ -79,7 +79,7 @@ static void _initialiseCompass(void){
     }
 
     EXPECT_DELAY_MS(sensorInitialisationTimeout);
-    
+
     compass.init();
     for (uint8_t i = 0; i < compass.get_count(); i++) {
         compass.set_and_save_offsets(i, Vector3f(0, 0, 0));
@@ -181,7 +181,7 @@ void setup()
     // initialise Cervello
     _initialiseCervello();
     _initialiseLED();
-    
+
     // initialise test console
     _initialiseConsole();
 
@@ -339,6 +339,95 @@ static void _consoleKeypress(void){
     }
 }
 
+static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0) {
+    if (data == NULL || length == 0) {
+        return 0;
+    }
+
+    for (size_t i = 0; i < length; i++) {
+        for (uint8_t shift = 0x01; shift > 0x00; shift <<= 1) {
+            uint8_t dataBit = (data[i] & shift) ? 1 : 0;
+            uint8_t crcBit = crc >> 15;
+
+            crc <<= 1;
+
+            if (dataBit != crcBit) {
+                crc ^= 0x8005;
+            }
+        }
+    }
+
+    return crc;
+}
+
+static bool _hasATECC608(void) {
+    uint8_t const k608Bus  = 2;
+    uint8_t const k608Addr = 0xC0;
+
+    AP_HAL::OwnPtr<AP_HAL::I2CDevice> dev = hal.i2c_mgr->get_device(k608Bus, k608Addr);
+    if (!dev) {
+        hal.console->printf("    Couldn't create device %u on I2C bus %u\n", k608Addr, k608Bus);
+        return false;
+    }
+
+    enum class ATECC608_Reg : uint8_t {
+        Command = 0x03,
+    };
+
+    enum class ATECC608_Opcode : uint8_t {
+        Info = 0x30,
+    };
+
+    typedef struct {
+        enum ATECC608_Reg reg;
+        uint8_t sz;
+        enum ATECC608_Opcode opcode;
+        uint8_t param1;
+        uint16_t param2;
+        // TODO: optional data goes here
+        uint16_t crc;
+    } PACKED ATECC608_Command;
+
+    ATECC608_Command command = {
+        ATECC608_Reg::Command,
+        7,    // number of bytes
+        ATECC608_Opcode::Info,
+        0,    // param 1 -> Get Chip Revision
+        0,    // param 2 -> unused
+        0,    // CRC
+    };
+
+    // TODO: check endianness of CRC
+    command.crc = ATECC608_crc16(&command.sz, 8 - 3);
+
+    typedef struct {
+        uint8_t sz;
+        uint8_t data[4];
+        uint16_t crc;
+    } PACKED ATECC608_Response;
+    ATECC608_Response info;
+
+    if (!dev->transfer((uint8_t * const)&command.reg, sizeof(command), &info.sz, sizeof(info))) {
+        hal.console->printf("    Couldn't transfer data to/from ATECC608 device.\n");
+        return false;
+    }
+
+    hal.console->printf("    Got ATECC608 Revision = [0x%02x 0x%02x 0x%02x 0x%02x]\n",
+                        info.data[0], info.data[1], info.data[2], info.data[3]); // expect [0x00 0x00, 0x50, 0x00]
+
+    if (info.sz != command.sz) {
+        hal.console->printf("    ...but the size was wrong!\n");
+        return false;
+    }
+
+    if (info.crc != ATECC608_crc16(&info.sz, 5)) {
+        hal.console->printf("    ...but the CRC was wrong!\n");
+        return false;
+    }
+
+    return true;
+}
+
 static bool _cervello_runAllProbeTests(void){
     // Function to run all probe tests on the Cervello
     bool summaryTestResult = true;
@@ -376,6 +465,11 @@ static bool _cervello_runAllProbeTests(void){
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
+    hal.console->printf("Probing ATECC608 on I2C\n");
+    testResult = _hasATECC608();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
     dirtyDriverState = true;
     return summaryTestResult;
 }
@@ -383,7 +477,7 @@ static bool _cervello_runAllProbeTests(void){
 static bool _cervello_runAllInteractiveTests(void){
     // function to run all interactive tests on the Cervello
     bool summaryTestResult = true;
-    
+
     // run the Accelerometer and Gyro tests
     summaryTestResult &= _cervello_interactiveAccel();
     summaryTestResult &= _cervello_interactiveGyro();
@@ -862,7 +956,7 @@ static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite){
     // Read data back from RAMTRON,
     std::vector<uint8_t> readbackData;
     readbackData.reserve(ramtronSize);
-    
+
     for (int j = 0; j < ramtronSize; j++){
         uint8_t bytesRead = ramtron.read(j, &readbackData[j], sizeof(uint8_t));
 
@@ -878,7 +972,7 @@ static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite){
 
         if (valueToWrite != readbackData[l]){
             hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", l, valueToWrite, readbackData[l]);
-            return false;                    
+            return false;
         }
     }
 
@@ -887,7 +981,7 @@ static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite){
 
 static bool _cervello_interactiveRAMTRON_writeRandom(void){
     // Test to write a random array to the entirety of the RAMTRON
-    
+
     if (ramtron.get_size()>cervelloRamtronSize){
         hal.console->printf(" This RAMTRON test is currently only applicable for Cervello boards with 16KB memory! --- ");
         return false;
@@ -924,7 +1018,7 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void){
         // Verify the read data matches the original written data
         if (randomArray[k] != readBackData){
             hal.console->printf("Value mismatch at index %i - Written: %u Read %u ", k, randomArray[k], readBackData);
-            return false;        
+            return false;
         }
 
     }
