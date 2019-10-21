@@ -47,7 +47,6 @@ void _updateLED(void);
 
 // test functions - forward declare
 static bool _reboot(void);
-static bool _runAll(void);
 static bool _executeTest(Test const * const);
 static bool _testNotImplemented(void);
 static char const * _getResultStr(bool result);
@@ -90,7 +89,6 @@ static bool _PPDSCarrier_safetySwitchTest(void);
 const Test kTestItem[] = {
     { '?', nullptr,              _printInstructions, "Print these instructions.", },
     { '!', nullptr,              _reboot,            "Reboot.", },
-    { 'a', nullptr,              _runAll,            "Run all tests.", },
 
     // All Cervello tests
     { '1', "Cervello probe tests",          _cervello_runAllProbeTests,            "Cervello - Test if all sensors can be discovered.", },

@@ -251,21 +251,6 @@ static bool _reboot(void) {
     return true;
 }
 
-static bool _runAll(void) {
-    bool result = true;
-
-    for (int i = 0; i < kNumTestItems; i++) {
-        Test const * const test = &kTestItem[i];
-        if (!test->name) {
-            continue;
-        }
-
-        result =_executeTest(test) && result;
-    }
-
-    return result;
-}
-
 static bool _executeTest(Test const * const test) {
 
     // Verify that the Cervello sensor drivers do not exist in a dirty state
