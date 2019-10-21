@@ -49,7 +49,7 @@ static void _initialiseCervello(void){
 };
 
 static void _initialiseConsole(void) {
-    hal.scheduler->delay(5000);
+    hal.scheduler->delay(2000);
 
     while (hal.console->available()) {
         hal.console->read(); // flush read buffer
