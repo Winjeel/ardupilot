@@ -45,7 +45,7 @@ static void _initialiseCervello(void){
     hal.scheduler->delay(1000);
 
     // initialisation notification system
-    notify.init();    
+    notify.init();
 };
 
 static void _initialiseConsole(void) {
@@ -396,9 +396,18 @@ static bool _hasATECC608(void) {
     } PACKED ATECC608_Response;
     ATECC608_Response info;
 
+    const uint32_t kSemaphoreTimeout_ms = 3000;
+    AP_HAL::Semaphore* sem = dev->get_semaphore();
+    if (!sem || !sem->take(kSemaphoreTimeout_ms)) {
+        hal.console->printf("    Couldn't take semaphore for ATECC608 device.\n");
+        return false;
+    }
+
+    #define CLEAN_UP_AND_RETURN(result) sem->give(); return result;
+
     if (!dev->transfer((uint8_t * const)&command.reg, sizeof(command), &info.sz, sizeof(info))) {
         hal.console->printf("    Couldn't transfer data to/from ATECC608 device.\n");
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
 
     hal.console->printf("    Got ATECC608 Revision = [0x%02x 0x%02x 0x%02x 0x%02x]\n",
@@ -406,15 +415,15 @@ static bool _hasATECC608(void) {
 
     if (info.sz != command.sz) {
         hal.console->printf("    ...but the size was wrong!\n");
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
 
     if (info.crc != ATECC608_crc16(&info.sz, 5)) {
         hal.console->printf("    ...but the CRC was wrong!\n");
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
 
-    return true;
+    CLEAN_UP_AND_RETURN(true);
 }
 
 static bool _cervello_runAllProbeTests(void){
@@ -1109,7 +1118,7 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
             SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
         }
     }
- 
+
     // Generate test message
     uint8_t tx_buffer[] = {12, 34};
 
@@ -1138,21 +1147,21 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
     for (int i = 0; i < rx_buffer.size(); i++){
         if (tx_buffer[i] != rx_buffer[i]){
             hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
-            return false;           
+            return false;
         }
     }
- 
+
     return true;
 }
 
 static bool _PPDSCarrier_buzzerTest(void){
     // Test to verify that the Buzzer on the PPDS Carrier Board is functional
-      
+
     if (!notify.buzzer_enabled()){
         hal.console->printf("Buzzer not enabled ");
         return false;
     }
-    
+
     // Tunes defined in ToneAlarm.cpp
     hal.console->printf("Buzzer generating tone --- ");
     AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
