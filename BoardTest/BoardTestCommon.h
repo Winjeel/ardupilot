@@ -2,10 +2,12 @@
 
 // Board Includes
 #include "AP_BoardConfig/AP_BoardConfig.h"
+
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Common/AP_FWVersion.h>
 #include "AP_HAL/AP_HAL.h"
 #include <GCS_MAVLink/GCS_Dummy.h>
+#include <AP_Notify/ToneAlarm.h>
 
 // Cervello hardware definition
 #include "hwdef.h"

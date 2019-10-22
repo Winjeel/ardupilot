@@ -11,6 +11,7 @@
 const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
+static AP_Notify notify;
 
 // Sensor classes
 static AP_Baro barometer;
@@ -42,6 +43,9 @@ static void _initialiseCervello(void){
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
+
+    // initialisation notification system
+    notify.init();    
 };
 
 static void _initialiseConsole(void) {
@@ -247,21 +251,6 @@ static bool _reboot(void) {
     return true;
 }
 
-static bool _runAll(void) {
-    bool result = true;
-
-    for (int i = 0; i < kNumTestItems; i++) {
-        Test const * const test = &kTestItem[i];
-        if (!test->name) {
-            continue;
-        }
-
-        result =_executeTest(test) && result;
-    }
-
-    return result;
-}
-
 static bool _executeTest(Test const * const test) {
 
     // Verify that the Cervello sensor drivers do not exist in a dirty state
@@ -433,7 +422,7 @@ static bool _cervello_runAllProbeTests(void){
     bool summaryTestResult = true;
     bool testResult;
 
-    EXPECT_DELAY_MS(probeTestTimeout);
+    EXPECT_DELAY_MS(testTimeout);
 
     hal.console->printf("Probing MS5611 (Baro - SPI)\n");
     testResult = _cervello_probeMS5611();
@@ -474,25 +463,95 @@ static bool _cervello_runAllProbeTests(void){
     return summaryTestResult;
 }
 
-static bool _cervello_runAllInteractiveTests(void){
-    // function to run all interactive tests on the Cervello
+static bool _cervello_runAllTests(void){
+    // function to run all  tests on the Cervello
     bool summaryTestResult = true;
 
     // run the Accelerometer and Gyro tests
-    summaryTestResult &= _cervello_interactiveAccel();
-    summaryTestResult &= _cervello_interactiveGyro();
+    summaryTestResult &= _cervello_AccelTest();
+    summaryTestResult &= _cervello_GyroTest();
 
     // run the compass tests
-    summaryTestResult &= _cervello_interactiveCompass();
+    summaryTestResult &= _cervello_CompassTest();
 
     // run the barometer tests
-    summaryTestResult &= _cervello_interactiveBarometer();
+    summaryTestResult &= _cervello_BarometerTest();
 
     // run the SD Card tests
-    summaryTestResult &= _cervello_interactiveSDCard();
+    summaryTestResult &= _cervello_SDCardTest();
 
     // run the RAMTRON tests
-    summaryTestResult &= _cervello_interactiveRAMTRON();
+    summaryTestResult &= _cervello_RAMTRONTest();
+
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_runAllTests(void){
+    // function to run all tests on the PPDS Carrier
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // SERIAL0	USB	OTG
+    // SERIAL1	SERIAL1 (J5)	USART2
+    // SERIAL2	SERIAL2 (J6)	USART3
+    // SERIAL3	GPS (J13)	UART4
+    // SERIAL4	TELEM3 (J4)	UART7
+    // SERIAL5	TELEM4 (J14-5, J14-7)	UART8
+    // SERIAL6	MOTOR_POD (J14-6)	USART1 Receive (RX) Only
+
+    // UART communication tests
+    const int SERIAL1 = 1; // J5 - TELEM1 - UART 2 - SERIAL1
+    const int SERIAL2 = 2; // J6 - TELEM2 - UART 3 - SERIAL2
+    const int SERIAL4 = 4; // J4 - TELEM 3 - UART 7 - SERIAL4
+    const int SERIAL5 = 5; // J14-5, J14-7 - TELEM4 - UART 8 - SERIAL5
+
+     // Test Serial 1 <-> Serial 2 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL2, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Serial 1 <-> Serial 2 communication with hardware flow control
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL1, SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL2, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Serial 1 <-> Serial 4 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL4);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL4, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL4, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL4, SERIAL1, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Serial 5 loopback
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL5, SERIAL5);
+    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL5, SERIAL5, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Buzzer
+    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
+    testResult = _PPDSCarrier_buzzerTest();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    // Test safety switch
+    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
+    testResult = _PPDSCarrier_safetySwitchTest();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
 
     return summaryTestResult;
 }
@@ -593,7 +652,7 @@ static bool _cervello_probeRAMTRON(void){ // RAMTRON
 }
 
 // test cases - cervello interactive
-static bool _cervello_interactiveAccel(void){
+static bool _cervello_AccelTest(void){
     // Initialise the INS
     _initialiseINS();
 
@@ -617,7 +676,7 @@ static bool _cervello_interactiveAccel(void){
         for (uint8_t j = 0; j < ins.get_accel_count(); j++) {
 
             hal.console->printf("Testing accelerometer %i --- ",j);
-            bool testResult =_cervello_interactiveAccel_SingleAxis(&ins.get_accel(j)[i]);
+            bool testResult =_cervello_AccelTest_SingleAxis(&ins.get_accel(j)[i]);
             hal.console->printf(kResultStr[testResult]);
             summaryTestResult &= testResult;
 
@@ -628,7 +687,7 @@ static bool _cervello_interactiveAccel(void){
     return summaryTestResult;
 }
 
-static bool _cervello_interactiveGyro(void){
+static bool _cervello_GyroTest(void){
     // Initialise the INS
     _initialiseINS();
 
@@ -651,7 +710,7 @@ static bool _cervello_interactiveGyro(void){
         for (uint8_t j = 0; j < ins.get_gyro_count(); j++) {
 
             hal.console->printf("Testing gyro %i --- ",j);
-            bool testResult =_cervello_interactiveGyro_SingleAxis(&ins.get_gyro(j)[i]);
+            bool testResult =_cervello_GyroTest_SingleAxis(&ins.get_gyro(j)[i]);
             hal.console->printf(kResultStr[testResult]);
             summaryTestResult &= testResult;
 
@@ -662,13 +721,13 @@ static bool _cervello_interactiveGyro(void){
     return summaryTestResult;
 }
 
-static bool _cervello_interactiveAccel_SingleAxis(float const * const accelSensor){
+static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
     // Expect delay based on timeout duration;
-    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+    EXPECT_DELAY_MS((int)testTimeout);
 
     // Setup test duration
     uint32_t testStartTime = AP_HAL::micros();
-    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     // Setup variable to track running average
     float runningAverage = 0;
@@ -688,18 +747,18 @@ static bool _cervello_interactiveAccel_SingleAxis(float const * const accelSenso
             // If accelerometer is aligned, pass test and continue
             return true;
         }
-        hal.scheduler->delay(interactiveTestLoopDelay);
+        hal.scheduler->delay(testLoopDelay);
     }
     return false;
 }
 
-static bool _cervello_interactiveGyro_SingleAxis(float const * const gyroSensor){
+static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
     // Expect delay based on timeout duration;
-    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+    EXPECT_DELAY_MS((int)testTimeout);
 
     // Setup test duration
     uint32_t testStartTime = AP_HAL::micros();
-    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     // Setup variable to track running average
     float runningAverage = 0;
@@ -721,12 +780,12 @@ static bool _cervello_interactiveGyro_SingleAxis(float const * const gyroSensor)
             // If accelerometer is aligned, pass test and continue
             return true;
         }
-        hal.scheduler->delay(interactiveTestLoopDelay);
+        hal.scheduler->delay(testLoopDelay);
     }
     return false;
 }
 
-static bool _cervello_interactiveBarometer(void){
+static bool _cervello_BarometerTest(void){
     // Initialise the barometer
     _initialiseBarometer();
 
@@ -790,7 +849,7 @@ static bool _cervello_interactiveBarometer(void){
     return summaryTestResult;
 }
 
-static bool _cervello_interactiveCompass(void){
+static bool _cervello_CompassTest(void){
     // Initialise the compass
     _initialiseCompass();
 
@@ -816,7 +875,7 @@ static bool _cervello_interactiveCompass(void){
     for (uint8_t j = 0; j < compass.get_count(); j++) {
 
         hal.console->printf("Testing compass %i --- ",j);
-        bool testResult =_cervello_interactiveCompass_SingleHeading(j);
+        bool testResult =_cervello_CompassTest_SingleHeading(j);
         (testResult) ? hal.console->printf("PASS\n") : hal.console->printf("FAIL\n");
         summaryTestResult &= testResult;
 
@@ -826,13 +885,13 @@ static bool _cervello_interactiveCompass(void){
     return summaryTestResult;
 }
 
-static bool _cervello_interactiveCompass_SingleHeading(const int i){
+static bool _cervello_CompassTest_SingleHeading(const int i){
     // Expect delay based on timeout duration;
-    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+    EXPECT_DELAY_MS((int)testTimeout);
 
     // Setup test duration
     uint32_t testStartTime = AP_HAL::micros();
-    uint32_t testEndTime = testStartTime + (uint32_t)interactiveTestTimeout;
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     // Calculate a reference compass heading
     compass.read();
@@ -855,14 +914,14 @@ static bool _cervello_interactiveCompass_SingleHeading(const int i){
             // If compass has detected a rotation, pass test and continue
             return true;
         }
-        hal.scheduler->delay(interactiveTestLoopDelay);
+        hal.scheduler->delay(testLoopDelay);
     }
     return false;
 }
 
-static bool _cervello_interactiveSDCard(void){
+static bool _cervello_SDCardTest(void){
     // Expect delay based on timeout duration;
-    EXPECT_DELAY_MS((int)interactiveTestTimeout);
+    EXPECT_DELAY_MS((int)testTimeout);
 
     // Initialise the logging system
     if(!_initialiseLogger()){
@@ -902,7 +961,7 @@ static bool _cervello_interactiveSDCard(void){
     return testResult;
 }
 
-static bool _cervello_interactiveRAMTRON(void){
+static bool _cervello_RAMTRONTest(void){
     // Initialise the RAMTRON
     _initialiseRAMTRON();
 
@@ -915,33 +974,33 @@ static bool _cervello_interactiveRAMTRON(void){
     // Test writing 0x00 (0)
     uint8_t testValue = 0x00;
     hal.console->printf("Testing RAMTRON sequential write/read with value of %u --- ", testValue);
-    summaryTestResult &= _cervello_interactiveRAMTRON_writeValue(testValue);
+    summaryTestResult &= _cervello_RAMTRONTest_writeValue(testValue);
     hal.console->printf(kResultStr[summaryTestResult]);
 
     // Test writing 0xFF (255)
     testValue = 0xFF;
     hal.console->printf("Testing RAMTRON sequential write/read with value of %u --- ", testValue);
-    summaryTestResult &= _cervello_interactiveRAMTRON_writeValue(testValue);
+    summaryTestResult &= _cervello_RAMTRONTest_writeValue(testValue);
     hal.console->printf(kResultStr[summaryTestResult]);
 
     // Test writing random numbers
     hal.console->printf("Testing RAMTRON sequential write/read with random numbers -- ");
-    summaryTestResult &= _cervello_interactiveRAMTRON_writeRandom();
+    summaryTestResult &= _cervello_RAMTRONTest_writeRandom();
     hal.console->printf(kResultStr[summaryTestResult]);
 
     // Write all zeros to reset RAMTRON to a known state
-    _cervello_interactiveRAMTRON_writeValue(0);
+    _cervello_RAMTRONTest_writeValue(0);
      hal.console->printf("\n");
 
     return summaryTestResult;
 }
 
-static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite){
+static bool _cervello_RAMTRONTest_writeValue(uint8_t valueToWrite){
     // Test to write a known value to all addresses in the RAMTRON memory
 
     // Write test data to RAMTRON
     int ramtronSize = ramtron.get_size();
-    EXPECT_DELAY_MS(interactiveTestTimeout);
+    EXPECT_DELAY_MS(testTimeout);
 
     for (int i = 0; i < ramtronSize; i++){
         uint8_t bytesWritten = ramtron.write(i, &valueToWrite, sizeof(uint8_t));
@@ -979,7 +1038,7 @@ static bool _cervello_interactiveRAMTRON_writeValue(uint8_t valueToWrite){
     return true;
 }
 
-static bool _cervello_interactiveRAMTRON_writeRandom(void){
+static bool _cervello_RAMTRONTest_writeRandom(void){
     // Test to write a random array to the entirety of the RAMTRON
 
     if (ramtron.get_size()>cervelloRamtronSize){
@@ -987,7 +1046,7 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void){
         return false;
     }
 
-    EXPECT_DELAY_MS(interactiveTestTimeout);
+    EXPECT_DELAY_MS(testTimeout);
 
     // Generate random data
     static uint8_t randomArray[cervelloRamtronSize];
@@ -1023,6 +1082,109 @@ static bool _cervello_interactiveRAMTRON_writeRandom(void){
 
     }
     return true;
+}
+
+// test cases - PPDS Carrier Board
+static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
+    // Test verifying communication between two serial devices, using a crosstalk cable
+
+    // Setup serial devices
+    std::vector<int> serialDeviceIDs = {serialDevice1, serialDevice2};
+
+    AP_HAL::UARTDriver* SerialDevice[serialDeviceIDs.size()];
+    for (int i = 0; i < serialDeviceIDs.size(); i++){
+        int deviceID = serialDeviceIDs[i];
+
+        // Retrieve device driver
+        SerialDevice[i] = serialManager.get_serial_by_id(deviceID);
+
+        // Begin device/Flush RX & TX buffers
+        SerialDevice[i]->begin((uint32_t)UARTbaud);
+
+        // Set flow control
+        if (enabledHardwareControlFlow) {
+            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_ENABLE);
+        }
+        else {
+            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+        }
+    }
+ 
+    // Generate test message
+    uint8_t tx_buffer[] = {12, 34};
+
+    // Write data using Serial Device #1
+    SerialDevice[0]->write(tx_buffer, (size_t)sizeof(tx_buffer));
+    hal.scheduler->delay(UARTwriteDelay);
+
+    // Verify that bytes exist in the read buffer
+    size_t nBytes = SerialDevice[1]->available();
+    if (nBytes < 1){
+        hal.console->printf("No bytes found in read buffer --- ");
+        return false;
+    }
+
+    // Read data using Serial Device #2
+    std::vector<uint8_t> rx_buffer;
+    rx_buffer.reserve(nBytes);
+    if (nBytes) {
+        while (nBytes-- > 0) {
+            uint8_t c = (uint8_t)SerialDevice[1]->read();
+            rx_buffer.push_back(c);
+         }
+    }
+
+    // Verify that the send and received message matches the original test message
+    for (int i = 0; i < rx_buffer.size(); i++){
+        if (tx_buffer[i] != rx_buffer[i]){
+            hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
+            return false;           
+        }
+    }
+ 
+    return true;
+}
+
+static bool _PPDSCarrier_buzzerTest(void){
+    // Test to verify that the Buzzer on the PPDS Carrier Board is functional
+      
+    if (!notify.buzzer_enabled()){
+        hal.console->printf("Buzzer not enabled ");
+        return false;
+    }
+    
+    // Tunes defined in ToneAlarm.cpp
+    hal.console->printf("Buzzer generating tone --- ");
+    AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+
+    return true;
+}
+
+static bool _PPDSCarrier_safetySwitchTest(void){
+    // Test to verify that the safety switch on the PPDS Carrier Board is functional
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    // Get the current switch state
+    int originalSwitchState = hal.util->safety_switch_state();
+
+    // Wait for the user to activate the safety switch
+    hal.console->printf("Waiting for switch to be activated --- ");
+    while(AP_HAL::micros() < testEndTime){
+
+        // Check if the switch has been actuated
+        if (hal.util->safety_switch_state() != originalSwitchState){
+            return true;
+        }
+
+        hal.scheduler->delay(testLoopDelay);
+    }
+    return false;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
