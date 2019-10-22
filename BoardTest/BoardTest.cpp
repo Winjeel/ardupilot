@@ -423,7 +423,7 @@ static bool _hasATECC608(void) {
         CLEAN_UP_AND_RETURN(false);
     }
 
-    CLEAN_UP_AND_RETURN(false);
+    CLEAN_UP_AND_RETURN(true);
 }
 
 static bool _cervello_runAllProbeTests(void){
