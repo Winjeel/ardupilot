@@ -513,6 +513,8 @@ static bool _PPDSCarrier_runAllTests(void){
     const int SERIAL2 = 2; // J6 - TELEM2 - UART 3 - SERIAL2
     const int SERIAL4 = 4; // J4 - TELEM 3 - UART 7 - SERIAL4
     const int SERIAL5 = 5; // J14-5, J14-7 - TELEM4 - UART 8 - SERIAL5
+    const int SERVO3 = 3; // J14-8 - ESC TX - SERVO3
+    const int SERIAL6 = 6; // J14-6 - MOTOR_POD  - USART1 Receive (RX) Only - SERIAL6    
 
      // Test Serial 1 <-> Serial 2 communication
     hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL2);
@@ -549,6 +551,12 @@ static bool _PPDSCarrier_runAllTests(void){
     testResult = _PPDSCarrier_serialCommunicationTest(SERIAL5, SERIAL5, false);
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Servo3 -> Serial 6 communication
+    hal.console->printf("Testing PPDS Carrier communucation from PWM device %i to serial device %i --- ", SERVO3, SERIAL6);
+    testResult = _PPDSCarrier_pwmToSerialCommunicationTest(SERVO3, SERIAL6);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");    
 
     // Test Buzzer
     hal.console->printf("Testing PPDS Carrier Buzzer --- ");
@@ -1107,8 +1115,14 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
         // Retrieve device driver
         SerialDevice[i] = serialManager.get_serial_by_id(deviceID);
 
-        // Begin device/Flush RX & TX buffers
+        // Begin device
         SerialDevice[i]->begin((uint32_t)UARTbaud);
+
+        // Clear the UART buffer
+        if (!_flushUART(SerialDevice[i])) {
+            hal.console->printf("Could not flush buffer on serial device %i --- ", deviceID);
+            return false;
+        }
 
         // Set flow control
         if (enabledHardwareControlFlow) {
@@ -1149,6 +1163,45 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
             hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
             return false;
         }
+    }
+
+    return true;
+}
+
+static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialDevice){
+    // Test verifying communication from a PWM device to a Serial device (one way)
+
+    // Setup the receiving serial device
+    AP_HAL::UARTDriver* SerialDevice;
+    SerialDevice = serialManager.get_serial_by_id(serialDevice);
+    SerialDevice->begin((uint32_t)150000);
+    SerialDevice->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+
+    // Clear the UART buffer
+    if (!_flushUART(SerialDevice)) {
+        hal.console->printf("Could not flush buffer on serial device %i --- ", serialDevice);
+        return false;
+    }
+
+    // Enable PWM outputs
+    for (uint8_t i=0; i < BOARD_PWM_COUNT_DEFAULT; i++) {
+        hal.rcout->enable_ch(i);
+
+        // Set serial protocol to enable writing serial
+        hal.rcout->set_output_mode(i, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
+    }
+
+    // Write a DSHOT message
+    hal.rcout->force_safety_off();
+    hal.rcout->write(pwmDevice-1, 2000);
+    hal.scheduler->delay(1);
+    hal.rcout->force_safety_on();
+
+    // Verify that bytes exist in the read buffer
+    hal.scheduler->delay(100);
+    if (SerialDevice->available() < 1){
+        hal.console->printf("No bytes found in read buffer --- ");
+        return false;
     }
 
     return true;

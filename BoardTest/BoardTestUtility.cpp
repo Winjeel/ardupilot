@@ -22,3 +22,18 @@ float _approxRunningAverage(float average, float newSample){
 void _initialiseRandomNumberGenerator(void){
     std::srand(rngSeed);
 }
+
+bool _flushUART(AP_HAL::UARTDriver* SerialDevice){
+    // Function to flush the RX buffer of a serial device
+    size_t initialBytes = SerialDevice->available();
+    std::vector<uint8_t> startBuffer;
+    startBuffer.reserve(initialBytes);
+    if (initialBytes > 0) {
+        while (initialBytes-- > 0) {
+            SerialDevice->read();
+         }
+    }
+
+    return (SerialDevice->available() < 1);
+
+}

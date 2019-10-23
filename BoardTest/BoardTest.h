@@ -82,6 +82,7 @@ static bool _cervello_RAMTRONTest_writeRandom(void);
 // PPDS Carrier test cases - forward declare
 static bool _PPDSCarrier_runAllTests(void);
 static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
+static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialDevice);
 static bool _PPDSCarrier_buzzerTest(void);
 static bool _PPDSCarrier_safetySwitchTest(void);
 
