@@ -556,7 +556,7 @@ float Plane::lookahead_adjustment(void)
 
 
 /*
-  correct target altitude using rangefinder or terrain estimator data. Returns offset in
+  correct target altitude using rangefinder data. Returns offset in
   meters to correct target altitude. A positive number means we need
   to ask the speed/height controller to fly higher
  */
@@ -564,13 +564,10 @@ float Plane::rangefinder_correction(void)
 {
     // for now we only support the rangefinder for landing 
     const uint32_t rangefinder_timeout_ms = 5000;
-    bool using_rangefinder = (g.rangefinder_landing == land_hagl_source::RANGEFINDER && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < rangefinder_timeout_ms));
-    float hagl;
-    bool using_estimator = g.rangefinder_landing == land_hagl_source::EKF && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(hagl);
+    bool using_rangefinder = ((g.rangefinder_landing == land_hagl_source::RANGEFINDER || g.rangefinder_landing == land_hagl_source::EKF)
+        && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && (millis() - rangefinder_state.last_correction_time_ms < rangefinder_timeout_ms));
     if (using_rangefinder) {
         return rangefinder_state.correction;
-    } else if (using_estimator) {
-        return relative_altitude - hagl;
     }
     return 0;
 }
@@ -580,47 +577,57 @@ float Plane::rangefinder_correction(void)
  */
 void Plane::rangefinder_height_update(void)
 {
-    float distance = rangefinder.distance_cm_orient(ROTATION_PITCH_270)*0.01f;
-    
-    if ((rangefinder.status_orient(ROTATION_PITCH_270) == RangeFinder::RangeFinder_Good) && ahrs.home_is_set()) {
-        if (!rangefinder_state.have_initial_reading) {
-            rangefinder_state.have_initial_reading = true;
-            rangefinder_state.initial_range = distance;
-        }
-        // correct the range for attitude (multiply by DCM.c.z, which
-        // is cos(roll)*cos(pitch))
-        rangefinder_state.height_estimate = distance * ahrs.get_rotation_body_to_ned().c.z;
-
-        // we consider ourselves to be fully in range when we have 10
-        // good samples (0.2s) that are different by 5% of the maximum
-        // range from the initial range we see. The 5% change is to
-        // catch Lidars that are giving a constant range, either due
-        // to misconfiguration or a faulty sensor
-        if (rangefinder_state.in_range_count < 10) {
-            if (!is_equal(distance, rangefinder_state.last_distance) &&
-                fabsf(rangefinder_state.initial_range - distance) > 0.05f * rangefinder.max_distance_cm_orient(ROTATION_PITCH_270)*0.01f) {
-                rangefinder_state.in_range_count++;
-            }
-            if (fabsf(rangefinder_state.last_distance - distance) > rangefinder.max_distance_cm_orient(ROTATION_PITCH_270)*0.01*0.2) {
-                // changes by more than 20% of full range will reset counter
-                rangefinder_state.in_range_count = 0;
-            }
-        } else {
-            rangefinder_state.in_range = true;
-            if (!rangefinder_state.in_use &&
-                (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND ||
-                 control_mode == &mode_qland ||
-                 control_mode == &mode_qrtl ||
-                 (control_mode == &mode_auto && quadplane.is_vtol_land(plane.mission.get_current_nav_cmd().id))) &&
-                g.rangefinder_landing == land_hagl_source::RANGEFINDER) {
-                rangefinder_state.in_use = true;
-                gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder engaged at %.2fm", (double)rangefinder_state.height_estimate);
-            }
-        }
-        rangefinder_state.last_distance = distance;
-    } else {
+    bool using_estimator = g.rangefinder_landing == land_hagl_source::EKF && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(rangefinder_state.height_estimate);
+    if (using_estimator) {
         rangefinder_state.in_range_count = 0;
-        rangefinder_state.in_range = false;
+        rangefinder_state.in_range = true;
+        if (!rangefinder_state.in_use && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND)
+        {
+            rangefinder_state.in_use = true;
+            gcs().send_text(MAV_SEVERITY_INFO, "Optical flow engaged at %.2fm", (double)rangefinder_state.height_estimate);
+        }
+    } else {
+        float distance = rangefinder.distance_cm_orient(ROTATION_PITCH_270)*0.01f;
+        if ((rangefinder.status_orient(ROTATION_PITCH_270) == RangeFinder::RangeFinder_Good) && ahrs.home_is_set()) {
+            if (!rangefinder_state.have_initial_reading) {
+                rangefinder_state.have_initial_reading = true;
+                rangefinder_state.initial_range = distance;
+            }
+            // correct the range for attitude (multiply by DCM.c.z, which
+            // is cos(roll)*cos(pitch))
+            rangefinder_state.height_estimate = distance * ahrs.get_rotation_body_to_ned().c.z;
+
+            // we consider ourselves to be fully in range when we have 10
+            // good samples (0.2s) that are different by 5% of the maximum
+            // range from the initial range we see. The 5% change is to
+            // catch Lidars that are giving a constant range, either due
+            // to misconfiguration or a faulty sensor
+            if (rangefinder_state.in_range_count < 10) {
+                if (!is_equal(distance, rangefinder_state.last_distance) &&
+                    fabsf(rangefinder_state.initial_range - distance) > 0.05f * rangefinder.max_distance_cm_orient(ROTATION_PITCH_270)*0.01f) {
+                    rangefinder_state.in_range_count++;
+                }
+                if (fabsf(rangefinder_state.last_distance - distance) > rangefinder.max_distance_cm_orient(ROTATION_PITCH_270)*0.01*0.2) {
+                    // changes by more than 20% of full range will reset counter
+                    rangefinder_state.in_range_count = 0;
+                }
+            } else {
+                rangefinder_state.in_range = true;
+                if (!rangefinder_state.in_use &&
+                    (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND ||
+                    control_mode == &mode_qland ||
+                    control_mode == &mode_qrtl ||
+                    (control_mode == &mode_auto && quadplane.is_vtol_land(plane.mission.get_current_nav_cmd().id))) &&
+                    g.rangefinder_landing == land_hagl_source::RANGEFINDER) {
+                    rangefinder_state.in_use = true;
+                    gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder engaged at %.2fm", (double)rangefinder_state.height_estimate);
+                }
+            }
+            rangefinder_state.last_distance = distance;
+        } else {
+            rangefinder_state.in_range_count = 0;
+            rangefinder_state.in_range = false;
+        }
     }
 
     if (rangefinder_state.in_range) {
@@ -646,16 +653,20 @@ void Plane::rangefinder_height_update(void)
             landing.set_initial_slope();
             rangefinder_state.last_correction_time_ms = now;
         } else {
-            rangefinder_state.correction = 0.8f*rangefinder_state.correction + 0.2f*correction;
+            if (using_estimator) {
+                // already filtered by EKF so no additional filtering required
+                rangefinder_state.correction = correction;
+            } else {
+                rangefinder_state.correction = 0.8f*rangefinder_state.correction + 0.2f*correction;
+            }
             rangefinder_state.last_correction_time_ms = now;
             if (fabsf(rangefinder_state.correction - rangefinder_state.initial_correction) > 30) {
-                // the correction has changed by more than 30m, reset use of Lidar. We may have a bad lidar
+                // the correction has changed by more than 30m, reset use of HAGL sensing. We may have a bad sensor
                 if (rangefinder_state.in_use) {
-                    gcs().send_text(MAV_SEVERITY_INFO, "Rangefinder disengaged at %.2fm", (double)rangefinder_state.height_estimate);
+                    gcs().send_text(MAV_SEVERITY_INFO, "HAGL measurement disengaged at %.2fm", (double)rangefinder_state.height_estimate);
                 }
                 memset(&rangefinder_state, 0, sizeof(rangefinder_state));
             }
         }
-        
     }
 }
