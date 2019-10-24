@@ -152,6 +152,7 @@ private:
     AP_Int8 flap_percent;
     AP_Int8 throttle_slewrate;
     AP_Int8 type;
+    AP_Float decel_coef;
 
     // Land Type STANDARD GLIDE SLOPE
 
