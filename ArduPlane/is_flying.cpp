@@ -5,6 +5,7 @@
  */
 
 #define CRASH_DETECTION_DELAY_MS            500
+#define SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS 5000
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
@@ -320,7 +321,14 @@ void Plane::crash_detection_update(void)
                     // accel threshold but still not fying, then you either shook/hit the
                     // plane or it was a failed launch.
                     crashed = true;
-                    crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                    if (g2.takeoff_throttle_accel_count > 1) {
+                        // using multiple shakes to start the motor so need to allow time for the
+                        // thrower to react and throw and the is_flying status to change to TRUE
+                        crash_state.debounce_time_total_ms = SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS;
+                    } else {
+                        // allow time for the is_flying status to change to TRUE after the throw
+                        crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                    }
                 }
                 // TODO: handle auto missions without NAV_TAKEOFF mission cmd
                 break;
