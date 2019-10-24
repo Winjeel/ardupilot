@@ -249,12 +249,11 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     // of total approach length
     float decel_distance = 0.0f;
     if (decel_coef >= 0.1f) {
-        float decel_rate = GRAVITY_MSS * decel_coef; // deceleration (m/s/s)
-        float decel_time = groundspeed / decel_rate; // time required to stop (s)
-        float decel_distance_fraction = 0.5f * decel_rate * decel_time * decel_time;
-        decel_distance_fraction /= total_distance;
-        decel_distance_fraction = MIN(decel_distance_fraction, 0.2f);
-        decel_distance = decel_distance_fraction * total_distance;
+        const float decel_rate = GRAVITY_MSS * decel_coef; // deceleration (m/s/s)
+        const float decel_time = groundspeed / decel_rate; // time required to stop (s)
+        decel_distance = 0.5f * decel_rate * decel_time * decel_time;
+        const float decel_distance_max = total_distance * 0.2f;
+        decel_distance = MIN(decel_distance, decel_distance_max);
     }
 
     // calculate time to lose the needed altitude
