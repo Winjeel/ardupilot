@@ -556,7 +556,7 @@ static bool _PPDSCarrier_runAllTests(void){
     hal.console->printf("Testing PPDS Carrier communucation from PWM device %i to serial device %i --- ", SERVO3, SERIAL6);
     testResult = _PPDSCarrier_pwmToSerialCommunicationTest(SERVO3, SERIAL6);
     hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");    
+    summaryTestResult &= testResult; hal.console->printf("\n");
 
     // Test Buzzer
     hal.console->printf("Testing PPDS Carrier Buzzer --- ");
@@ -1170,38 +1170,61 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
 
 static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialDevice){
     // Test verifying communication from a PWM device to a Serial device (one way)
-
+    
     // Setup the receiving serial device
     AP_HAL::UARTDriver* SerialDevice;
     SerialDevice = serialManager.get_serial_by_id(serialDevice);
-    SerialDevice->begin((uint32_t)150000);
+    SerialDevice->begin(UARTbaud);
     SerialDevice->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    _flushUART(SerialDevice);
 
-    // Clear the UART buffer
-    if (!_flushUART(SerialDevice)) {
-        hal.console->printf("Could not flush buffer on serial device %i --- ", serialDevice);
-        return false;
-    }
-
-    // Enable PWM outputs
+    // Enable all PWM channels
     for (uint8_t i=0; i < BOARD_PWM_COUNT_DEFAULT; i++) {
         hal.rcout->enable_ch(i);
-
         // Set serial protocol to enable writing serial
         hal.rcout->set_output_mode(i, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
     }
-
-    // Write a DSHOT message
-    hal.rcout->force_safety_off();
-    hal.rcout->write(pwmDevice-1, 2000);
-    hal.scheduler->delay(1);
-    hal.rcout->force_safety_on();
-
-    // Verify that bytes exist in the read buffer
     hal.scheduler->delay(100);
-    if (SerialDevice->available() < 1){
-        hal.console->printf("No bytes found in read buffer --- ");
+    
+    // Setup serial communication over the PWM device
+    if (!hal.rcout->serial_setup_output((uint8_t)pwmDevice-1, UARTbaud, (uint16_t)1 << pwmDevice)){
+        hal.console->printf("Could not configure PWM device %i with serial output --- ", pwmDevice);
         return false;
+    }
+
+    // Write serial using PWM
+    uint8_t tx_buffer[2] = {29, 31};
+    if (!hal.rcout->serial_write_bytes(tx_buffer, (uint16_t)sizeof(tx_buffer))){
+        hal.console->printf("Could not write serial data using PWM device %i -- ", pwmDevice);
+        return false;
+    }
+
+    // Clean up the serial connection over PWM
+    hal.rcout->serial_end();
+
+    // Check if data exists in the read buffer of the receiving serial device
+    hal.scheduler->delay(100);
+    size_t nBytes = SerialDevice->available();
+    if (nBytes < 1){
+                hal.console->printf("No bytes found in read buffer --- ");
+        return false;
+    }
+
+    // Retrieve data from the read buffer
+    std::vector<uint8_t> rx_buffer;
+    rx_buffer.reserve(nBytes);
+    while (nBytes-- > 0) {
+        uint8_t c = (uint8_t)SerialDevice->read();
+        hal.console->printf("%u  ", c);
+        rx_buffer.push_back(c);
+    }
+
+    // Verify that the send and received message matches the original test message
+    for (int i = 0; i < rx_buffer.size(); i++){
+        if (tx_buffer[i] != rx_buffer[i]){
+            hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
+            return false;
+        }
     }
 
     return true;

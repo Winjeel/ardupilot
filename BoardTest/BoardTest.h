@@ -92,8 +92,8 @@ const Test kTestItem[] = {
     { '!', nullptr,              _reboot,            "Reboot.", },
 
     // All Cervello tests
-    { '1', "Cervello probe tests",          _cervello_runAllProbeTests,      "Cervello - Test if all sensors can be discovered.", },
-    { '2', "Cervello all  tests",           _cervello_runAllTests,           "Cervello - Run all tests.", },
+    { '1', "Cervello probe tests",          _cervello_runAllProbeTests,          "Cervello - Test if all sensors can be discovered.", },
+    { '2', "Cervello all tests",            _cervello_runAllTests,               "Cervello - Run all tests.", },
 
     // Cervello individual tests
     { '3', "Cervello accelerometer tests",  _cervello_AccelTest,                 "Cervello - Run accelerometer test.", },
@@ -104,7 +104,7 @@ const Test kTestItem[] = {
     { '8', "Cervello RAMTRON tests",        _cervello_RAMTRONTest,               "Cervello - Run RAMTRON test.", },
 
     // All PPDS Carrier Tests
-    { '9', "PPDS Carrier Tests",            _PPDSCarrier_runAllTests,                   "PPDS Carrier - Run all tests.", },
+    { '9', "PPDS Carrier Tests",            _PPDSCarrier_runAllTests,            "PPDS Carrier - Run all tests.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
