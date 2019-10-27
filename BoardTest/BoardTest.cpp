@@ -495,84 +495,6 @@ static bool _cervello_runAllTests(void){
     return summaryTestResult;
 }
 
-static bool _PPDSCarrier_runAllTests(void){
-    // function to run all tests on the PPDS Carrier
-    bool summaryTestResult = true;
-    bool testResult;
-
-    // SERIAL0	USB	OTG
-    // SERIAL1	SERIAL1 (J5)	USART2
-    // SERIAL2	SERIAL2 (J6)	USART3
-    // SERIAL3	GPS (J13)	UART4
-    // SERIAL4	TELEM3 (J4)	UART7
-    // SERIAL5	TELEM4 (J14-5, J14-7)	UART8
-    // SERIAL6	MOTOR_POD (J14-6)	USART1 Receive (RX) Only
-
-    // UART communication tests
-    const int SERIAL1 = 1; // J5 - TELEM1 - UART 2 - SERIAL1
-    const int SERIAL2 = 2; // J6 - TELEM2 - UART 3 - SERIAL2
-    const int SERIAL4 = 4; // J4 - TELEM 3 - UART 7 - SERIAL4
-    const int SERIAL5 = 5; // J14-5, J14-7 - TELEM4 - UART 8 - SERIAL5
-    const int SERVO3 = 3; // J14-8 - ESC TX - SERVO3
-    const int SERIAL6 = 6; // J14-6 - MOTOR_POD  - USART1 Receive (RX) Only - SERIAL6    
-
-     // Test Serial 1 <-> Serial 2 communication
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL2);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL2, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 1 <-> Serial 2 communication with hardware flow control
-    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL1, SERIAL2);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, true);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL2, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, true);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 1 <-> Serial 4 communication
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL4);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL4, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL4, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL4, SERIAL1, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 5 loopback
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL5, SERIAL5);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL5, SERIAL5, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Servo3 -> Serial 6 communication
-    hal.console->printf("Testing PPDS Carrier communucation from PWM device %i to serial device %i --- ", SERVO3, SERIAL6);
-    testResult = _PPDSCarrier_pwmToSerialCommunicationTest(SERVO3, SERIAL6);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Buzzer
-    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
-    testResult = _PPDSCarrier_buzzerTest();
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-
-    // Test safety switch
-    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
-    testResult = _PPDSCarrier_safetySwitchTest();
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-
-    return summaryTestResult;
-}
-
 // test cases - cervello probe
 static bool _cervello_probeMS5611(void) { // Baro 1, SPI
     bool result = false;
@@ -1102,7 +1024,72 @@ static bool _cervello_RAMTRONTest_writeRandom(void){
 }
 
 // test cases - PPDS Carrier Board
-static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial2(void){
+    // Test to verify that the devices Serial1 and Serial2 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Serial%i & Serial%i (J%i & J%i) has been fitted\n\n", SERIAL1, SERIAL2, 5, 6);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // Test Serial 1 <-> Serial 2 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL1, SERIAL2, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL2, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL2, SERIAL1, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Serial 1 <-> Serial 2 communication with hardware flow control
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL1, SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL1, SERIAL2, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL2, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL2, SERIAL1, true);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial4(void){
+    // Test to verify that the devices Serial1 and Serial4 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Serial%i & Serial%i (J%i & J%i) has been fitted\n\n", SERIAL1, SERIAL4, 5, 4);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // Test Serial 1 <-> Serial 4 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL4);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL1, SERIAL4, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL4, SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL4, SERIAL1, false);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_Serial5_Loopback(void){
+    // Test to verify that the devices Serial1 and Serial4 are able to communicate
+    hal.console->printf("Ensure loopback cable on Serial5 (J14-5, J14-7) has been fitted\n\n");
+
+    // Test Serial 5 loopback
+    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL5, SERIAL5);
+    bool testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SERIAL5, SERIAL5, false);
+    hal.console->printf(kResultStr[testResult]);
+    hal.console->printf("\n");
+
+    return testResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
     // Test verifying communication between two serial devices, using a crosstalk cable
 
     // Setup serial devices
@@ -1168,7 +1155,49 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
     return true;
 }
 
-static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialDevice){
+static bool _PPDSCarrier_serialCommunicationTest_Servo3_Serial6(void){
+    // Test to verify that the devices Servo3 and Serial6 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Servo%i & Serial%i (J14-8, J14-6) has been fitted\n\n", SERVO3, SERIAL6);
+
+    // Test Servo 3 -> Serial 6 communication
+    hal.console->printf("Testing PPDS Carrier communucation from PWM device %i to serial device %i --- ", SERVO3, SERIAL6);
+    bool testResult = _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(SERVO3, SERIAL6);
+    hal.console->printf(kResultStr[testResult]);
+    hal.console->printf("\n");
+
+    return testResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_Servos_Serial4(void){
+    // Test to verify that the remaining Servo devices are able to communicate to Serial4
+    return true;
+
+
+
+ /*    //int pwmDevices[8] = {SERVO1, SERVO2, SERVO4, SERVO5, SERVO6, SERVO7, SERVO8, SERVO9}; // Skip ESC PWM channel
+    int pwmDevices[1] = {SERVO1};
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    bool testResult = false;
+
+    for (int i = 0; i < sizeof(pwmDevices); i++){
+        EXPECT_DELAY_MS(testTimeout);
+
+        int pwmDevice = pwmDevices[i];
+        hal.console->printf("Testing PPDS Carrier communucation from PWM device %i to serial device %i --- ", pwmDevice, SERIAL4);
+
+        hal.scheduler->delay(testTimeout);
+        testResult = _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(pwmDevice, SERIAL4);
+        hal.console->printf(kResultStr[testResult]);
+        summaryTestResult &= testResult; hal.console->printf("\n");
+    }
+
+    return summaryTestResult; */
+
+}
+
+static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(int pwmDevice, int serialDevice){
     // Test verifying communication from a PWM device to a Serial device (one way)
     
     // Setup the receiving serial device
@@ -1206,7 +1235,7 @@ static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialD
     hal.scheduler->delay(100);
     size_t nBytes = SerialDevice->available();
     if (nBytes < 1){
-                hal.console->printf("No bytes found in read buffer --- ");
+        hal.console->printf("No bytes found in read buffer --- ");
         return false;
     }
 
@@ -1232,21 +1261,32 @@ static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialD
 
 static bool _PPDSCarrier_buzzerTest(void){
     // Test to verify that the Buzzer on the PPDS Carrier Board is functional
+    hal.console->printf("Ensure buzzer has been fitted on J18\n\n");
+
+    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
+    bool testResult = true;
 
     if (!notify.buzzer_enabled()){
         hal.console->printf("Buzzer not enabled ");
-        return false;
+        testResult = false;
     }
 
     // Tunes defined in ToneAlarm.cpp
-    hal.console->printf("Buzzer generating tone --- ");
-    AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+    if (testResult){
+        hal.console->printf("Buzzer generating tone --- ");
+        AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+    }
 
-    return true;
+    hal.console->printf(kResultStr[testResult]);
+    return testResult;
 }
 
 static bool _PPDSCarrier_safetySwitchTest(void){
     // Test to verify that the safety switch on the PPDS Carrier Board is functional
+    hal.console->printf("Ensure safety switch has been fitted on J7\n\n");
+
+    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
+    bool testResult = false;
 
     // Expect delay based on timeout duration;
     EXPECT_DELAY_MS((int)testTimeout);
@@ -1264,12 +1304,14 @@ static bool _PPDSCarrier_safetySwitchTest(void){
 
         // Check if the switch has been actuated
         if (hal.util->safety_switch_state() != originalSwitchState){
-            return true;
+            testResult = true;
+            break;
         }
 
         hal.scheduler->delay(testLoopDelay);
     }
-    return false;
+    hal.console->printf(kResultStr[testResult]);
+    return testResult;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {

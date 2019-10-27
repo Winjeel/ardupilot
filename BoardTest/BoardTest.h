@@ -80,9 +80,15 @@ static bool _cervello_RAMTRONTest_writeValue(uint8_t valueToWrite);
 static bool _cervello_RAMTRONTest_writeRandom(void);
 
 // PPDS Carrier test cases - forward declare
-static bool _PPDSCarrier_runAllTests(void);
-static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
-static bool _PPDSCarrier_pwmToSerialCommunicationTest(int pwmDevice, int serialDevice);
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial2(void);
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial4(void);
+static bool _PPDSCarrier_serialCommunicationTest_Serial5_Loopback(void);
+static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
+
+static bool _PPDSCarrier_serialCommunicationTest_Servo3_Serial6(void);
+static bool _PPDSCarrier_serialCommunicationTest_Servos_Serial4(void);
+
+static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(int pwmDevice, int serialDevice);
 static bool _PPDSCarrier_buzzerTest(void);
 static bool _PPDSCarrier_safetySwitchTest(void);
 
@@ -103,8 +109,16 @@ const Test kTestItem[] = {
     { '7', "Cervello SD Card tests",        _cervello_SDCardTest,                "Cervello - Run SD Card test.", },
     { '8', "Cervello RAMTRON tests",        _cervello_RAMTRONTest,               "Cervello - Run RAMTRON test.", },
 
-    // All PPDS Carrier Tests
-    { '9', "PPDS Carrier Tests",            _PPDSCarrier_runAllTests,            "PPDS Carrier - Run all tests.", },
+    // PPDS Carrier individual tests
+    { 'q', "PPDS Carrier Serial1 to Serial2 Communication test",            _PPDSCarrier_serialCommunicationTest_Serial1_Serial2,            "PPDS Carrier - Run Serial1 to Serial2 Communication test.", },
+    { 'w', "PPDS Carrier Serial1 to Serial4 Communication test",            _PPDSCarrier_serialCommunicationTest_Serial1_Serial4,            "PPDS Carrier - Run Serial1 to Serial4 Communication test.", },
+    { 'e', "PPDS Carrier Serial5 Loopback Communication test",              _PPDSCarrier_serialCommunicationTest_Serial5_Loopback,           "PPDS Carrier - Run Serial5 Loopback Communication test.", },
+
+    { 'r', "PPDS Carrier Servo3 to Serial6 Communication test",             _PPDSCarrier_serialCommunicationTest_Servo3_Serial6,             "PPDS Carrier - Run Servo3 to Serial6 Communication test.", },
+    { 't', "PPDS Carrier Servos to Serial4 Communication test",             _PPDSCarrier_serialCommunicationTest_Servos_Serial4,             "PPDS Carrier - Run Remaining Servos to Serial4 Communication test.", },
+
+    { 'y', "PPDS Carrier Buzzer test",                                      _PPDSCarrier_buzzerTest,                                         "PPDS Carrier - Run Buzzer test.", },
+    { 'u', "PPDS Carrier Safety Switch test",                               _PPDSCarrier_safetySwitchTest,                                   "PPDS Carrier - Run Safety Switch test.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
