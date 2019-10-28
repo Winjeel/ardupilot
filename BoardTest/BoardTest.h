@@ -86,9 +86,10 @@ static bool _PPDSCarrier_serialCommunicationTest_Serial5_Loopback(void);
 static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
 
 static bool _PPDSCarrier_serialCommunicationTest_Servo3_Serial6(void);
-static bool _PPDSCarrier_serialCommunicationTest_Servos_Serial4(void);
+static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void);
+static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(int pwmDevice, int serialDevice, bool printFailMsg);
 
-static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(int pwmDevice, int serialDevice);
+static bool _PPDSCarrier_rcInputTest(void);
 static bool _PPDSCarrier_buzzerTest(void);
 static bool _PPDSCarrier_safetySwitchTest(void);
 
@@ -115,10 +116,12 @@ const Test kTestItem[] = {
     { 'e', "PPDS Carrier Serial5 Loopback Communication test",              _PPDSCarrier_serialCommunicationTest_Serial5_Loopback,           "PPDS Carrier - Run Serial5 Loopback Communication test.", },
 
     { 'r', "PPDS Carrier Servo3 to Serial6 Communication test",             _PPDSCarrier_serialCommunicationTest_Servo3_Serial6,             "PPDS Carrier - Run Servo3 to Serial6 Communication test.", },
-    { 't', "PPDS Carrier Servos to Serial4 Communication test",             _PPDSCarrier_serialCommunicationTest_Servos_Serial4,             "PPDS Carrier - Run Remaining Servos to Serial4 Communication test.", },
+    { 't', "PPDS Carrier Servos to Serial4 Communication test",             _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4,           "PPDS Carrier - Run All Remaining Servos to Serial4 Communication test.", },
 
-    { 'y', "PPDS Carrier Buzzer test",                                      _PPDSCarrier_buzzerTest,                                         "PPDS Carrier - Run Buzzer test.", },
-    { 'u', "PPDS Carrier Safety Switch test",                               _PPDSCarrier_safetySwitchTest,                                   "PPDS Carrier - Run Safety Switch test.", },
+    { 'y', "PPDS Carrier RC Input test",                                    _PPDSCarrier_rcInputTest,                                        "PPDS Carrier - Run RC Input test.", },
+
+    { 'u', "PPDS Carrier Buzzer test",                                      _PPDSCarrier_buzzerTest,                                         "PPDS Carrier - Run Buzzer test.", },
+    { 'i', "PPDS Carrier Safety Switch test",                               _PPDSCarrier_safetySwitchTest,                                   "PPDS Carrier - Run Safety Switch test.", },
 
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
