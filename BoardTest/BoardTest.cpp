@@ -3,6 +3,10 @@
 */
 #include "BoardTest.h"
 
+#include <AP_SBusOut/AP_SBusOut.h>
+#include <SRV_Channel/SRV_Channel.h>
+#include <AP_Param/AP_Param.h>
+
 #if APJ_BOARD_ID != 1688
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
@@ -12,6 +16,10 @@ const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
 static AP_Notify notify;
+
+static AP_SBusOut sbusOut;
+static SRV_Channels servoChannels;
+static AP_Param params;
 
 // Sensor classes
 static AP_Baro barometer;
@@ -1281,12 +1289,54 @@ static bool _PPDSCarrier_rcInputTest(void){
     // Test to verify that the devices RC In and Serial4 are able to communicate
     hal.console->printf("Ensure crosstalk cable between RC Input & Serial%i (J16 & J4) has been fitted\n\n", SERIAL4);
 
+
+    params.setup();
+    params.setup_sketch_defaults();
+
+    bool success = params.set_object_value(&serialManager, serialManager.var_info, "4_PROTOCOL", (float)AP_SerialManager::SerialProtocol_Sbus1);
+
+    //bool success = params.set_by_name("4_PROTOCOL", (float)AP_SerialManager::SerialProtocol_Sbus1);
+    hal.console->printf("success %d\n", success);
+
+    // Setup SBUS UART
+    AP_HAL::UARTDriver* SerialDevice2;
+    SerialDevice2 = serialManager.find_serial(AP_SerialManager::SerialProtocol_Sbus1,0);
+    if (SerialDevice2 == nullptr){
+        return false;
+    }
+
+
+    // @Param: 4_PROTOCOL
+    // @DisplayName: Serial4 protocol selection
+    // @Description: Control what protocol Serial4 port should be used for. Note that the Frsky options require external converter hardware. See the wiki for details.
+    // @Values: -1:None, 1:MAVLink1, 2:MAVLink2, 3:Frsky D, 4:Frsky SPort, 5:GPS, 7:Alexmos Gimbal Serial, 8:SToRM32 Gimbal Serial, 9:Rangefinder, 10:FrSky SPort Passthrough (OpenTX), 11:Lidar360, 13:Beacon, 14:Volz servo out, 15:SBus servo out, 16:ESC Telemetry, 17:Devo Telemetry, 18:OpticalFlow, 19:RobotisServo
+    // @User: Standard
+    // @RebootRequired: True
+    //AP_GROUPINFO("4_PROTOCOL",  7, AP_SerialManager, state[4].protocol, SerialProtocol_GPS),
+
+
+
+    
+
+
+
+    // state[4].uart = hal.uartE;  // serial4, uartE, normally 2nd GPS
+
+    // Setup servo outputs for SBUS
+    for (int i = 0; i < BOARD_PWM_COUNT_DEFAULT; i++){
+        servoChannels.set_output_pwm_chan(i, 1000);
+    }
+
     // Setup the transmitting serial device
     AP_HAL::UARTDriver* SerialDevice;
     SerialDevice = serialManager.get_serial_by_id(SERIAL4);
-    SerialDevice->begin(UARTbaud);
+    SerialDevice->begin(100000);
     SerialDevice->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
     _flushUART(SerialDevice);
+
+    // Write the SBUS signal
+    sbusOut.update();
+
 
     EXPECT_DELAY_MS(testTimeout);
 
@@ -1295,13 +1345,7 @@ static bool _PPDSCarrier_rcInputTest(void){
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     while(AP_HAL::micros() < testEndTime){
-        uint8_t tx_buffer[2] = {29, 31};
-        SerialDevice->write(tx_buffer, (uint16_t)sizeof(tx_buffer));
-        // size_t writtenBytes = 
-        //hal.console->printf("%i ", (int)writtenBytes);
-
-        
-
+        sbusOut.update();
 
         if (hal.rcin->read(0) > 0){
             return true;
@@ -1309,35 +1353,7 @@ static bool _PPDSCarrier_rcInputTest(void){
 
         hal.scheduler->delay(20);
     }
-
-
-/*     AP_HAL::UARTDriver* SerialDevice2;
-    SerialDevice2 = serialManager.find_serial(AP_SerialManager::SerialProtocol_Sbus1,0);
-
-    if(SerialDevice2==nullptr){
-        return false;
-    }
-
-    AP_Param::GroupInfo aaa = serialManager.var_info[];
-
-    aaa.
-
-
-    hal.console->printf("%u\n",SerialDevice2->available()); */
-    
-    /* 
-    uint16_t channels[2] = {1000, 2000};
-    uint8_t num_channels = 2;
-    uint8_t buffer[25];
-
-    sbusOut.sbus_format_frame(channels, num_channels, buffer);
-
-
-    sbusOut.update();
-
-    return (SerialDevice->available() > 0); */
     return false;
-
 }
 
 static bool _PPDSCarrier_buzzerTest(void){
