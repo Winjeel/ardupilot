@@ -16,6 +16,9 @@
 #include "AP_PpdsMotorPod.hpp"
 
 #include "autopilot-interface.h"
+
+#include "SoftwareVersion.h"
+
 #include "OpticalFlowState.h"
 #include "AdcState.h"
 
@@ -89,6 +92,27 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
     }
 
     switch (kMsg_id) {
+        case SOFTWARE_VERSION: {
+            uint8_t tmp[getSoftwareVersionMaxDataLength()];
+            msg_buffer.copyData(tmp, sizeof(tmp));
+
+            SoftwareVersion_t sw_version;
+            int idx = 0;
+            decodeSoftwareVersion_t(tmp, &idx, &sw_version);
+
+            char build_char = '?';
+            if (sw_version.build_type == CV_BLD_DEVELOPMENT) { build_char = 'D'; }
+            if (sw_version.build_type == CV_BLD_INTEGRATION) { build_char = 'I'; }
+            if (sw_version.build_type == CV_BLD_PRODUCTION)  { build_char = 'P'; }
+            gcs().send_text(MAV_SEVERITY_INFO,
+                            "MotorPod SW: %.*s v%u.%u.%u-%c hash=%lx",
+                            sizeof(sw_version.id), sw_version.id,
+                            sw_version.major, sw_version.minor, sw_version.patch, build_char,
+                            sw_version.git_hash);
+
+            break;
+        }
+
         case INTERFACE_VERSION: {
             uint8_t tmp[getInterfaceVersionMaxDataLength()];
             msg_buffer.copyData(tmp, sizeof(tmp));
