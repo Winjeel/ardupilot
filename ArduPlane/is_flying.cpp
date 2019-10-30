@@ -9,6 +9,11 @@
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
+#define LAUNCH_FAIL_UNKNOWN 0
+#define LAUNCH_FAIL_ANGLE   1
+#define LAUNCH_FAIL_TIME    2
+#define LAUNCH_FAIL_THROW   3
+
 /*
   Do we think we are flying?
   Probabilistic method where a bool is low-passed and considered a probability.
@@ -278,6 +283,7 @@ void Plane::crash_detection_update(void)
     bool crashed = false;
     bool been_auto_flying = (auto_state.started_flying_in_auto_ms > 0) &&
                             (now_ms - auto_state.started_flying_in_auto_ms >= 2500);
+    uint8_t launch_fail_status = LAUNCH_FAIL_UNKNOWN;
 
     if (!is_flying() && arming.is_armed())
     {
@@ -330,12 +336,15 @@ void Plane::crash_detection_update(void)
                         if (ahrs.pitch > radians(45.0f) || ahrs.pitch < -radians(30.0f) || fabsf(ahrs.roll) > radians(45.0f)) {
                             // Stop motor quickly if operator loses grip to prevent injury
                             crash_state.debounce_time_total_ms = 0;
+                            launch_fail_status = LAUNCH_FAIL_ANGLE;
                         } else {
                             crash_state.debounce_time_total_ms = SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS;
+                            launch_fail_status = LAUNCH_FAIL_TIME;
                         }
                     } else {
                         // allow time for the is_flying status to change to TRUE after the throw
                         crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                        launch_fail_status = LAUNCH_FAIL_THROW;
                     }
                 }
                 // TODO: handle auto missions without NAV_TAKEOFF mission cmd
@@ -392,7 +401,15 @@ void Plane::crash_detection_update(void)
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected");
             } else {
-                gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                if (launch_fail_status == LAUNCH_FAIL_TIME) {
+                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
+                } else if (launch_fail_status == LAUNCH_FAIL_ANGLE) {
+                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
+                } else if (launch_fail_status == LAUNCH_FAIL_THROW) {
+                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed");
+                } else {
+                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                }
             }
         }
     }
