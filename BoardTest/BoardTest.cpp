@@ -3,6 +3,10 @@
 */
 #include "BoardTest.h"
 
+#include <AP_SBusOut/AP_SBusOut.h>
+#include <SRV_Channel/SRV_Channel.h>
+#include <AP_Param/AP_Param.h>
+
 #if APJ_BOARD_ID != 1688
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
@@ -12,6 +16,10 @@ const AP_HAL::HAL &hal = AP_HAL::get_HAL();
 static AP_BoardConfig boardConfig;
 static AP_SerialManager serialManager;
 static AP_Notify notify;
+
+static AP_SBusOut sbusOut;
+static SRV_Channels servoChannels;
+static AP_Param params;
 
 // Sensor classes
 static AP_Baro barometer;
@@ -39,7 +47,7 @@ static void _initialiseCervello(void){
 
     // initialise serial ports
     serialManager.init();
-
+    
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
@@ -491,76 +499,6 @@ static bool _cervello_runAllTests(void){
 
     // run the RAMTRON tests
     summaryTestResult &= _cervello_RAMTRONTest();
-
-    return summaryTestResult;
-}
-
-static bool _PPDSCarrier_runAllTests(void){
-    // function to run all tests on the PPDS Carrier
-    bool summaryTestResult = true;
-    bool testResult;
-
-    // SERIAL0	USB	OTG
-    // SERIAL1	SERIAL1 (J5)	USART2
-    // SERIAL2	SERIAL2 (J6)	USART3
-    // SERIAL3	GPS (J13)	UART4
-    // SERIAL4	TELEM3 (J4)	UART7
-    // SERIAL5	TELEM4 (J14-5, J14-7)	UART8
-    // SERIAL6	MOTOR_POD (J14-6)	USART1 Receive (RX) Only
-
-    // UART communication tests
-    const int SERIAL1 = 1; // J5 - TELEM1 - UART 2 - SERIAL1
-    const int SERIAL2 = 2; // J6 - TELEM2 - UART 3 - SERIAL2
-    const int SERIAL4 = 4; // J4 - TELEM 3 - UART 7 - SERIAL4
-    const int SERIAL5 = 5; // J14-5, J14-7 - TELEM4 - UART 8 - SERIAL5
-
-     // Test Serial 1 <-> Serial 2 communication
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL2);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL2, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 1 <-> Serial 2 communication with hardware flow control
-    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL1, SERIAL2);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL2, true);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier hardware flow control from serial device %i to %i --- ", SERIAL2, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL2, SERIAL1, true);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 1 <-> Serial 4 communication
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL1, SERIAL4);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL1, SERIAL4, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL4, SERIAL1);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL4, SERIAL1, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Serial 5 loopback
-    hal.console->printf("Testing PPDS Carrier crosstalk from serial device %i to %i --- ", SERIAL5, SERIAL5);
-    testResult = _PPDSCarrier_serialCommunicationTest(SERIAL5, SERIAL5, false);
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult; hal.console->printf("\n");
-
-    // Test Buzzer
-    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
-    testResult = _PPDSCarrier_buzzerTest();
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
-
-    // Test safety switch
-    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
-    testResult = _PPDSCarrier_safetySwitchTest();
-    hal.console->printf(kResultStr[testResult]);
-    summaryTestResult &= testResult;
 
     return summaryTestResult;
 }
@@ -1094,57 +1032,133 @@ static bool _cervello_RAMTRONTest_writeRandom(void){
 }
 
 // test cases - PPDS Carrier Board
-static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow){
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial2(void){
+    // Test to verify that the devices Serial1 and Serial2 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Serial%i & Serial%i (J%i & J%i) has been fitted\n\n", SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL2, 5, 6);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // Test Serial 1 <-> Serial 2 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from Serial %i to %i --- ", SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL2, AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from Serial %i to %i --- ", SerialDeviceList::SERIAL2, SerialDeviceList::SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL2, SerialDeviceList::SERIAL1, AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    // Test Serial 1 <-> Serial 2 communication with hardware flow control
+    hal.console->printf("Testing PPDS Carrier hardware flow control from Serial %i to %i --- ", SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL2);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL2, AP_HAL::UARTDriver::FLOW_CONTROL_ENABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier hardware flow control from Serial %i to %i --- ", SerialDeviceList::SERIAL2, SerialDeviceList::SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL2, SerialDeviceList::SERIAL1, AP_HAL::UARTDriver::FLOW_CONTROL_ENABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial4(void){
+    // Test to verify that the devices Serial1 and Serial4 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Serial%i & Serial%i (J%i & J%i) has been fitted\n\n", SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL4, 5, 4);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    bool testResult;
+
+    // Test Serial 1 <-> Serial 4 communication
+    hal.console->printf("Testing PPDS Carrier crosstalk from Serial %i to %i --- ", SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL4);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL1, SerialDeviceList::SERIAL4, AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+    hal.console->printf("Testing PPDS Carrier crosstalk from Serial %i to %i --- ", SerialDeviceList::SERIAL4, SerialDeviceList::SERIAL1);
+    testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL4, SerialDeviceList::SERIAL1, AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult; hal.console->printf("\n");
+
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_Serial5_Loopback(void){
+    // Test to verify that Serial5 is able to communicate with itself via a loopback
+    hal.console->printf("Ensure loopback cable on Serial5 (J14-5 & J14-7) has been fitted\n\n");
+
+    // Test Serial 5 loopback
+    hal.console->printf("Testing PPDS Carrier loopback on Serial %i --- ", SerialDeviceList::SERIAL5);
+    bool testResult = _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList::SERIAL5, SerialDeviceList::SERIAL5, AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+    hal.console->printf(kResultStr[testResult]);
+    hal.console->printf("\n");
+
+    return testResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList serialDevice1ID, SerialDeviceList serialDevice2ID, AP_HAL::UARTDriver::flow_control hardwareFlowControl){
     // Test verifying communication between two serial devices, using a crosstalk cable
 
     // Setup serial devices
-    std::vector<int> serialDeviceIDs = {serialDevice1, serialDevice2};
+    std::vector<int> serialDeviceIDs = {serialDevice1ID, serialDevice2ID};
 
-    AP_HAL::UARTDriver* SerialDevice[serialDeviceIDs.size()];
+    AP_HAL::UARTDriver* serialDevice[serialDeviceIDs.size()];
     for (int i = 0; i < serialDeviceIDs.size(); i++){
         int deviceID = serialDeviceIDs[i];
 
         // Retrieve device driver
-        SerialDevice[i] = serialManager.get_serial_by_id(deviceID);
+        serialDevice[i] = serialManager.get_serial_by_id(deviceID);
 
-        // Begin device/Flush RX & TX buffers
-        SerialDevice[i]->begin((uint32_t)UARTbaud);
+        // Begin device
+        serialDevice[i]->begin((uint32_t)UARTbaud);
+
+        // Clear the UART buffer
+        if (!_flushUART(serialDevice[i])) {
+            hal.console->printf("Could not flush buffer on serial device %i --- ", deviceID);
+            return false;
+        }
 
         // Set flow control
-        if (enabledHardwareControlFlow) {
-            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_ENABLE);
-        }
-        else {
-            SerialDevice[i]->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
-        }
+        serialDevice[i]->set_flow_control(hardwareFlowControl);
     }
 
     // Generate test message
     uint8_t tx_buffer[] = {12, 34};
 
     // Write data using Serial Device #1
-    SerialDevice[0]->write(tx_buffer, (size_t)sizeof(tx_buffer));
+    serialDevice[0]->write(tx_buffer, sizeof(tx_buffer));
     hal.scheduler->delay(UARTwriteDelay);
 
     // Verify that bytes exist in the read buffer
-    size_t nBytes = SerialDevice[1]->available();
-    if (nBytes < 1){
-        hal.console->printf("No bytes found in read buffer --- ");
+    size_t nBytes = serialDevice[1]->available();
+    if (nBytes != sizeof(tx_buffer)){
+        hal.console->printf("Number of received bytes does not match the number of transmitted bytes - Transmitted: %u Received: %u --- ", sizeof(tx_buffer), nBytes);
+
+        for (int i = 0; i<2; i++){
+            _flushUART(serialDevice[i]);
+            serialDevice[i]->end();
+        }
         return false;
     }
 
     // Read data using Serial Device #2
-    std::vector<uint8_t> rx_buffer;
-    rx_buffer.reserve(nBytes);
-    if (nBytes) {
-        while (nBytes-- > 0) {
-            uint8_t c = (uint8_t)SerialDevice[1]->read();
-            rx_buffer.push_back(c);
-         }
+    uint8_t rx_buffer[nBytes] = {};
+    int counter = 0;
+    while (nBytes-- > 0) {
+        uint8_t c = (uint8_t)serialDevice[1]->read();
+        rx_buffer[counter] = c;
+        counter++;
     }
 
+    // Clean up the serial devices
+    for (int i = 0; i<2; i++){
+        _flushUART(serialDevice[i]);
+        serialDevice[i]->end();
+    }  
+
     // Verify that the send and received message matches the original test message
-    for (int i = 0; i < rx_buffer.size(); i++){
+    for (int i = 0; i < sizeof(rx_buffer); i++){
         if (tx_buffer[i] != rx_buffer[i]){
             hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);
             return false;
@@ -1154,23 +1168,224 @@ static bool _PPDSCarrier_serialCommunicationTest(int serialDevice1, int serialDe
     return true;
 }
 
-static bool _PPDSCarrier_buzzerTest(void){
-    // Test to verify that the Buzzer on the PPDS Carrier Board is functional
+static bool _PPDSCarrier_serialCommunicationTest_Servo3_Serial6(void){
+    // Test to verify that the devices Servo3 and Serial6 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between Servo%i & Serial%i (J14-8 & J14-6) has been fitted\n\n", PWMDeviceList::SERVO3+1, SerialDeviceList::SERIAL6);
 
-    if (!notify.buzzer_enabled()){
-        hal.console->printf("Buzzer not enabled ");
+    // Test Servo 3 -> Serial 6 communication
+    hal.console->printf("Testing PPDS Carrier communucation from PWM %i to Serial %i --- ", PWMDeviceList::SERVO3+1, SerialDeviceList::SERIAL6);
+    bool testResult = _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDeviceList::SERVO3, SerialDeviceList::SERIAL6, true);
+    hal.console->printf(kResultStr[testResult]);
+    hal.console->printf("\n");
+
+    return testResult;
+}
+
+static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
+    // Test to verify that the remaining Servo devices are able to communicate to Serial4
+    hal.console->printf("Ensure probe cable on Serial%i (J4) has been fitted\n\n", SERIAL4);
+
+    PWMDeviceList pwmDevices[8] = {PWMDeviceList::SERVO1, PWMDeviceList::SERVO2, PWMDeviceList::SERVO4, PWMDeviceList::SERVO5, PWMDeviceList::SERVO6, PWMDeviceList::SERVO7, PWMDeviceList::SERVO8, PWMDeviceList::SERVO9}; // Skip ESC PWM channel
+    const size_t numDevices = sizeof(pwmDevices) / sizeof(pwmDevices[0]);
+
+    // Setup variable to track test result
+    bool summaryTestResult = true;
+    
+    for (int i = 0; i < numDevices; i++){
+        PWMDeviceList pwmDevice = pwmDevices[i];
+        hal.console->printf("Testing PPDS Carrier communucation from PWM %i to Serial %i --- ", pwmDevice+1, SerialDeviceList::SERIAL4);
+        EXPECT_DELAY_MS(testTimeout);
+
+        // Setup test duration
+        bool testResult = false;
+        uint32_t testStartTime = AP_HAL::micros();
+        uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+        hal.scheduler->delay(1000);
+        while(AP_HAL::micros() < testEndTime){
+
+            testResult = _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(pwmDevice, SerialDeviceList::SERIAL4, false);
+            hal.scheduler->delay(500);
+
+            if (testResult){
+                break;
+            }
+        }
+        
+        hal.console->printf(kResultStr[testResult]);
+        summaryTestResult &= testResult;
+    }
+    return summaryTestResult;
+}
+
+static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDeviceList pwmDevice, SerialDeviceList serialDeviceID, bool printFailMsg){
+    // Test verifying communication from a PWM device to a Serial device (one way)
+    
+    // Setup the receiving serial device
+    AP_HAL::UARTDriver* serialDevice;
+    serialDevice = serialManager.get_serial_by_id(serialDeviceID);
+    serialDevice->begin(UARTbaud);
+    serialDevice->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+
+    // Clear the UART buffer
+    if (!_flushUART(serialDevice)) {
+        hal.console->printf("Could not flush buffer on serial device %i --- ", serialDeviceID);
         return false;
     }
 
-    // Tunes defined in ToneAlarm.cpp
-    hal.console->printf("Buzzer generating tone --- ");
-    AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+    // Enable all PWM channels
+    for (uint8_t i=0; i < BOARD_PWM_COUNT_DEFAULT; i++) {
+        hal.rcout->enable_ch(i);
+        // Set serial protocol to enable writing serial
+        hal.rcout->set_output_mode((uint16_t)1 << i, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
+    }
+    hal.scheduler->delay(100);
+    
+    // Setup serial communication over the PWM device
+    if (!hal.rcout->serial_setup_output((uint8_t)pwmDevice, UARTbaud, (uint16_t)1 << pwmDevice)){
+        if(printFailMsg) {hal.console->printf("Could not configure PWM device %i with serial output --- ", pwmDevice);};
+        return false;
+    }
+
+    // Write serial using PWM
+    uint8_t tx_buffer[2] = {29, 31};
+
+    if (!hal.rcout->serial_write_bytes(tx_buffer, (uint16_t)sizeof(tx_buffer))){
+        if(printFailMsg) {hal.console->printf("Could not write serial data using PWM device %i -- ", pwmDevice);};
+        return false;
+    }
+
+    // Clean up the serial connection over PWM
+    hal.rcout->serial_end();
+
+    // Disable all PWM channels
+    for (uint8_t i=0; i < BOARD_PWM_COUNT_DEFAULT; i++) {
+        hal.rcout->disable_ch(i);
+    }
+
+    // Check if data exists in the read buffer of the receiving serial device
+    hal.scheduler->delay(100);
+    size_t nBytes = serialDevice->available();
+    if (nBytes != sizeof(tx_buffer)){
+        if(printFailMsg) {hal.console->printf("Number of received bytes does not match the number of transmitted bytes - Transmitted: %u Received: %u --- ", sizeof(tx_buffer), nBytes);};
+        _flushUART(serialDevice);
+        serialDevice->end();
+        return false;
+    }
+
+    // Retrieve data from the read buffer
+    uint8_t rx_buffer[nBytes] = {};
+    int counter = 0;
+    while (nBytes-- > 0) {
+        uint8_t c = (uint8_t)serialDevice->read();
+        rx_buffer[counter] = c;
+        counter++;
+    }
+
+    // Clean up the serial device
+    _flushUART(serialDevice);
+    serialDevice->end();
+
+    // Verify that the send and received message matches the original test message
+    for (int i = 0; i < sizeof(rx_buffer); i++){
+        if (tx_buffer[i] != rx_buffer[i]){
+            if(printFailMsg) {hal.console->printf("Value mismatch at index %i - Written Value: %u Read Value %u ", i, tx_buffer[i], rx_buffer[i]);};
+            return false;
+        }
+    }
 
     return true;
 }
 
+static bool _PPDSCarrier_rcInputTest(void){
+    // Test to verify that the devices RC In and Serial4 are able to communicate
+    hal.console->printf("Ensure crosstalk cable between RC Input & Serial%i (J16 & J4) has been fitted\n\n", SERIAL4);
+
+    // As that test still requires development, return fail
+    hal.console->printf("RC Input test currently unavailable\n");
+    return false;
+
+    // Initialise the parameter system
+    params.setup();
+
+    // Set parameter to enable SBUS protocol on Serial 4
+    if (!params.set_object_value(&serialManager, serialManager.var_info, "4_PROTOCOL", (float)AP_SerialManager::SerialProtocol_Sbus1)){
+        hal.console->printf("Could not set SBUS Protocol parameter for Serial4");
+        return false;
+    }
+
+    if (!params.set_object_value(&serialManager, serialManager.var_info, "4_BAUD", (float)sbusBaud)){
+        hal.console->printf("Could not set SBUS Baud Rate parameter for Serial4");
+        return false;
+    }
+
+    if (!params.set_object_value(&sbusOut, sbusOut.var_info, "RATE", (float)111)){
+        hal.console->printf("Could not set SBUS PRF parameter");
+        return false;
+    }    
+
+    // Setup SBUS UART
+    AP_HAL::UARTDriver* serialDevice;
+    serialDevice = serialManager.find_serial(AP_SerialManager::SerialProtocol_Sbus1,0);
+    if (serialDevice == nullptr){
+        return false;
+    }
+
+    serialDevice->begin((uint32_t)sbusBaud);
+
+    // Setup servo outputs for SBUS
+    for (int i = 0; i < BOARD_PWM_COUNT_DEFAULT; i++){
+        servoChannels.set_output_pwm_chan(i, 1000);
+    }
+
+    EXPECT_DELAY_MS(testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    while(AP_HAL::micros() < testEndTime){
+        // Write the SBUS signal
+        sbusOut.update();
+
+        if (hal.rcin->new_input()){
+            return true;
+        }
+
+        hal.scheduler->delay_microseconds(725);
+    }
+
+    return false;
+}
+
+static bool _PPDSCarrier_buzzerTest(void){
+    // Test to verify that the Buzzer on the PPDS Carrier Board is functional
+    hal.console->printf("Ensure buzzer has been fitted on J18\n\n");
+
+    hal.console->printf("Testing PPDS Carrier Buzzer --- ");
+    bool testResult = true;
+
+    if (!notify.buzzer_enabled()){
+        hal.console->printf("Buzzer not enabled ");
+        testResult = false;
+    }
+
+    // Tunes defined in ToneAlarm.cpp
+    if (testResult){
+        hal.console->printf("Buzzer generating tone --- ");
+        AP_Notify::play_tune("MFT100L4>G#6A#6B#4");
+    }
+
+    hal.console->printf(kResultStr[testResult]);
+    return testResult;
+}
+
 static bool _PPDSCarrier_safetySwitchTest(void){
     // Test to verify that the safety switch on the PPDS Carrier Board is functional
+    hal.console->printf("Ensure safety switch has been fitted on J7\n\n");
+
+    hal.console->printf("Testing PPDS Carrier Safety Switch --- ");
+    bool testResult = false;
 
     // Expect delay based on timeout duration;
     EXPECT_DELAY_MS((int)testTimeout);
@@ -1188,12 +1403,14 @@ static bool _PPDSCarrier_safetySwitchTest(void){
 
         // Check if the switch has been actuated
         if (hal.util->safety_switch_state() != originalSwitchState){
-            return true;
+            testResult = true;
+            break;
         }
 
         hal.scheduler->delay(testLoopDelay);
     }
-    return false;
+    hal.console->printf(kResultStr[testResult]);
+    return testResult;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
