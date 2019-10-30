@@ -36,6 +36,30 @@ char const * kResultStr[]  = {
     "PASS\n",
 };
 
+// Enumerates
+enum SerialDeviceList {
+    SERIAL0=0, // J12 - USB - OTG
+    SERIAL1=1, // J5 - TELEM1 - UART 2 - SERIAL1
+    SERIAL2=2, // J6 - TELEM2 - UART 3 - SERIAL2
+    SERIAL4=4, // J4 - TELEM 3 - UART 7 - SERIAL4
+    SERIAL5=5, // J14-5, J14-7 - TELEM4 - UART 8 - SERIAL5
+    SERIAL6=6 // J14-6 - MOTOR_POD  - USART1 Receive (RX) Only - SERIAL6
+};
+
+enum PWMDeviceList {
+    SERVO1=0, // J2 - SERVO_STBD
+    SERVO2=1, // J3 - SERVO_PORT
+    SERVO3=2, // J14-8 - ESC_TX
+    SERVO4=3, // J1-3 - SERVO_PWM_A
+    SERVO5=4, // J1-6 - SERVO_PWM_B
+    SERVO6=5, // J1-9 - SERVO_PWM_C
+    SERVO7=6, // J1-12 - SERVO_PWM_D
+    SERVO8=7, // J1-15- SERVO_PWM_E
+    SERVO9=8 // J1-18 - SERVO_PWM_F
+};
+
+
+
 // main functions - forward declare
 void setup();
 void loop();
@@ -83,11 +107,11 @@ static bool _cervello_RAMTRONTest_writeRandom(void);
 static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial2(void);
 static bool _PPDSCarrier_serialCommunicationTest_Serial1_Serial4(void);
 static bool _PPDSCarrier_serialCommunicationTest_Serial5_Loopback(void);
-static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(int serialDevice1, int serialDevice2, bool enabledHardwareControlFlow);
+static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDeviceList serialDevice1ID, SerialDeviceList serialDevice2ID, AP_HAL::UARTDriver::flow_control hardwareFlowControl);
 
 static bool _PPDSCarrier_serialCommunicationTest_Servo3_Serial6(void);
 static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void);
-static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(int pwmDevice, int serialDevice, bool printFailMsg);
+static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDeviceList pwmDevice, SerialDeviceList serialDeviceID, bool printFailMsg);
 
 static bool _PPDSCarrier_rcInputTest(void);
 static bool _PPDSCarrier_buzzerTest(void);

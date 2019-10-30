@@ -9,4 +9,4 @@ bool _checkRotation(float rotation);
 float _approxRunningAverage(float average, float newSample);
 
 void _initialiseRandomNumberGenerator(void);
-bool _flushUART(AP_HAL::UARTDriver* SerialDevice);
+bool _flushUART(AP_HAL::UARTDriver* serialDevice);

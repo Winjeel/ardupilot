@@ -23,17 +23,13 @@ void _initialiseRandomNumberGenerator(void){
     std::srand(rngSeed);
 }
 
-bool _flushUART(AP_HAL::UARTDriver* SerialDevice){
+bool _flushUART(AP_HAL::UARTDriver* serialDevice){
     // Function to flush the RX buffer of a serial device
-    size_t initialBytes = SerialDevice->available();
-    std::vector<uint8_t> startBuffer;
-    startBuffer.reserve(initialBytes);
+    size_t initialBytes = serialDevice->available();
     if (initialBytes > 0) {
         while (initialBytes-- > 0) {
-            SerialDevice->read();
+            serialDevice->read();
          }
     }
-
-    return (SerialDevice->available() < 1);
-
+    return (serialDevice->available() < 1);
 }
