@@ -15,23 +15,59 @@ extern "C" {
  * This is the external interface for the PPDS Motor Pod firmware, generated
  * with ProtoGen.
  *
- * The protocol version is 0.0.1.b
+ * The protocol version is 0.1.3
  */
 
 #include <stdint.h>
 #include "corvo_packet.h"	// Definition for Corvo packet structure.
 
 //! \return the protocol version string
-#define getPpdsMotorPodVersion() "0.0.1.b"
+#define getPpdsMotorPodVersion() "0.1.3"
 
 /*!
  * The list of packet identifiers.
  */
 typedef enum
 {
+    SOFTWARE_VERSION,//!< The software version of this device.
+    HARDWARE_VERSION,//!< The hardware version of this device.
+    INTERFACE_VERSION,//!< The version of this device interface.
+    DIAGNOSTIC_MSG,  //!< A diagnostic message.
     OPTICAL_FLOW_STATE,//!< The data measured by the Optical Flow sensor.
     ADC_STATE        //!< The data measured by the ADC.
-} PacketIds;
+} PacketId;
+
+/*!
+ * The list of build types.
+ */
+typedef enum
+{
+    CV_BLD_DEVELOPMENT,//!< An experimental build. Not to be flown.
+    CV_BLD_INTEGRATION,//!< An integration build ready for flight ops. Not to be used in production.
+    CV_BLD_PRODUCTION //!< A verified build suitable for use in production equipment.
+} BuildType;
+
+/*!
+ * The diagnostic level of the message.
+ */
+typedef enum
+{
+    CV_LVL_FATAL,//!< A message that indicates the system as a whole has failed.
+    CV_LVL_ERROR,//!< A message that indicates an error with part of the system.
+    CV_LVL_WARN, //!< A message that indicates a problem with part of the system.
+    CV_LVL_INFO, //!< A message that provides information.
+    CV_LVL_DEBUG //!< A message used for debugging.
+} DiagnosticLevel;
+
+/*!
+ * The error codes that can be sent in response to a message.
+ */
+typedef enum
+{
+    CV_ERR_OK = 0,       //!< Success.
+    CV_ERR_NO_CHANGE,    //!< Requested message had no effect.
+    CV_ERR_NOT_IMPLEMENTED //!< Requested message is not implemented.
+} ErrorCode;
 
 
 // The prototypes below provide an interface to the packets.
