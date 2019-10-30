@@ -19,6 +19,7 @@
 
 #include "SoftwareVersion.h"
 #include "HardwareVersion.h"
+#include "DiagnosticMessage.h"
 
 #include "OpticalFlowState.h"
 #include "AdcState.h"
@@ -145,6 +146,30 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
                             "MotorPod IF: %.*s v%u.%u.%u",
                             sizeof(if_version.id), if_version.id,
                             if_version.major, if_version.minor, if_version.patch);
+
+            break;
+        }
+
+        case DIAGNOSTIC_MSG: {
+            uint8_t tmp[getDiagnosticMessageMaxDataLength()];
+            msg_buffer.copyData(tmp, sizeof(tmp));
+
+            DiagnosticMessage_t msg;
+            int idx = 0;
+            decodeDiagnosticMessage_t(tmp, &idx, &msg);
+
+            enum MAV_SEVERITY kSeverityMap[] = {
+                MAV_SEVERITY_CRITICAL, // CV_LVL_FATAL
+                MAV_SEVERITY_ERROR,    // CV_LVL_ERROR
+                MAV_SEVERITY_WARNING,  // CV_LVL_WARN
+                MAV_SEVERITY_INFO,     // CV_LVL_INFO
+                MAV_SEVERITY_DEBUG,    // CV_LVL_DEBUG
+            };
+            if (msg.level > CV_LVL_DEBUG) {
+                msg.level = CV_LVL_DEBUG;
+            }
+
+            gcs().send_text(kSeverityMap[msg.level], "MotorPod Msg: %.*s", sizeof(msg.str), msg.str);
 
             break;
         }
