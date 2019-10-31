@@ -71,7 +71,7 @@ bool Plane::auto_takeoff_check(void)
                 takeoff_state.accel_event_counter = 0;
             }
             bool odd_event = ((takeoff_state.accel_event_counter & 1) != 0);
-            float accel_level = ahrs.get_accel_ef().z + GRAVITY_MSS;
+            accel_level = ahrs.get_accel_ef().z + GRAVITY_MSS;
             bool got_event = (odd_event?accel_level < -g.takeoff_throttle_min_accel : accel_level > g.takeoff_throttle_min_accel);
             if (got_event) {
                 takeoff_state.accel_event_counter++;
