@@ -287,7 +287,7 @@ void Plane::crash_detection_update(void)
     bool crashed = false;
     bool been_auto_flying = (auto_state.started_flying_in_auto_ms > 0) &&
                             (now_ms - auto_state.started_flying_in_auto_ms >= 2500);
-    uint8_t launch_fail_status = LaunchFailType::UNKNOWN;
+    LaunchFailType launch_fail_status = LaunchFailType::UNKNOWN;
 
     if (!is_flying() && arming.is_armed())
     {
@@ -405,14 +405,23 @@ void Plane::crash_detection_update(void)
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected");
             } else {
-                if (launch_fail_status == LaunchFailType::TIME) {
-                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
-                } else if (launch_fail_status == LaunchFailType::ANGLE) {
-                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
-                } else if (launch_fail_status == LaunchFailType::THROWN) {
-                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed");
-                } else {
-                    gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                switch (launch_fail_status)
+                {
+                    case LaunchFailType::TIME:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
+                        break;
+
+                    case LaunchFailType::ANGLE:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
+                        break;
+
+                    case LaunchFailType::THROWN:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed");
+                        break;
+
+                    default:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                        break;
                 }
             }
         }
