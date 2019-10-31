@@ -34,3 +34,6 @@
 #define UARTbaud 5600
 #define UARTwriteDelay 20
 #define sbusBaud 100000
+
+// GPS constants
+#define gpsRate 10 // 100Hz

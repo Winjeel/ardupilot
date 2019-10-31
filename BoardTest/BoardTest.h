@@ -116,6 +116,7 @@ static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDev
 static bool _PPDSCarrier_rcInputTest(void);
 static bool _PPDSCarrier_buzzerTest(void);
 static bool _PPDSCarrier_safetySwitchTest(void);
+static bool _PPDSCarrier_GPSTest(void);
 
 // test items
 const Test kTestItem[] = {
@@ -146,6 +147,6 @@ const Test kTestItem[] = {
 
     { 'u', "PPDS Carrier Buzzer test",                                      _PPDSCarrier_buzzerTest,                                         "PPDS Carrier - Run Buzzer test.", },
     { 'i', "PPDS Carrier Safety Switch test",                               _PPDSCarrier_safetySwitchTest,                                   "PPDS Carrier - Run Safety Switch test.", },
-
+    { 'o', "PPDS Carrier GPS test",                                         _PPDSCarrier_GPSTest,                                            "PPDS Carrier - Run GPS test.", },
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
