@@ -501,6 +501,7 @@ void Plane::update_navigation()
             // prevent running the expensive jump_to_landing_sequence
             // on every loop
             auto_state.checked_for_autoland = true;
+            break;
         }
         else if (g.rtl_autoland == 2 &&
             !auto_state.checked_for_autoland) {
@@ -513,6 +514,7 @@ void Plane::update_navigation()
             // prevent running the expensive jump_to_landing_sequence
             // on every loop
             auto_state.checked_for_autoland = true;
+            break;
         }
         radius = abs(g.rtl_radius);
         if (radius > 0) {
