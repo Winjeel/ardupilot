@@ -9,10 +9,14 @@
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
-#define LAUNCH_FAIL_UNKNOWN 0
-#define LAUNCH_FAIL_ANGLE   1
-#define LAUNCH_FAIL_TIME    2
-#define LAUNCH_FAIL_THROW   3
+enum ControlMode {
+    MANUAL=0,
+    STOP=1,
+    SCAN=2,
+    SERVO_TEST=3,
+    AUTO=10,
+    INITIALISING=16
+};
 
 /*
   Do we think we are flying?
@@ -283,7 +287,7 @@ void Plane::crash_detection_update(void)
     bool crashed = false;
     bool been_auto_flying = (auto_state.started_flying_in_auto_ms > 0) &&
                             (now_ms - auto_state.started_flying_in_auto_ms >= 2500);
-    uint8_t launch_fail_status = LAUNCH_FAIL_UNKNOWN;
+    uint8_t launch_fail_status = LaunchFailType::UNKNOWN;
 
     if (!is_flying() && arming.is_armed())
     {
@@ -336,15 +340,15 @@ void Plane::crash_detection_update(void)
                         if (ahrs.pitch > radians(45.0f) || ahrs.pitch < -radians(30.0f) || fabsf(ahrs.roll) > radians(45.0f)) {
                             // Stop motor quickly if operator loses grip to prevent injury
                             crash_state.debounce_time_total_ms = 0;
-                            launch_fail_status = LAUNCH_FAIL_ANGLE;
+                            launch_fail_status = LaunchFailType::ANGLE;
                         } else {
                             crash_state.debounce_time_total_ms = SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS;
-                            launch_fail_status = LAUNCH_FAIL_TIME;
+                            launch_fail_status = LaunchFailType::TIME;
                         }
                     } else {
                         // allow time for the is_flying status to change to TRUE after the throw
                         crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
-                        launch_fail_status = LAUNCH_FAIL_THROW;
+                        launch_fail_status = LaunchFailType::THROWN;
                     }
                 }
                 // TODO: handle auto missions without NAV_TAKEOFF mission cmd
@@ -401,11 +405,11 @@ void Plane::crash_detection_update(void)
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected");
             } else {
-                if (launch_fail_status == LAUNCH_FAIL_TIME) {
+                if (launch_fail_status == LaunchFailType::TIME) {
                     gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
-                } else if (launch_fail_status == LAUNCH_FAIL_ANGLE) {
+                } else if (launch_fail_status == LaunchFailType::ANGLE) {
                     gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
-                } else if (launch_fail_status == LAUNCH_FAIL_THROW) {
+                } else if (launch_fail_status == LaunchFailType::THROWN) {
                     gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed");
                 } else {
                     gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
