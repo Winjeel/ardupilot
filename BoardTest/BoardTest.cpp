@@ -3,10 +3,6 @@
 */
 #include "BoardTest.h"
 
-#include <AP_SBusOut/AP_SBusOut.h>
-#include <SRV_Channel/SRV_Channel.h>
-#include <AP_Param/AP_Param.h>
-
 #if APJ_BOARD_ID != 1688
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
@@ -25,6 +21,7 @@ static AP_Param params;
 static AP_Baro barometer;
 static Compass compass;
 static AP_InertialSensor ins;
+static AP_GPS gps;
 
 // On-board memory classes
 AP_RAMTRON ramtron;
@@ -54,6 +51,9 @@ static void _initialiseCervello(void){
 
     // initialisation notification system
     notify.init();
+
+    // initialise the GPS
+    gps.init(serialManager);
 };
 
 static void _initialiseConsole(void) {
@@ -1411,6 +1411,31 @@ static bool _PPDSCarrier_safetySwitchTest(void){
     }
     hal.console->printf(kResultStr[testResult]);
     return testResult;
+}
+
+static bool _PPDSCarrier_GPSTest(void){
+    // Test to verify that the GPS on the PPDS Carrier Board is functional
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+    EXPECT_DELAY_MS(testTimeout);
+
+    // Poll the GPS system
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update the GPS system
+        gps.update();
+
+        // Verify that the GPS device can be found
+        if (gps.status() != AP_GPS::GPS_Status::NO_GPS){
+            return true;
+        }
+        hal.scheduler->delay(gpsRate);
+    }
+
+    hal.console->printf("GPS Device could not be found\n");
+    return false;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
