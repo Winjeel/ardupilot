@@ -158,17 +158,17 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
             decodeDiagnosticMessage_t(tmp, &idx, &msg);
 
             enum MAV_SEVERITY kSeverityMap[] = {
-                MAV_SEVERITY_CRITICAL, // CV_LVL_FATAL
-                MAV_SEVERITY_ERROR,    // CV_LVL_ERROR
-                MAV_SEVERITY_WARNING,  // CV_LVL_WARN
-                MAV_SEVERITY_INFO,     // CV_LVL_INFO
-                MAV_SEVERITY_DEBUG,    // CV_LVL_DEBUG
+                MAV_SEVERITY_CRITICAL, // CV_SEV_FATAL
+                MAV_SEVERITY_ERROR,    // CV_SEV_ERROR
+                MAV_SEVERITY_WARNING,  // CV_SEV_WARN
+                MAV_SEVERITY_INFO,     // CV_SEV_INFO
+                MAV_SEVERITY_DEBUG,    // CV_SEV_DEBUG
             };
-            if (msg.level > CV_LVL_DEBUG) {
-                msg.level = CV_LVL_DEBUG;
+            if (msg.severity > CV_SEV_DEBUG) {
+                msg.severity = CV_SEV_DEBUG;
             }
 
-            gcs().send_text(kSeverityMap[msg.level], "MotorPod Msg: %.*s", sizeof(msg.str), msg.str);
+            gcs().send_text(kSeverityMap[msg.severity], "MotorPod Msg: %.*s", sizeof(msg.text), msg.text);
 
             break;
         }

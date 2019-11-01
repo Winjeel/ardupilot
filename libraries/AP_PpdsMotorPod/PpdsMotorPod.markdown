@@ -175,9 +175,9 @@ The list of build types.
 
 
 
-## Diagnostic Level
+## Diagnostic Severity
 
-The diagnostic level of the message.
+The severity of the diagnostic message.
 
 | Name                    | Value | Description                                                 |
 | ----------------------- | :---: | ----------------------------------------------------------- |
@@ -186,7 +186,7 @@ The diagnostic level of the message.
 | Warning diagnostic.     | 2     | A message that indicates a problem with part of the system. |
 | Information diagnostic. | 3     | A message that provides information.                        |
 | Debug diagnostic.       | 4     | A message used for debugging.                               |
-[<a name="DiagnosticLevel"></a>Diagnostic Level enumeration]
+[<a name="DiagnosticSeverity"></a>Diagnostic Severity enumeration]
 
 
 
@@ -268,10 +268,10 @@ Diagnostic message.
 - maximum data length: 65
 
 
-| Bytes  | Name                        | [Enc](#Enc)                           | Repeat | Description |
-| ------ | --------------------------- | :-----------------------------------: | :----: | ----------- |
-| 0      | 1)[level](#DiagnosticLevel) | U8                                    | 1      |             |
-| 1...64 | 2)str                       | Zero-terminated string up to 64 bytes         ||             |
+| Bytes  | Name                              | [Enc](#Enc)                           | Repeat | Description |
+| ------ | --------------------------------- | :-----------------------------------: | :----: | ----------- |
+| 0      | 1)[severity](#DiagnosticSeverity) | U8                                    | 1      |             |
+| 1...64 | 2)text                            | Zero-terminated string up to 64 bytes         ||             |
 [DiagnosticMessage packet bytes]
 
 

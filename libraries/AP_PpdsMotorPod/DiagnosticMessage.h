@@ -19,8 +19,8 @@ extern "C" {
  */
 typedef struct
 {
-    DiagnosticLevel level;  
-    char            str[64];
+    DiagnosticSeverity severity;
+    char               text[64];
 }DiagnosticMessage_t;
 
 //! Encode a DiagnosticMessage_t structure into a byte array

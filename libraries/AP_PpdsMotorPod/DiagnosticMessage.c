@@ -19,9 +19,9 @@ void encodeDiagnosticMessage_t(uint8_t* _pg_data, int* _pg_bytecount, const Diag
 {
     int _pg_byteindex = *_pg_bytecount;
 
-    uint8ToBytes(_pg_user->level, _pg_data, &_pg_byteindex);
+    uint8ToBytes(_pg_user->severity, _pg_data, &_pg_byteindex);
 
-    stringToBytes(_pg_user->str, _pg_data, &_pg_byteindex, 64, 0);
+    stringToBytes(_pg_user->text, _pg_data, &_pg_byteindex, 64, 0);
 
     *_pg_bytecount = _pg_byteindex;
 
@@ -40,9 +40,9 @@ int decodeDiagnosticMessage_t(const uint8_t* _pg_data, int* _pg_bytecount, Diagn
 {
     int _pg_byteindex = *_pg_bytecount;
 
-    _pg_user->level = (DiagnosticLevel)uint8FromBytes(_pg_data, &_pg_byteindex);
+    _pg_user->severity = (DiagnosticSeverity)uint8FromBytes(_pg_data, &_pg_byteindex);
 
-    stringFromBytes(_pg_user->str, _pg_data, &_pg_byteindex, 64, 0);
+    stringFromBytes(_pg_user->text, _pg_data, &_pg_byteindex, 64, 0);
 
     *_pg_bytecount = _pg_byteindex;
 
@@ -62,9 +62,9 @@ void encodeDiagnosticMessagePacketStructure(CorvoPacket* _pg_pkt, const Diagnost
     uint8_t* _pg_data = getPpdsMotorPodPacketData(_pg_pkt);
     int _pg_byteindex = 0;
 
-    uint8ToBytes(_pg_user->level, _pg_data, &_pg_byteindex);
+    uint8ToBytes(_pg_user->severity, _pg_data, &_pg_byteindex);
 
-    stringToBytes(_pg_user->str, _pg_data, &_pg_byteindex, 64, 0);
+    stringToBytes(_pg_user->text, _pg_data, &_pg_byteindex, 64, 0);
 
     // complete the process of creating the packet
     finishPpdsMotorPodPacket(_pg_pkt, _pg_byteindex, getDiagnosticMessagePacketID());
@@ -96,9 +96,9 @@ int decodeDiagnosticMessagePacketStructure(const CorvoPacket* _pg_pkt, Diagnosti
     // The raw data from the packet
     _pg_data = getPpdsMotorPodPacketDataConst(_pg_pkt);
 
-    _pg_user->level = (DiagnosticLevel)uint8FromBytes(_pg_data, &_pg_byteindex);
+    _pg_user->severity = (DiagnosticSeverity)uint8FromBytes(_pg_data, &_pg_byteindex);
 
-    stringFromBytes(_pg_user->str, _pg_data, &_pg_byteindex, 64, 0);
+    stringFromBytes(_pg_user->text, _pg_data, &_pg_byteindex, 64, 0);
 
     return 1;
 }

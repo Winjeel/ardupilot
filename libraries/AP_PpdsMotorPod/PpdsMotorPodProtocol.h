@@ -48,16 +48,16 @@ typedef enum
 } BuildType;
 
 /*!
- * The diagnostic level of the message.
+ * The severity of the diagnostic message.
  */
 typedef enum
 {
-    CV_LVL_FATAL,//!< A message that indicates the system as a whole has failed.
-    CV_LVL_ERROR,//!< A message that indicates an error with part of the system.
-    CV_LVL_WARN, //!< A message that indicates a problem with part of the system.
-    CV_LVL_INFO, //!< A message that provides information.
-    CV_LVL_DEBUG //!< A message used for debugging.
-} DiagnosticLevel;
+    CV_SEV_FATAL,//!< A message that indicates the system as a whole has failed.
+    CV_SEV_ERROR,//!< A message that indicates an error with part of the system.
+    CV_SEV_WARN, //!< A message that indicates a problem with part of the system.
+    CV_SEV_INFO, //!< A message that provides information.
+    CV_SEV_DEBUG //!< A message used for debugging.
+} DiagnosticSeverity;
 
 /*!
  * The error codes that can be sent in response to a message.
