@@ -55,7 +55,6 @@ void AP_PpdsMotorPod::init(AP_SerialManager &_serial_manager) {
 
         if (uart != nullptr) {
             uart->begin(_serial_manager.find_baudrate(AP_SerialManager::SerialProtocol_Corvo, 0));
-            _requestInterfaceVersion();
         }
     }
 }
@@ -255,10 +254,9 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
 }
 
 
-void AP_PpdsMotorPod::_requestInterfaceVersion(void) {
-    if_version_request_ms = AP_HAL::millis();
+void AP_PpdsMotorPod::_requestPacket(PacketId pktId) {
     CorvoPacket pkt = { 0, 0, 0, nullptr, 0 };
-    finishPpdsMotorPodPacket(&pkt, 0, INTERFACE_VERSION);
+    finishPpdsMotorPodPacket(&pkt, 0, pktId);
     _sendCorvoPacket(&pkt);
 }
 
@@ -285,6 +283,7 @@ void AP_PpdsMotorPod::_assessInterfaceVersion(InterfaceVersion_t const &kIF_vers
             && kIF_version.patch == kSupportedVersion.patch) {
             interface_state = IF_State::Ok;
         } else {
+            gcs().send_text(MAV_SEVERITY_ERROR, "MotorPod: Bad Interface Version!");
             interface_state = IF_State::Mismatch;
         }
     }
@@ -315,9 +314,14 @@ void AP_PpdsMotorPod::update(void) {
     }
 
     if (interface_state == IF_State::Waiting) {
-        bool waited_too_long = ((AP_HAL::millis() - if_version_request_ms) > 1000);
-        if (waited_too_long) {
-            _requestInterfaceVersion();
+        uint32_t now = AP_HAL::millis();
+        bool first_time = (if_version_request_ms == 0);
+        bool waited_too_long = ((now - if_version_request_ms) > 1000);
+        if (first_time || waited_too_long) {
+            if_version_request_ms = now;
+            _requestPacket(INTERFACE_VERSION);
+            _requestPacket(SOFTWARE_VERSION);
+            _requestPacket(HARDWARE_VERSION);
         }
     }
 

@@ -81,12 +81,12 @@ private:
     void _handleMsg(size_t const kUartNumBytes);
     void _handleRequest(void);
     uint16_t _sendCorvoPacket(CorvoPacket const * const pkt);
-    void _requestInterfaceVersion(void);
+    void _requestPacket(PacketId pktId);
 
     void _assessInterfaceVersion(InterfaceVersion_t const &kIF_version);
     enum IF_State interface_state = IF_State::Waiting;
-    uint32_t if_version_request_ms;
-    uint32_t if_version_receive_ms;
+    uint32_t if_version_request_ms = 0;
+    uint32_t if_version_receive_ms = 0;
 
     AP_HAL::UARTDriver *uart = nullptr;
 
