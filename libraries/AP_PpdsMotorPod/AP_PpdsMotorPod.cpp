@@ -176,7 +176,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
         case OPTICAL_FLOW_STATE: {
             WITH_SEMAPHORE(_flow_sem);
 
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
 
             uint8_t tmp[getOpticalFlowStateMaxDataLength()];
             msg_buffer.copyData(tmp, sizeof(tmp));
@@ -204,7 +204,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
         case ADC_STATE: {
             WITH_SEMAPHORE(_adc_sem);
 
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
 
             uint8_t tmp[getAdcStateMaxDataLength()];
             msg_buffer.copyData(tmp, sizeof(tmp));
@@ -241,7 +241,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
 
         // TODO: Handle other received messages
         default: {
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP:   got msg 0x%02x", msg_id);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod:   got msg 0x%02x", msg_id);
             break;
         }
     }
@@ -249,7 +249,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
     // Done with the current msg, so remove it from the buffer (otherwise
     // we'll get an infinite loop)
     size_t eaten = msg_buffer.consume();
-    _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: ate %lu bytes", eaten);
+    _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: ate %lu bytes", eaten);
     (void)eaten;
 }
 
@@ -294,22 +294,22 @@ void AP_PpdsMotorPod::_assessInterfaceVersion(InterfaceVersion_t const &kIF_vers
   around 10Hz by main loop
  */
 void AP_PpdsMotorPod::update(void) {
-    _debug_sample(MAV_SEVERITY_WARNING, "[%8lums] PMP: update", AP_HAL::millis());
+    _debug_sample(MAV_SEVERITY_WARNING, "[%8lums] MotorPod: update", AP_HAL::millis());
 
     // TODO: re-init?
     if (uart == nullptr) {
-        _debug(MAV_SEVERITY_ERROR, "\tPMP: uart == null");
+        _debug(MAV_SEVERITY_ERROR, "\tMotorPod: uart == null");
         return;
     }
 
     if (!uart->is_initialized()) {
         // TODO: is this needed, and how do we recover?
-        _debug(MAV_SEVERITY_ERROR, "\tPMP: uart !init");
+        _debug(MAV_SEVERITY_ERROR, "\tMotorPod: uart !init");
         return;
     }
 
     if (interface_state == IF_State::Mismatch) {
-        _debug(MAV_SEVERITY_ERROR, "\tPMP: bad IF version!");
+        _debug(MAV_SEVERITY_ERROR, "\tMotorPod: bad IF version!");
         return;
     }
 
@@ -333,7 +333,7 @@ void AP_PpdsMotorPod::update(void) {
     }
 
     if (num_bytes) {
-        _debug_sample(MAV_SEVERITY_DEBUG, "\tPMP: got %lu bytes", num_bytes);
+        _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got %lu bytes", num_bytes);
 
         while (num_bytes-- > 0) {
             int16_t c = uart->read();
@@ -352,7 +352,7 @@ void AP_PpdsMotorPod::update(void) {
 
         }
     } else {
-        _debug(MAV_SEVERITY_ERROR, "\tPMP: got no bytes", num_bytes);
+        _debug(MAV_SEVERITY_ERROR, "\tMotorPod: got no bytes", num_bytes);
     }
 
 #if (CORVO_DEBUG)
