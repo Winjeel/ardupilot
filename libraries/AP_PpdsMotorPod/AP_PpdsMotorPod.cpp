@@ -107,8 +107,8 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
             if (sw_version.build_type == CV_BLD_INTEGRATION) { build_char = 'I'; }
             if (sw_version.build_type == CV_BLD_PRODUCTION)  { build_char = 'P'; }
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "MotorPod SW: %.*s v%u.%u.%u-%c hash=%lx",
-                            sizeof(sw_version.id), sw_version.id,
+                            "MotorPod SW: %.12s v%u.%u.%u-%c hash=%lx",
+                            sw_version.id,
                             sw_version.major, sw_version.minor, sw_version.patch, build_char,
                             sw_version.git_hash);
 
@@ -124,8 +124,8 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
             decodeHardwareVersion_t(tmp, &idx, &hw_version);
 
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "MotorPod HW: %.*s rev%u.%u",
-                            sizeof(hw_version.id), hw_version.id,
+                            "MotorPod HW: %.12s rev%c.%u",
+                            hw_version.id,
                             hw_version.major, hw_version.minor);
 
             break;
@@ -143,8 +143,8 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
             _assessInterfaceVersion(if_version);
 
             gcs().send_text(MAV_SEVERITY_INFO,
-                            "MotorPod IF: %.*s v%u.%u.%u",
-                            sizeof(if_version.id), if_version.id,
+                            "MotorPod IF: %.12s v%u.%u.%u",
+                            if_version.id,
                             if_version.major, if_version.minor, if_version.patch);
 
             break;
