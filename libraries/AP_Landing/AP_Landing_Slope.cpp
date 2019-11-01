@@ -245,6 +245,17 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
         groundspeed = 0.5f;
     }
 
+    // calculate distance required to stop after touchdown and limit to be no more than 20%
+    // of total approach length
+    float decel_distance = 0.0f;
+    if (decel_coef >= 0.1f) {
+        const float decel_rate = GRAVITY_MSS * decel_coef; // deceleration (m/s/s)
+        const float decel_time = groundspeed / decel_rate; // time required to stop (s)
+        decel_distance = 0.5f * decel_rate * decel_time * decel_time;
+        const float decel_distance_max = total_distance * 0.2f;
+        decel_distance = MIN(decel_distance, decel_distance_max);
+    }
+
     // calculate time to lose the needed altitude
     float sink_time = total_distance / groundspeed;
     if (sink_time < 0.5f) {
@@ -292,7 +303,7 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     // now calculate our aim point, which is before the landing
     // point and above it
     Location loc = next_WP_loc;
-    loc.offset_bearing(land_bearing_cd * 0.01f, -flare_distance);
+    loc.offset_bearing(land_bearing_cd * 0.01f, -(flare_distance + decel_distance));
     loc.alt += aim_height*100;
 
     // calculate point along that slope 500m ahead

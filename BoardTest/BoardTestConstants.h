@@ -7,9 +7,8 @@
 
 // test timeouts
 #define sensorInitialisationTimeout 5000000 // 5 seconds
-#define interactiveTestTimeout 10000000 // 10 seconds
-#define probeTestTimeout 5000000 // 5 seconds
-#define interactiveTestLoopDelay 5 // 5 microseconds
+#define testTimeout 10000000 // 10 seconds
+#define testLoopDelay 5 // 5 microseconds
 #define sdCardActivityDelay 500 // 500 microseconds
 
 // moving average samples
@@ -30,3 +29,11 @@
 
 // cervello RAMTRON size
 #define cervelloRamtronSize 16384
+
+// UART constants
+#define UARTbaud 5600
+#define UARTwriteDelay 20
+#define sbusBaud 100000
+
+// GPS constants
+#define gpsRate 10 // 100Hz

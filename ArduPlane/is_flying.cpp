@@ -5,6 +5,7 @@
  */
 
 #define CRASH_DETECTION_DELAY_MS            500
+#define SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS 7000
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
@@ -316,11 +317,23 @@ void Plane::crash_detection_update(void)
             case AP_Vehicle::FixedWing::FLIGHT_TAKEOFF:
                 if (g.takeoff_throttle_min_accel > 0 &&
                         !throttle_suppressed) {
-                    // if you have an acceleration holding back throttle, but you met the
-                    // accel threshold but still not fying, then you either shook/hit the
-                    // plane or it was a failed launch.
+                    // if we have an acceleration threshold controlling throttle start, have met the
+                    // accel threshold but still not fying, then we are either waiting to complete the throw
+                    // or accidentally either shook/hit the plane or it was a failed launch.
                     crashed = true;
-                    crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                    if (g2.takeoff_throttle_accel_count > 1) {
+                        // Using multiple shakes to start the motor so need to allow extra time for the
+                        // thrower to react and throw and the is_flying status to change to TRUE.
+                        if (ahrs.pitch > radians(45.0f) || ahrs.pitch < -radians(30.0f) || fabsf(ahrs.roll) > radians(45.0f)) {
+                            // Stop motor quickly if operator loses grip to prevent injury
+                            crash_state.debounce_time_total_ms = 0;
+                        } else {
+                            crash_state.debounce_time_total_ms = SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS;
+                        }
+                    } else {
+                        // allow time for the is_flying status to change to TRUE after the throw
+                        crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                    }
                 }
                 // TODO: handle auto missions without NAV_TAKEOFF mission cmd
                 break;

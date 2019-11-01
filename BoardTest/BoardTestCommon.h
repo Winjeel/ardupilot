@@ -2,10 +2,17 @@
 
 // Board Includes
 #include "AP_BoardConfig/AP_BoardConfig.h"
+
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Common/AP_FWVersion.h>
 #include "AP_HAL/AP_HAL.h"
 #include <GCS_MAVLink/GCS_Dummy.h>
+#include <AP_Notify/ToneAlarm.h>
+
+#include <AP_SBusOut/AP_SBusOut.h>
+#include <SRV_Channel/SRV_Channel.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_GPS/AP_GPS.h>
 
 // Cervello hardware definition
 #include "hwdef.h"
@@ -31,3 +38,4 @@
 // Data structures
 static const struct LogStructure log_structure[256] = {
     };
+    

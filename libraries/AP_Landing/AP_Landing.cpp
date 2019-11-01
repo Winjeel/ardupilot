@@ -141,6 +141,15 @@ const AP_Param::GroupInfo AP_Landing::var_info[] = {
     // @Group: DS_
     // @Path: AP_Landing_Deepstall.cpp
     AP_SUBGROUPINFO(deepstall, "DS_", 15, AP_Landing, AP_Landing_Deepstall),
+
+    // @Param: DECEL_COEF
+    // @DisplayName: Post touchdown friction coefficient
+    // @Description: Specifies a friction coefficient used to estimate the distance the plane will slide after touchdown. This is used to adjust the aim point so that the vehicle comes to rest at the landing waypoint. This also steepens the glide slope angle which must be allowed for in mission planning. The correction will be limited to no more than 20% of the nominal approach length calculated from the distance btween the landing and previous waypoint. Set to 0 to disable this feature as values less than 0.1 will be ignored.
+    // @Range: 0.0 1.5
+    // @Increment: 0.1
+    // @User: Advanced
+    AP_GROUPINFO("DECEL_COEF", 16, AP_Landing, decel_coef, 0),
+
     
     AP_GROUPEND
 };

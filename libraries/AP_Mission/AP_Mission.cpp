@@ -792,9 +792,9 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
             See Plane::create_into_wind_landing_sequence() for more information on how the adaptive approach angle is calculated.
             */
             cmd.content.location.loiter_xtrack = 1;
-            uint16_t nominal_yaw_deg = (uint16_t)round(wrap_360(packet.param1));
+            uint16_t sector_yaw_deg = (uint16_t)round(wrap_360(packet.param1));
             uint16_t tolerance_deg = MIN((int)packet.param3,180);
-            cmd.p1= packAngleSectorParam(nominal_yaw_deg, tolerance_deg);
+            cmd.p1= packAngleSectorParam(sector_yaw_deg, tolerance_deg);
         } else {
             cmd.p1 = packet.param1;                         // abort target altitude(m)  (plane only)
             cmd.content.location.loiter_xtrack = 0;
@@ -1236,11 +1236,11 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         if (isAngleSectorLanding(cmd)) {
             // This is a special case where the p1 parameter is used to store data specifying the sector that a landing approach can be flown
             // The loiter_xtrack flag (normally only used by loiter waypoint types) is used to indicate when p1 contains angle sector and not abort height information.            packet.param1 = cmd.p1 & 0x01FF;    // yaw angle demand is held in low 9 bits of p1
-            uint16_t nominal_yaw_deg;
+            uint16_t sector_yaw_deg;
             uint16_t tolerance_deg;
-            unpackAngleSectorParam(cmd.p1, nominal_yaw_deg, tolerance_deg);
+            unpackAngleSectorParam(cmd.p1, sector_yaw_deg, tolerance_deg);
             packet.param3 = tolerance_deg;
-            packet.param1 = nominal_yaw_deg;
+            packet.param1 = sector_yaw_deg;
         } else {
             packet.param1 = cmd.p1;                        // abort target altitude(m) or approach heaading angle if param3 is non zero (plane only)
         }
@@ -2030,13 +2030,13 @@ AP_Mission *mission()
 
 }
 
-uint16_t AP_Mission::packAngleSectorParam(uint16_t const nominal_yaw_deg, uint16_t const tolerance_deg)
+uint16_t AP_Mission::packAngleSectorParam(uint16_t const sector_yaw_deg, uint16_t const tolerance_deg)
 {
-    return ((tolerance_deg / TOLERANCE_RESOLUTION ) << NOMINAL_YAW_BITS) | (nominal_yaw_deg & NOMINAL_YAW_MASK);
+    return ((tolerance_deg / TOLERANCE_RESOLUTION ) << NOMINAL_YAW_BITS) | (sector_yaw_deg & NOMINAL_YAW_MASK);
 }
 
-void AP_Mission::unpackAngleSectorParam(uint16_t const param, uint16_t& nominal_yaw_deg, uint16_t& tolerance_deg)
+void AP_Mission::unpackAngleSectorParam(uint16_t const param, uint16_t& sector_yaw_deg, uint16_t& tolerance_deg)
 {
     tolerance_deg = (param >> NOMINAL_YAW_BITS ) * TOLERANCE_RESOLUTION;
-    nominal_yaw_deg = param & NOMINAL_YAW_MASK;
+    sector_yaw_deg = param & NOMINAL_YAW_MASK;
 }
