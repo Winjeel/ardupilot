@@ -487,7 +487,6 @@ void Plane::update_navigation()
               RTL_RADIUS
              */
             set_mode(mode_qrtl, MODE_REASON_UNKNOWN);
-            break;
         } else if (g.rtl_autoland == 1 &&
             !auto_state.checked_for_autoland &&
             reached_loiter_target() &&
@@ -501,9 +500,7 @@ void Plane::update_navigation()
             // prevent running the expensive jump_to_landing_sequence
             // on every loop
             auto_state.checked_for_autoland = true;
-            break;
-        }
-        else if (g.rtl_autoland == 2 &&
+        } else if (g.rtl_autoland == 2 &&
             !auto_state.checked_for_autoland) {
             // Go directly to the landing sequence
             if (mission.jump_to_landing_sequence()) {
@@ -514,11 +511,11 @@ void Plane::update_navigation()
             // prevent running the expensive jump_to_landing_sequence
             // on every loop
             auto_state.checked_for_autoland = true;
-            break;
-        }
-        radius = abs(g.rtl_radius);
-        if (radius > 0) {
-            loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
+        } else {
+            radius = abs(g.rtl_radius);
+            if (radius > 0) {
+                loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
+            }
         }
         // fall through to LOITER
         FALLTHROUGH;
