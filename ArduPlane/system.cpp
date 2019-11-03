@@ -591,17 +591,13 @@ bool Plane::create_into_wind_landing_sequence()
             // to minimise excusion outside the sector when turning onto final approach
             if (wrap_PI(approach_iwl_hdg_rad - sector_yaw_rad) > 0.0f) {
                 // approaching from the left side of the sector, so use a right turn onto final (positive radius)
-                printf("right turn required\n");
                 if (turn_radius < 0.0f) {
                     turn_radius = -turn_radius;
-                    printf("flip sign\n");
                 }
             } else {
                 // approaching from the right side of the sector, so use a left  turn onto final (negative radius)
-                printf("left turn required\n");
                 if (turn_radius > 0.0f) {
                     turn_radius = -turn_radius;
-                    printf("flip sign\n");
                 }
             }
         }
