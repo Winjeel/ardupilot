@@ -9,15 +9,6 @@
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
-enum ControlMode {
-    MANUAL=0,
-    STOP=1,
-    SCAN=2,
-    SERVO_TEST=3,
-    AUTO=10,
-    INITIALISING=16
-};
-
 /*
   Do we think we are flying?
   Probabilistic method where a bool is low-passed and considered a probability.
