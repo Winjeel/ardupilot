@@ -637,6 +637,13 @@ private:
 
     } crash_state;
 
+    enum LaunchFailType {
+        UNKNOWN=0,
+        ANGLE=1,
+        TIME=2,
+        THROWN=3,
+    };
+
     // true if we are in an auto-throttle mode, which means
     // we need to run the speed/height controller
     bool auto_throttle_mode:1;

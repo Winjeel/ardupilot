@@ -57,20 +57,22 @@ bool Plane::auto_takeoff_check(void)
         distance_travelled = 0.0f;
     }
 
+    float accel_level = 0.0f;
     if (!takeoff_state.launchTimerStarted && !is_zero(g.takeoff_throttle_min_accel)) {
         // we are requiring an X acceleration event to launch
-        float xaccel = SpdHgt_Controller->get_VXdot();
         if (g2.takeoff_throttle_accel_count <= 1) {
-            if (xaccel < g.takeoff_throttle_min_accel) {
+            accel_level = SpdHgt_Controller->get_VXdot();
+            if (accel_level < g.takeoff_throttle_min_accel) {
                 abort_launch = true;
             }
         } else {
-            // we need multiple accel events
+            // we need multiple vertical accel events
             if (now - takeoff_state.accel_event_ms > 500) {
                 takeoff_state.accel_event_counter = 0;
             }
             bool odd_event = ((takeoff_state.accel_event_counter & 1) != 0);
-            bool got_event = (odd_event?xaccel < -g.takeoff_throttle_min_accel : xaccel > g.takeoff_throttle_min_accel);
+            accel_level = ahrs.get_accel_ef().z + GRAVITY_MSS;
+            bool got_event = (odd_event?accel_level < -g.takeoff_throttle_min_accel : accel_level > g.takeoff_throttle_min_accel);
             if (got_event) {
                 takeoff_state.accel_event_counter++;
                 takeoff_state.accel_event_ms = now;
@@ -89,7 +91,7 @@ bool Plane::auto_takeoff_check(void)
         ahrs.get_relative_position_NE_origin(takeoff_state.position_at_start);
         if (now - takeoff_state.last_report_ms > 2000) {
             gcs().send_text(MAV_SEVERITY_INFO, "Armed AUTO, xaccel = %.1f m/s/s, waiting %.1f sec",
-                              (double)SpdHgt_Controller->get_VXdot(), (double)(wait_time_ms*0.001f));
+                              (double)accel_level, (double)(wait_time_ms*0.001f));
             takeoff_state.last_report_ms = now;
         }
     }
