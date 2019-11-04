@@ -44,7 +44,7 @@ static void _initialiseCervello(void){
 
     // initialise serial ports
     serialManager.init();
-    
+
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
@@ -474,6 +474,14 @@ static bool _hasATAES132A(void) {
         return false;
     }
 
+    enum class ATA_SPI : uint8_t {
+        WRITE = 0x02,
+        READ  = 0x03,
+        WRDI  = 0x04,
+        RDSR  = 0x05,
+        WREN  = 0x06,
+    };
+
     enum class ATAES132A_Opcode : uint8_t {
         Info = 0x0C,
     };
@@ -483,6 +491,8 @@ static bool _hasATAES132A(void) {
     };
 
     typedef struct {
+        ATA_SPI reg;
+        uint16_t addr;
         uint8_t count;
         enum ATAES132A_Opcode opcode;
         uint8_t mode;
@@ -516,41 +526,115 @@ static bool _hasATAES132A(void) {
     } PACKED ATAES132A_InfoResult;
 
     ATAES132A_Command command = {
-        7, // count
+        ATA_SPI::WRITE,
+        0x00FE, // addr // TODO: endianness...
+        9, // count
         ATAES132A_Opcode::Info,
         0x00, // mode
-        (uint16_t)ATAES132A_InfoRegister::DeviceNum, // param1
+        // (uint16_t)ATAES132A_InfoRegister::DeviceNum, // param1
+        0x0600, // TODO: endianness...
         0x00, // param2
         0, // CRC
     };
-    command.crc = ATAES132A_crc16((uint8_t *)&command, command.count - 2);
+    command.crc = ATAES132A_crc16((uint8_t *)&command.count, command.count - 2);
 
     ATAES132A_InfoResult info = { 0, };
 
-    if (!dev->transfer(&command.count, sizeof(command), &info.count, sizeof(info))) {
-        hal.console->printf("    Couldn't transfer data to/from ATAES132A device.\n");
+    #define CLEAN_UP_AND_RETURN(result) sem->give(); return result;
+
+    const uint32_t kSemaphoreTimeout_ms = 3000;
+    AP_HAL::Semaphore* sem = dev->get_semaphore();
+    if (!sem || !sem->take(kSemaphoreTimeout_ms)) {
+        hal.console->printf("    Couldn't take semaphore for ATAES132A device.\n");
         return false;
     }
+
+    uint8_t SR_MASK_WIP  = (1 << 0);
+    // uint8_t SR_MASK_WEN  = (1 << 1);
+    // uint8_t SR_MASK_WAKE = (1 << 2);
+    // uint8_t SR_MASK_CRCE = (1 << 4);
+    // uint8_t SR_MASK_RRDY = (1 << 6);
+    // uint8_t SR_MASK_EERR = (1 << 7);
+
+    uint8_t com[] = { (uint8_t)ATA_SPI::READ, 0xFF, 0xF0, };
+    uint8_t sr = 0;
+    if (!dev->transfer(com, sizeof(com), &sr, 1)) {
+        hal.console->printf("    Couldn't read STATUS_REGISTER of ATAES132A device.\n");
+        CLEAN_UP_AND_RETURN(false);
+    }
+    // hal.console->printf("    ATAES132A sr: 0x%02x,   i=%u e=%u w=%u c=%u r=%u !=%u\n"
+    //                     , sr
+    //                     , ((sr & SR_MASK_WIP) == SR_MASK_WIP)
+    //                     , ((sr & SR_MASK_WEN) == SR_MASK_WEN)
+    //                     , ((sr & SR_MASK_WAKE) == SR_MASK_WAKE)
+    //                     , ((sr & SR_MASK_CRCE) == SR_MASK_CRCE)
+    //                     , ((sr & SR_MASK_RRDY) == SR_MASK_RRDY)
+    //                     , ((sr & SR_MASK_EERR) == SR_MASK_EERR)
+    // );
+
+    hal.console->printf("    Sending INFO command...\n");
+    if (!dev->transfer((uint8_t *)&command, sizeof(command), nullptr, 0)) {
+         hal.console->printf("    Couldn't transfer command to ATAES132A device.\n");
+         CLEAN_UP_AND_RETURN(false);
+    }
+
+    uint8_t retries = 30;
+    while (retries--) {
+        if (!dev->transfer(com, sizeof(com), &sr, 1)) {
+            hal.console->printf("        Couldn't read STATUS_REGISTER of ATAES132A device.\n");
+            break;
+        }
+        if ((sr & SR_MASK_WIP) == 0) {
+            // finished
+            break;
+        }
+        // hal.console->printf(".");
+        hal.scheduler->delay(1);
+    }
+    // hal.console->printf("\n");
+
+    // hal.console->printf("    ATAES132A sr: 0x%02x,   i=%u e=%u w=%u c=%u r=%u !=%u\n"
+    //                     , sr
+    //                     , ((sr & SR_MASK_WIP) == SR_MASK_WIP)
+    //                     , ((sr & SR_MASK_WEN) == SR_MASK_WEN)
+    //                     , ((sr & SR_MASK_WAKE) == SR_MASK_WAKE)
+    //                     , ((sr & SR_MASK_CRCE) == SR_MASK_CRCE)
+    //                     , ((sr & SR_MASK_RRDY) == SR_MASK_RRDY)
+    //                     , ((sr & SR_MASK_EERR) == SR_MASK_EERR)
+    // );
+
+// read Response Memory Buffer error code
+    uint8_t err_com[] = { (uint8_t)ATA_SPI::READ, 0xFE, 0x00, };
+    if (!dev->transfer(err_com, sizeof(err_com), (uint8_t *)&info, sizeof(info))) {
+        hal.console->printf("    Couldn't read STATUS_REGISTER of ATAES132A device.\n");
+    }
+
+    // if (!dev->transfer(&command.count, sizeof(command), (uint8_t *)&info, sizeof(info))) {
+    //     hal.console->printf("    Couldn't transfer data to/from ATAES132A device.\n");
+    //     CLEAN_UP_AND_RETURN(false);
+    // }
 
     if (info.count < 4) {
         hal.console->printf("    ATAES132A device didn't return enough bytes (expected 4+, got %u).\n", info.count);
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
+    uint8_t *p = (uint8_t *)&info;
+    hal.console->printf("    ATAES132A: [%02x %02x %02x %02x %02x %02x]\n", p[0], p[1], p[2], p[3], p[4], p[5]);
 
     if (info.result != ATAES132A_ReturnCode::Success) {
         hal.console->printf("    ATAES132A device returned error code: 0x%02x\n", info.result);
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
 
     uint16_t expectedCRC = ATAES132A_crc16((uint8_t *)&info, info.count - 2);
     if (info.crc != expectedCRC) {
         hal.console->printf("    ATAES132A CRC (0x%04x) doesn't match expected (0x%04x).\n", info.crc, expectedCRC);
-        return false;
+        CLEAN_UP_AND_RETURN(false);
     }
 
     hal.console->printf("    Successfully found ATAES132A device: Device=0x%02x Revision=0x%02x\n", info.deviceCode, info.deviceRevision);
 
-    return true;
+    CLEAN_UP_AND_RETURN(true);
 }
 
 static bool _cervello_runAllProbeTests(void){
@@ -1279,7 +1363,7 @@ static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDevic
     for (int i = 0; i<2; i++){
         _flushUART(serialDevice[i]);
         serialDevice[i]->end();
-    }  
+    }
 
     // Verify that the send and received message matches the original test message
     for (int i = 0; i < sizeof(rx_buffer); i++){
@@ -1314,7 +1398,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
 
     // Setup variable to track test result
     bool summaryTestResult = true;
-    
+
     for (int i = 0; i < numDevices; i++){
         PWMDeviceList pwmDevice = pwmDevices[i];
         hal.console->printf("Testing PPDS Carrier communucation from PWM %i to Serial %i --- ", pwmDevice+1, SerialDeviceList::SERIAL4);
@@ -1335,7 +1419,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
                 break;
             }
         }
-        
+
         hal.console->printf(kResultStr[testResult]);
         summaryTestResult &= testResult;
     }
@@ -1344,7 +1428,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
 
 static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDeviceList pwmDevice, SerialDeviceList serialDeviceID, bool printFailMsg){
     // Test verifying communication from a PWM device to a Serial device (one way)
-    
+
     // Setup the receiving serial device
     AP_HAL::UARTDriver* serialDevice;
     serialDevice = serialManager.get_serial_by_id(serialDeviceID);
@@ -1364,7 +1448,7 @@ static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDev
         hal.rcout->set_output_mode((uint16_t)1 << i, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
     }
     hal.scheduler->delay(100);
-    
+
     // Setup serial communication over the PWM device
     if (!hal.rcout->serial_setup_output((uint8_t)pwmDevice, UARTbaud, (uint16_t)1 << pwmDevice)){
         if(printFailMsg) {hal.console->printf("Could not configure PWM device %i with serial output --- ", pwmDevice);};
@@ -1446,7 +1530,7 @@ static bool _PPDSCarrier_rcInputTest(void){
     if (!params.set_object_value(&sbusOut, sbusOut.var_info, "RATE", (float)111)){
         hal.console->printf("Could not set SBUS PRF parameter");
         return false;
-    }    
+    }
 
     // Setup SBUS UART
     AP_HAL::UARTDriver* serialDevice;
