@@ -3,6 +3,8 @@
 */
 #include "BoardTest.h"
 
+#include "ATAES132A.h"
+
 #if APJ_BOARD_ID != 1688
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
@@ -390,7 +392,7 @@ static uint16_t ATAES132A_crc16(uint8_t const data[], size_t const length, uint1
     return result;
 }
 
-static bool _hasATECC608(void) {
+static bool _cervello_probeATECC608(void) {
     uint8_t const k608Bus  = 2;
     uint8_t const k608Addr = 0xC0;
 
@@ -467,175 +469,54 @@ static bool _hasATECC608(void) {
     CLEAN_UP_AND_RETURN(true);
 }
 
-static bool _hasATAES132A(void) {
-    AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev = hal.spi->get_device("ATAES132A_ext");
-    if (!dev) {
-        hal.console->printf("    Couldn't create device on SPI bus\n");
+
+static bool _cervello_probeATAES132A(void) {
+    ATAES132A ataes132a;
+    if (!ataes132a.init()) {
+        hal.console->printf("    Couldn't create ATAES132A device on SPI bus\n");
         return false;
     }
 
-    enum class ATA_SPI : uint8_t {
-        WRITE = 0x02,
-        READ  = 0x03,
-        WRDI  = 0x04,
-        RDSR  = 0x05,
-        WREN  = 0x06,
+    ATAES132A::Command info_cmd = {
+        ATAES132A::Opcode::Info,
+        0x00, // mode
+        0x0006, // DeviceNum
+        0x0000, // param2
     };
+    if (!ataes132a._send_command(info_cmd)) {
+        hal.console->printf("    Couldn't send ATAES132A command\n");
+        return false;
+    }
+    if (!ataes132a._wait_for_response(1000)) {
+        hal.console->printf("    Didn't get response from ATAES132A\n");
+        return false;
+    }
 
-    enum class ATAES132A_Opcode : uint8_t {
-        Info = 0x0C,
-    };
-
-    enum class ATAES132A_InfoRegister : uint16_t {
-        DeviceNum = 0x0006,
-    };
-
-    typedef struct {
-        ATA_SPI reg;
-        uint16_t addr;
-        uint8_t count;
-        enum ATAES132A_Opcode opcode;
-        uint8_t mode;
-        uint16_t param1;
-        uint16_t param2;
-        // TODO: optional data goes here
-        uint16_t crc;
-    } PACKED ATAES132A_Command;
-
-    // names as per datasheet
-    enum class ATAES132A_ReturnCode : uint8_t {
-        Success       = 0x00,
-        BoundaryError = 0x02,
-        RWConfig      = 0x04,
-        BadAddr       = 0x08,
-        CountErr      = 0x10,
-        NonceError    = 0x20,
-        MacError      = 0x40,
-        ParseError    = 0x50,
-        DataMatch     = 0x60,
-        LockError     = 0x70,
-        KeyErr        = 0x80,
-    };
-
-    typedef struct {
-        uint8_t count;
-        ATAES132A_ReturnCode result;
+    struct {
         uint8_t deviceCode;
         uint8_t deviceRevision;
-        uint16_t crc;
-    } PACKED ATAES132A_InfoResult;
+    } PACKED info_result;
 
-    ATAES132A_Command command = {
-        ATA_SPI::WRITE,
-        0x00FE, // addr // TODO: endianness...
-        9, // count
-        ATAES132A_Opcode::Info,
-        0x00, // mode
-        // (uint16_t)ATAES132A_InfoRegister::DeviceNum, // param1
-        0x0600, // TODO: endianness...
-        0x00, // param2
-        0, // CRC
-    };
-    command.crc = ATAES132A_crc16((uint8_t *)&command.count, command.count - 2);
-
-    ATAES132A_InfoResult info = { 0, };
-
-    #define CLEAN_UP_AND_RETURN(result) sem->give(); return result;
-
-    const uint32_t kSemaphoreTimeout_ms = 3000;
-    AP_HAL::Semaphore* sem = dev->get_semaphore();
-    if (!sem || !sem->take(kSemaphoreTimeout_ms)) {
-        hal.console->printf("    Couldn't take semaphore for ATAES132A device.\n");
+    ATAES132A::ReturnCode rc;
+    ATAES132A::ResponseStatus resp =
+        ataes132a._read_response(rc,
+                                 reinterpret_cast<uint8_t *>(&info_result),
+                                 sizeof(info_result));
+    if (ATAES132A::ResponseStatus::Ok != resp) {
+        hal.console->printf("    Bad response (0x%02x) from ATAES132A\n", resp);
         return false;
     }
 
-    uint8_t SR_MASK_WIP  = (1 << 0);
-    // uint8_t SR_MASK_WEN  = (1 << 1);
-    // uint8_t SR_MASK_WAKE = (1 << 2);
-    // uint8_t SR_MASK_CRCE = (1 << 4);
-    // uint8_t SR_MASK_RRDY = (1 << 6);
-    // uint8_t SR_MASK_EERR = (1 << 7);
-
-    uint8_t com[] = { (uint8_t)ATA_SPI::READ, 0xFF, 0xF0, };
-    uint8_t sr = 0;
-    if (!dev->transfer(com, sizeof(com), &sr, 1)) {
-        hal.console->printf("    Couldn't read STATUS_REGISTER of ATAES132A device.\n");
-        CLEAN_UP_AND_RETURN(false);
-    }
-    // hal.console->printf("    ATAES132A sr: 0x%02x,   i=%u e=%u w=%u c=%u r=%u !=%u\n"
-    //                     , sr
-    //                     , ((sr & SR_MASK_WIP) == SR_MASK_WIP)
-    //                     , ((sr & SR_MASK_WEN) == SR_MASK_WEN)
-    //                     , ((sr & SR_MASK_WAKE) == SR_MASK_WAKE)
-    //                     , ((sr & SR_MASK_CRCE) == SR_MASK_CRCE)
-    //                     , ((sr & SR_MASK_RRDY) == SR_MASK_RRDY)
-    //                     , ((sr & SR_MASK_EERR) == SR_MASK_EERR)
-    // );
-
-    hal.console->printf("    Sending INFO command...\n");
-    if (!dev->transfer((uint8_t *)&command, sizeof(command), nullptr, 0)) {
-         hal.console->printf("    Couldn't transfer command to ATAES132A device.\n");
-         CLEAN_UP_AND_RETURN(false);
+    if (rc != ATAES132A::ReturnCode::Success) {
+        hal.console->printf("    ATAES132A device returned error code: 0x%02x\n", rc);
+        return false;
     }
 
-    uint8_t retries = 30;
-    while (retries--) {
-        if (!dev->transfer(com, sizeof(com), &sr, 1)) {
-            hal.console->printf("        Couldn't read STATUS_REGISTER of ATAES132A device.\n");
-            break;
-        }
-        if ((sr & SR_MASK_WIP) == 0) {
-            // finished
-            break;
-        }
-        // hal.console->printf(".");
-        hal.scheduler->delay(1);
-    }
-    // hal.console->printf("\n");
-
-    // hal.console->printf("    ATAES132A sr: 0x%02x,   i=%u e=%u w=%u c=%u r=%u !=%u\n"
-    //                     , sr
-    //                     , ((sr & SR_MASK_WIP) == SR_MASK_WIP)
-    //                     , ((sr & SR_MASK_WEN) == SR_MASK_WEN)
-    //                     , ((sr & SR_MASK_WAKE) == SR_MASK_WAKE)
-    //                     , ((sr & SR_MASK_CRCE) == SR_MASK_CRCE)
-    //                     , ((sr & SR_MASK_RRDY) == SR_MASK_RRDY)
-    //                     , ((sr & SR_MASK_EERR) == SR_MASK_EERR)
-    // );
-
-// read Response Memory Buffer error code
-    uint8_t err_com[] = { (uint8_t)ATA_SPI::READ, 0xFE, 0x00, };
-    if (!dev->transfer(err_com, sizeof(err_com), (uint8_t *)&info, sizeof(info))) {
-        hal.console->printf("    Couldn't read STATUS_REGISTER of ATAES132A device.\n");
-    }
-
-    // if (!dev->transfer(&command.count, sizeof(command), (uint8_t *)&info, sizeof(info))) {
-    //     hal.console->printf("    Couldn't transfer data to/from ATAES132A device.\n");
-    //     CLEAN_UP_AND_RETURN(false);
-    // }
-
-    if (info.count < 4) {
-        hal.console->printf("    ATAES132A device didn't return enough bytes (expected 4+, got %u).\n", info.count);
-        CLEAN_UP_AND_RETURN(false);
-    }
-    uint8_t *p = (uint8_t *)&info;
-    hal.console->printf("    ATAES132A: [%02x %02x %02x %02x %02x %02x]\n", p[0], p[1], p[2], p[3], p[4], p[5]);
-
-    if (info.result != ATAES132A_ReturnCode::Success) {
-        hal.console->printf("    ATAES132A device returned error code: 0x%02x\n", info.result);
-        CLEAN_UP_AND_RETURN(false);
-    }
-
-    uint16_t expectedCRC = ATAES132A_crc16((uint8_t *)&info, info.count - 2);
-    if (info.crc != expectedCRC) {
-        hal.console->printf("    ATAES132A CRC (0x%04x) doesn't match expected (0x%04x).\n", info.crc, expectedCRC);
-        CLEAN_UP_AND_RETURN(false);
-    }
-
-    hal.console->printf("    Successfully found ATAES132A device: Device=0x%02x Revision=0x%02x\n", info.deviceCode, info.deviceRevision);
-
-    CLEAN_UP_AND_RETURN(true);
+    hal.console->printf("    Successfully found ATAES132A device: Device=0x%02x Revision=0x%02x\n",
+                        info_result.deviceCode, info_result.deviceRevision);
+    return true;
 }
+
 
 static bool _cervello_runAllProbeTests(void){
     // Function to run all probe tests on the Cervello
@@ -675,12 +556,12 @@ static bool _cervello_runAllProbeTests(void){
     summaryTestResult &= testResult;
 
     hal.console->printf("Probing ATECC608 on I2C\n");
-    testResult = _hasATECC608();
+    testResult = _cervello_probeATECC608();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
     hal.console->printf("Probing ATAES132A on SPI\n");
-    testResult = _hasATAES132A();
+    testResult = _cervello_probeATAES132A();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 

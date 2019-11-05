@@ -1,0 +1,93 @@
+#pragma once
+
+/*
+   This program is free software: you can redistribute it and/or modify
+   it under the terms of the GNU General Public License as published by
+   the Free Software Foundation, either version 3 of the License, or
+   (at your option) any later version.
+
+   This program is distributed in the hope that it will be useful,
+   but WITHOUT ANY WARRANTY; without even the implied warranty of
+   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+   GNU General Public License for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with this program.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+// #include <stdint.h>
+#include "AP_HAL/AP_HAL.h"
+
+
+class ATAES132A {
+public:
+    ATAES132A(void) {
+
+    }
+
+    /* Do not allow copies */
+    ATAES132A(const ATAES132A &other) = delete;
+    ATAES132A &operator=(const ATAES132A&) = delete;
+
+
+    bool init(void);
+
+// private:
+    uint8_t SR_MASK_WIP  = (1 << 0);
+    uint8_t SR_MASK_WEN  = (1 << 1);
+    uint8_t SR_MASK_WAKE = (1 << 2);
+    uint8_t SR_MASK_CRCE = (1 << 4);
+    uint8_t SR_MASK_RRDY = (1 << 6);
+    uint8_t SR_MASK_EERR = (1 << 7);
+
+    uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
+
+    inline bool _read_status_register(void) {
+        // uint8_t const RDSR = 0x05;
+        // return dev->transfer(&RDSR, sizeof(RDSR), &status_register, sizeof(status_register));
+        uint8_t com[] = { 0x03, 0xFF, 0xF0, };
+        return dev->transfer(com, sizeof(com), &status_register, sizeof(status_register));
+    }
+
+    bool _wait_until_ready(uint32_t timeout);
+    bool _wait_for_response(uint32_t timeout);
+
+    enum class Opcode : uint8_t {
+        Info = 0x0C,
+    };
+    typedef struct {
+        Opcode opcode;
+        uint8_t mode;
+        uint16_t param1;
+        uint16_t param2;
+        uint8_t data[];
+        uint8_t sz;
+    } Command;
+    bool _send_command(Command const &cmd);
+
+    enum class ReturnCode : uint8_t {
+        Success       = 0x00,
+        BoundaryError = 0x02,
+        RWConfig      = 0x04,
+        BadAddr       = 0x08,
+        CountErr      = 0x10,
+        NonceError    = 0x20,
+        MacError      = 0x40,
+        ParseError    = 0x50,
+        DataMatch     = 0x60,
+        LockError     = 0x70,
+        KeyErr        = 0x80,
+    };
+    enum class ResponseStatus {
+        Ok,
+        TransferError,
+        CrcError,
+        ReturnCodeError,
+        BufferSzError,
+    };
+    ResponseStatus _read_response(ReturnCode &rc, uint8_t data[], uint8_t const sz);
+
+    AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev;
+    AP_HAL::Semaphore* sem;
+    uint8_t status_register;
+};
