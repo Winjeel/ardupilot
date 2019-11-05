@@ -141,11 +141,10 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
     land_WP_loc.offset_bearing(land_bearing_cd * 0.01f, prev_WP_loc.get_distance(current_loc) + 200);
     nav_controller->update_waypoint(prev_WP_loc, land_WP_loc);
 
-    // once landed and stationary, post some statistics
-    // this is done before disarm_if_autoland_complete() so that it happens on the next loop after the disarm
-    if (type_slope_flags.post_stats && !is_armed) {
-        type_slope_flags.post_stats = false;
+    // Post final landing statistic with sufficient time to be logged before disarm
+    if (type_slope_flags.post_stats && (AP_HAL::millis() - last_flying_ms - 100) >= get_disarm_delay()*1000UL) {
         gcs().send_text(MAV_SEVERITY_INFO, "Distance from LAND point=%.2fm", (double)current_loc.get_distance(next_WP_loc));
+        type_slope_flags.post_stats = false;
     }
 
     // check if we should auto-disarm after a confirmed landing
