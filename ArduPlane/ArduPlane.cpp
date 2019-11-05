@@ -516,9 +516,9 @@ void Plane::update_navigation()
             if (radius > 0) {
                 loiter.direction = (g.rtl_radius < 0) ? -1 : 1;
             }
+            update_loiter(radius);
         }
-        // fall through to LOITER
-        FALLTHROUGH;
+        break;
 
     case Mode::Number::LOITER:
     case Mode::Number::AVOID_ADSB:
