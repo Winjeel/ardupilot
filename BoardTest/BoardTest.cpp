@@ -360,38 +360,6 @@ static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16
 }
 
 
-static uint16_t ATAES132A_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0) {
-    if (data == NULL || length == 0) {
-        return crc;
-    }
-
-    uint8_t crcLSB = (crc & 0x00FF);
-    uint8_t crcMSB = (crc >> 8);
-    uint8_t polyLSB = 0x05;
-    uint8_t polyMSB = 0x80;
-
-    for (size_t counter = 0; counter < length; counter++) {
-        for (uint8_t shiftRegister = 0x80; shiftRegister > 0x00; shiftRegister >>= 1) {
-            uint8_t dataBit = (data[counter] & shiftRegister) ? 1 : 0;
-            uint8_t crcBit = crcMSB >> 7;
-
-            // Shift CRC to the left by 1.
-            uint8_t crcCarry = crcLSB >> 7;
-            crcLSB <<= 1;
-            crcMSB <<= 1;
-            crcMSB |= crcCarry;
-
-            if ((dataBit ^ crcBit) != 0) {
-                crcLSB ^= polyLSB;
-                crcMSB ^= polyMSB;
-            }
-        }
-    }
-
-    uint16_t result = (crcMSB & 0x00FF) | (crcLSB << 8);
-    return result;
-}
-
 static bool _cervello_probeATECC608(void) {
     uint8_t const k608Bus  = 2;
     uint8_t const k608Addr = 0xC0;
