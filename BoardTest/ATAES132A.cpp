@@ -2,9 +2,6 @@
 #include "ATAES132A.h"
 
 
-
-
-
 uint16_t ATAES132A::_crc16(uint8_t const data[], size_t const sz, uint16_t crc) {
     if (data == NULL || sz == 0) {
         return crc;
@@ -94,7 +91,7 @@ bool ATAES132A::init(void) {
 #define MSB(x) static_cast<uint8_t>(x >> 8)
 
 
-bool ATAES132A::_send_command(Command const &cmd) {
+bool ATAES132A::send_command(Command const &cmd) {
     uint8_t const kWriteReg = 0x02;
     uint16_t const kCommandAddr = 0xFE00;
     uint8_t const kHeaderSz = 3;
@@ -125,7 +122,7 @@ bool ATAES132A::_send_command(Command const &cmd) {
     return dev->transfer(buffer, sizeof(buffer), nullptr, 0);
 }
 
-ATAES132A::ResponseStatus ATAES132A::_read_response(ReturnCode &rc, uint8_t data[], uint8_t const sz) {
+ATAES132A::ResponseStatus ATAES132A::read_response(ReturnCode &rc, uint8_t data[], uint8_t const sz, uint32_t wait_ms) {
     uint8_t const kReadReg = 0x03;
     uint16_t const kCommandAddr = 0xFE00;
     uint8_t read_cmd[] = {
@@ -137,6 +134,10 @@ ATAES132A::ResponseStatus ATAES132A::_read_response(ReturnCode &rc, uint8_t data
     uint8_t const kCrcSz = 2;
     uint8_t buffer[kHeaderSz + sz + kCrcSz];
 
+    if (!_wait_for_response(wait_ms)) {
+        return ResponseStatus::ResponseTimeout;
+    }
+
     WITH_SEMAPHORE(sem);
     if (!dev->transfer(read_cmd, sizeof(read_cmd), buffer, sizeof(buffer))) {
         return ResponseStatus::TransferError;
@@ -144,12 +145,6 @@ ATAES132A::ResponseStatus ATAES132A::_read_response(ReturnCode &rc, uint8_t data
 
     size_t const kIdxCount = 0;
     size_t const kIdxReturnCode = 1;
-
-    rc = static_cast<ReturnCode>(buffer[kIdxReturnCode]);
-    if (rc != ReturnCode::Success) {
-        return ResponseStatus::ReturnCodeError;
-    }
-
     size_t const kIdxData = 2;
     size_t const kIdxCrc = buffer[kIdxCount] - kCrcSz;
 
@@ -161,6 +156,11 @@ ATAES132A::ResponseStatus ATAES132A::_read_response(ReturnCode &rc, uint8_t data
     }
 
     ResponseStatus result = ResponseStatus::Ok;
+    rc = static_cast<ReturnCode>(buffer[kIdxReturnCode]);
+    if (rc != ReturnCode::Success) {
+        result = ResponseStatus::ReturnCodeError;
+    }
+
     uint8_t data_sz = buffer[kIdxCount] - kHeaderSz - kCrcSz;
     if (data_sz > sz) {
         data_sz = sz;

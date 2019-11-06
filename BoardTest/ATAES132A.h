@@ -15,15 +15,12 @@
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-// #include <stdint.h>
 #include "AP_HAL/AP_HAL.h"
 
 
 class ATAES132A {
 public:
-    ATAES132A(void) {
-
-    }
+    ATAES132A(void) {}
 
     /* Do not allow copies */
     ATAES132A(const ATAES132A &other) = delete;
@@ -31,26 +28,6 @@ public:
 
 
     bool init(void);
-
-// private:
-    uint8_t SR_MASK_WIP  = (1 << 0);
-    uint8_t SR_MASK_WEN  = (1 << 1);
-    uint8_t SR_MASK_WAKE = (1 << 2);
-    uint8_t SR_MASK_CRCE = (1 << 4);
-    uint8_t SR_MASK_RRDY = (1 << 6);
-    uint8_t SR_MASK_EERR = (1 << 7);
-
-    uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
-
-    inline bool _read_status_register(void) {
-        // uint8_t const RDSR = 0x05;
-        // return dev->transfer(&RDSR, sizeof(RDSR), &status_register, sizeof(status_register));
-        uint8_t com[] = { 0x03, 0xFF, 0xF0, };
-        return dev->transfer(com, sizeof(com), &status_register, sizeof(status_register));
-    }
-
-    bool _wait_until_ready(uint32_t timeout);
-    bool _wait_for_response(uint32_t timeout);
 
     enum class Opcode : uint8_t {
         Info = 0x0C,
@@ -63,7 +40,7 @@ public:
         uint8_t data[];
         uint8_t sz;
     } Command;
-    bool _send_command(Command const &cmd);
+    bool send_command(Command const &cmd);
 
     enum class ReturnCode : uint8_t {
         Success       = 0x00,
@@ -80,12 +57,31 @@ public:
     };
     enum class ResponseStatus {
         Ok,
+        ResponseTimeout,
         TransferError,
         CrcError,
         ReturnCodeError,
         BufferSzError,
     };
-    ResponseStatus _read_response(ReturnCode &rc, uint8_t data[], uint8_t const sz);
+    ResponseStatus read_response(ReturnCode &rc, uint8_t data[], uint8_t const sz, uint32_t wait_ms = 100);
+
+private:
+    uint8_t SR_MASK_WIP  = (1 << 0);
+    uint8_t SR_MASK_WEN  = (1 << 1);
+    uint8_t SR_MASK_WAKE = (1 << 2);
+    uint8_t SR_MASK_CRCE = (1 << 4);
+    uint8_t SR_MASK_RRDY = (1 << 6);
+    uint8_t SR_MASK_EERR = (1 << 7);
+
+    uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
+
+    inline bool _read_status_register(void) {
+        uint8_t com[] = { 0x03, 0xFF, 0xF0, };
+        return dev->transfer(com, sizeof(com), &status_register, sizeof(status_register));
+    }
+
+    bool _wait_until_ready(uint32_t timeout);
+    bool _wait_for_response(uint32_t timeout);
 
     AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev;
     AP_HAL::Semaphore* sem;

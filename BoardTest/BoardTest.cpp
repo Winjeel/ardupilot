@@ -451,12 +451,8 @@ static bool _cervello_probeATAES132A(void) {
         0x0006, // DeviceNum
         0x0000, // param2
     };
-    if (!ataes132a._send_command(info_cmd)) {
+    if (!ataes132a.send_command(info_cmd)) {
         hal.console->printf("    Couldn't send ATAES132A command\n");
-        return false;
-    }
-    if (!ataes132a._wait_for_response(1000)) {
-        hal.console->printf("    Didn't get response from ATAES132A\n");
         return false;
     }
 
@@ -467,9 +463,9 @@ static bool _cervello_probeATAES132A(void) {
 
     ATAES132A::ReturnCode rc;
     ATAES132A::ResponseStatus resp =
-        ataes132a._read_response(rc,
-                                 reinterpret_cast<uint8_t *>(&info_result),
-                                 sizeof(info_result));
+        ataes132a.read_response(rc,
+                                reinterpret_cast<uint8_t *>(&info_result),
+                                sizeof(info_result));
     if (ATAES132A::ResponseStatus::Ok != resp) {
         hal.console->printf("    Bad response (0x%02x) from ATAES132A\n", resp);
         return false;
