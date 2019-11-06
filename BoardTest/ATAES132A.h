@@ -73,7 +73,7 @@ private:
     uint8_t SR_MASK_RRDY = (1 << 6);
     uint8_t SR_MASK_EERR = (1 << 7);
 
-    uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
+    static uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
 
     // pre-condition: semaphore has been taken
     inline bool _read_status_register(void) {
