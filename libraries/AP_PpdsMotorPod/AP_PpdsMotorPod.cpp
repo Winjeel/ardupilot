@@ -5,9 +5,7 @@
 #include "OpticalFlowState.h"
 #include "AdcState.h"
 
-#if (CORVO_DEBUG)
 #include "GCS_MAVLink/GCS.h"
-#endif // (CORVO_DEBUG)
 
 
 extern const AP_HAL::HAL &hal;
