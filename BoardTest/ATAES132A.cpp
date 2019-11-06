@@ -50,11 +50,6 @@ bool ATAES132A::_wait_until_ready(uint32_t timeout) {
 }
 
 bool ATAES132A::_wait_for_response(uint32_t timeout) {
-    if (!sem) {
-        return false;
-    }
-    WITH_SEMAPHORE(sem);
-
     AP_HAL::HAL const &hal = AP_HAL::get_HAL();
     uint32_t const kNow = AP_HAL::millis();
     EXPECT_DELAY_MS(timeout);
@@ -134,11 +129,11 @@ ATAES132A::ResponseStatus ATAES132A::read_response(ReturnCode &rc, uint8_t data[
     uint8_t const kCrcSz = 2;
     uint8_t buffer[kHeaderSz + sz + kCrcSz];
 
+    WITH_SEMAPHORE(sem);
     if (!_wait_for_response(wait_ms)) {
         return ResponseStatus::ResponseTimeout;
     }
 
-    WITH_SEMAPHORE(sem);
     if (!dev->transfer(read_cmd, sizeof(read_cmd), buffer, sizeof(buffer))) {
         return ResponseStatus::TransferError;
     }

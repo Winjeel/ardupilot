@@ -75,12 +75,15 @@ private:
 
     uint16_t _crc16(uint8_t const data[], size_t const sz, uint16_t crc = 0);
 
+    // pre-condition: semaphore has been taken
     inline bool _read_status_register(void) {
         uint8_t com[] = { 0x03, 0xFF, 0xF0, };
         return dev->transfer(com, sizeof(com), &status_register, sizeof(status_register));
     }
 
+    // pre-condition: semaphore has been taken
     bool _wait_until_ready(uint32_t timeout);
+    // pre-condition: semaphore has been taken
     bool _wait_for_response(uint32_t timeout);
 
     AP_HAL::OwnPtr<AP_HAL::SPIDevice> dev;
