@@ -5,7 +5,7 @@
  */
 
 #define CRASH_DETECTION_DELAY_MS            500
-#define SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS 7000
+#define SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS 10000
 #define IS_FLYING_IMPACT_TIMER_MS           3000
 #define GPS_IS_FLYING_SPEED_CMS             150
 
@@ -101,9 +101,12 @@ void Plane::update_is_flying_5Hz(void)
                     }
 
                     // check optical flow sensor
+                    Vector2f rel_vel_bf = ahrs.rotate_earth_to_body2D(ahrs.groundspeed_vector());
+                    const float is_launched_min_spd = 5.0f; // considered launched if moving faster than this (m/s)
                     if (g.crash_flow_threshold > 0 &&
                         optflow.flowRate().y > (float)g.crash_flow_threshold &&
-                        optflow.quality() > 128) {
+                        optflow.quality() > 128 &&
+                        rel_vel_bf.x > is_launched_min_spd) {
                         crash_state.launch_flow_timer_ms = now_ms;
                     } else if (g.crash_flow_threshold == 0) {
                         // can't use optical flow sensor
@@ -122,12 +125,12 @@ void Plane::update_is_flying_5Hz(void)
                     // ground proximity as measured using optical flow/forward speed and a negative pitch angle 
                     // indicate impending ground contact.
                     if (use_spd_acc && crash_state.launch_flow_timer_ms == now_ms) {
-                        Vector2f rel_vel_bf = ahrs.rotate_earth_to_body2D(ahrs.groundspeed_vector());
-                        float hagl_est = rel_vel_bf.x / optflow.flowRate().y;
+                        float hagl_est = rel_vel_bf.x / (optflow.flowRate().y - optflow.bodyRate().y);
                         Vector3f rel_vel_ef;
                         if (ahrs.get_velocity_NED(rel_vel_ef)) {
                             float time_to_impact = hagl_est / rel_vel_ef.z;
                             if (hagl_est < 1.0f && hagl_est > 0.0f && // close to ground
+                                rel_vel_bf.x > is_launched_min_spd && // moving forward with signficant velocity
                                 rel_vel_ef.z > 0.0f && // losing height
                                 time_to_impact < 1.0f && // will hit ground soon
                                 ahrs.pitch < 0.0f) { // nose down
@@ -146,6 +149,7 @@ void Plane::update_is_flying_5Hz(void)
                         is_flying_bool = false;
                         isFlyingProbability = 0.0f;
                         plane.disarm_motors();
+                        gcs().send_text(MAV_SEVERITY_INFO, "Hit ground after launch - disarming");
                     }
                 }
                 break;
@@ -275,6 +279,7 @@ void Plane::crash_detection_update(void)
     bool crashed = false;
     bool been_auto_flying = (auto_state.started_flying_in_auto_ms > 0) &&
                             (now_ms - auto_state.started_flying_in_auto_ms >= 2500);
+    LaunchFailType launch_fail_status = LaunchFailType::UNKNOWN;
 
     if (!is_flying() && arming.is_armed())
     {
@@ -327,12 +332,15 @@ void Plane::crash_detection_update(void)
                         if (ahrs.pitch > radians(45.0f) || ahrs.pitch < -radians(30.0f) || fabsf(ahrs.roll) > radians(45.0f)) {
                             // Stop motor quickly if operator loses grip to prevent injury
                             crash_state.debounce_time_total_ms = 0;
+                            launch_fail_status = LaunchFailType::ANGLE;
                         } else {
                             crash_state.debounce_time_total_ms = SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS;
+                            launch_fail_status = LaunchFailType::TIME;
                         }
                     } else {
                         // allow time for the is_flying status to change to TRUE after the throw
                         crash_state.debounce_time_total_ms = CRASH_DETECTION_DELAY_MS;
+                        launch_fail_status = LaunchFailType::THROWN;
                     }
                 }
                 // TODO: handle auto missions without NAV_TAKEOFF mission cmd
@@ -389,7 +397,24 @@ void Plane::crash_detection_update(void)
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected");
             } else {
-                gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                switch (launch_fail_status)
+                {
+                    case LaunchFailType::TIME:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
+                        break;
+
+                    case LaunchFailType::ANGLE:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
+                        break;
+
+                    case LaunchFailType::THROWN:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed");
+                        break;
+
+                    default:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected");
+                        break;
+                }
             }
         }
     }

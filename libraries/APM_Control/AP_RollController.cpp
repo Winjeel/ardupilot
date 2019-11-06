@@ -141,8 +141,8 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	// This means aileron trim offset doesn't change as the value of scaler changes with airspeed
 	// Don't integrate if in stabilise mode as the integrator will wind up against the pilots inputs
 	if (!disable_integrator && ki_rate > 0) {
-		//only integrate if gain and time step are positive and airspeed above min value.
-		if (dt > 0 && aspeed > float(aparm.airspeed_min)) {
+		// only integrate if gain and time step are positive and airspeed above the minimum where we could be flying.
+		if (dt > 0 && aspeed > 0.5f*float(aparm.airspeed_min)) {
 		    float integrator_delta = rate_error * ki_rate * delta_time * scaler;
 			// prevent the integrator from increasing if surface defln demand is above the upper limit
 			if (_last_out < -45) {

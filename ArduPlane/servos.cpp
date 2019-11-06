@@ -861,7 +861,7 @@ void Plane::set_servos(void)
     // Following detection of launch movement, this special case is inhibited until the vehicle is disarmed.
     if (plane.g.auto_preflight == 1 && control_mode == &mode_auto && !takeoff_state.control_check_inhibit) {
         if (!arming.is_armed()) {
-            // when pre-arm checks ar passing
+            // when pre-arm checks are passing
             if (AP_Notify::flags.pre_arm_check) {
                 if (!surface_test_state.control_checks_complete) {
                     // start servo movement checks
@@ -871,6 +871,8 @@ void Plane::set_servos(void)
                 } else {
                     // try to arm when movement checks complete provided the mission plan checks pass
                     if (plane.mission.get_current_nav_index() == 1) {
+                        takeoff_state.last_check_ms = 0; // makes takeoff detector reset states
+                        memset(&crash_state, 0, sizeof(crash_state));
                         arming.arm(AP_Arming::Method::MAVLINK, true);
                     } else {
                         plane.mission.set_current_cmd(1);
