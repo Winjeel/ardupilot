@@ -365,7 +365,7 @@ void AP_PpdsMotorPod::update(void) {
 uint16_t AP_PpdsMotorPod::_sendCorvoPacket(CorvoPacket const * const pkt) {
     uint16_t sentBytes = 0;
 
-    size_t toSend = 3;
+    size_t toSend = offsetof(CorvoPacket, data);
     size_t tx = uart->write((uint8_t *)pkt, toSend);
     if ((pkt->dataSz > 0) && (tx == toSend)) {
         sentBytes += tx;
