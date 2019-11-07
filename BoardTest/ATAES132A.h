@@ -23,7 +23,7 @@ public:
         uint8_t mode;
         uint16_t param1;
         uint16_t param2;
-        uint8_t data[];
+        uint8_t * const data;
         uint8_t sz;
     } Command;
     bool send_command(Command const &cmd);

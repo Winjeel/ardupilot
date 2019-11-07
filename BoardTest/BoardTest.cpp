@@ -447,9 +447,11 @@ static bool _cervello_probeATAES132A(void) {
 
     ATAES132A::Command info_cmd = {
         ATAES132A::Opcode::Info,
-        0x00, // mode
-        0x0006, // DeviceNum
-        0x0000, // param2
+        0x00,    // mode
+        0x0006,  // DeviceNum
+        0x0000,  // param2
+        nullptr, // data
+        0,       // sz
     };
     if (!ataes132a.send_command(info_cmd)) {
         hal.console->printf("    Couldn't send ATAES132A command\n");
