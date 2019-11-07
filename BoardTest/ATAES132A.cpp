@@ -106,8 +106,10 @@ bool ATAES132A::send_command(Command const &cmd) {
     };
 
     size_t idx = kHeaderSz + kCount - kCrcSz;
-    memcpy(&buffer[idx], cmd.data, cmd.sz);
-    idx += cmd.sz;
+    if ((cmd.sz > 0) && (cmd.data != nullptr)) {
+        memcpy(&buffer[idx], cmd.data, cmd.sz);
+        idx += cmd.sz;
+    }
 
     size_t const kCountIdx = 3;
     uint16_t const crc = _crc16(&buffer[kCountIdx], buffer[kCountIdx] - kCrcSz);
