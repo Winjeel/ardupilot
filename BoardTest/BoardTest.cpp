@@ -3,6 +3,8 @@
 */
 #include "BoardTest.h"
 
+#include "ATAES132A.h"
+
 #if APJ_BOARD_ID != 1688
     #error This BoardTest is currently only applicable for Cervello boards!
 #endif
@@ -44,7 +46,7 @@ static void _initialiseCervello(void){
 
     // initialise serial ports
     serialManager.init();
-    
+
     // initialise Cervello
     boardConfig.init();
     hal.scheduler->delay(1000);
@@ -338,7 +340,7 @@ static void _consoleKeypress(void){
 
 static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16_t crc = 0) {
     if (data == NULL || length == 0) {
-        return 0;
+        return crc;
     }
 
     for (size_t i = 0; i < length; i++) {
@@ -357,7 +359,8 @@ static uint16_t ATECC608_crc16(uint8_t const data[], size_t const length, uint16
     return crc;
 }
 
-static bool _hasATECC608(void) {
+
+static bool _cervello_probeATECC608(void) {
     uint8_t const k608Bus  = 2;
     uint8_t const k608Addr = 0xC0;
 
@@ -434,6 +437,51 @@ static bool _hasATECC608(void) {
     CLEAN_UP_AND_RETURN(true);
 }
 
+
+static bool _cervello_probeATAES132A(void) {
+    ATAES132A ataes132a;
+    if (!ataes132a.init()) {
+        hal.console->printf("    Couldn't create ATAES132A device on SPI bus\n");
+        return false;
+    }
+
+    ATAES132A::Command info_cmd = {
+        ATAES132A::Opcode::Info,
+        0x00, // mode
+        0x0006, // DeviceNum
+        0x0000, // param2
+    };
+    if (!ataes132a.send_command(info_cmd)) {
+        hal.console->printf("    Couldn't send ATAES132A command\n");
+        return false;
+    }
+
+    struct {
+        uint8_t deviceCode;
+        uint8_t deviceRevision;
+    } PACKED info_result;
+
+    ATAES132A::ReturnCode rc;
+    ATAES132A::ResponseStatus resp =
+        ataes132a.read_response(rc,
+                                reinterpret_cast<uint8_t *>(&info_result),
+                                sizeof(info_result));
+    if (ATAES132A::ResponseStatus::Ok != resp) {
+        hal.console->printf("    Bad response (0x%02x) from ATAES132A\n", resp);
+        return false;
+    }
+
+    if (rc != ATAES132A::ReturnCode::Success) {
+        hal.console->printf("    ATAES132A device returned error code: 0x%02x\n", rc);
+        return false;
+    }
+
+    hal.console->printf("    Successfully found ATAES132A device: Device=0x%02x Revision=0x%02x\n",
+                        info_result.deviceCode, info_result.deviceRevision);
+    return true;
+}
+
+
 static bool _cervello_runAllProbeTests(void){
     // Function to run all probe tests on the Cervello
     bool summaryTestResult = true;
@@ -472,7 +520,12 @@ static bool _cervello_runAllProbeTests(void){
     summaryTestResult &= testResult;
 
     hal.console->printf("Probing ATECC608 on I2C\n");
-    testResult = _hasATECC608();
+    testResult = _cervello_probeATECC608();
+    hal.console->printf(kResultStr[testResult]);
+    summaryTestResult &= testResult;
+
+    hal.console->printf("Probing ATAES132A on SPI\n");
+    testResult = _cervello_probeATAES132A();
     hal.console->printf(kResultStr[testResult]);
     summaryTestResult &= testResult;
 
@@ -1155,7 +1208,7 @@ static bool _PPDSCarrier_serialCommunicationTest_singleCommunication(SerialDevic
     for (int i = 0; i<2; i++){
         _flushUART(serialDevice[i]);
         serialDevice[i]->end();
-    }  
+    }
 
     // Verify that the send and received message matches the original test message
     for (int i = 0; i < sizeof(rx_buffer); i++){
@@ -1190,7 +1243,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
 
     // Setup variable to track test result
     bool summaryTestResult = true;
-    
+
     for (int i = 0; i < numDevices; i++){
         PWMDeviceList pwmDevice = pwmDevices[i];
         hal.console->printf("Testing PPDS Carrier communucation from PWM %i to Serial %i --- ", pwmDevice+1, SerialDeviceList::SERIAL4);
@@ -1211,7 +1264,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
                 break;
             }
         }
-        
+
         hal.console->printf(kResultStr[testResult]);
         summaryTestResult &= testResult;
     }
@@ -1220,7 +1273,7 @@ static bool _PPDSCarrier_serialCommunicationTest_ServoAll_Serial4(void){
 
 static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDeviceList pwmDevice, SerialDeviceList serialDeviceID, bool printFailMsg){
     // Test verifying communication from a PWM device to a Serial device (one way)
-    
+
     // Setup the receiving serial device
     AP_HAL::UARTDriver* serialDevice;
     serialDevice = serialManager.get_serial_by_id(serialDeviceID);
@@ -1240,7 +1293,7 @@ static bool _PPDSCarrier_pwmToSerialCommunicationTest_singleCommunication(PWMDev
         hal.rcout->set_output_mode((uint16_t)1 << i, AP_HAL::RCOutput::MODE_PWM_DSHOT150);
     }
     hal.scheduler->delay(100);
-    
+
     // Setup serial communication over the PWM device
     if (!hal.rcout->serial_setup_output((uint8_t)pwmDevice, UARTbaud, (uint16_t)1 << pwmDevice)){
         if(printFailMsg) {hal.console->printf("Could not configure PWM device %i with serial output --- ", pwmDevice);};
@@ -1322,7 +1375,7 @@ static bool _PPDSCarrier_rcInputTest(void){
     if (!params.set_object_value(&sbusOut, sbusOut.var_info, "RATE", (float)111)){
         hal.console->printf("Could not set SBUS PRF parameter");
         return false;
-    }    
+    }
 
     // Setup SBUS UART
     AP_HAL::UARTDriver* serialDevice;
