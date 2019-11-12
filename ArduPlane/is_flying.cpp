@@ -387,7 +387,31 @@ void Plane::crash_detection_update(void)
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected. No action taken");
             } else {
-                gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected. No action taken");
+                switch (launch_fail_status)
+                {
+                    case LaunchFailType::TIME:
+                        // Special case where operator has not thrown vehicle after starting motors
+                        // Must always disarm in this situation even when crash detection is disabled
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
+                        disarm_motors();
+                        break;
+
+                    case LaunchFailType::ANGLE:
+                        // Special case where operator has lost grip of vehicle before throwing it
+                        // Must always disarm in this situation even when crash detection is disabled
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
+                        disarm_motors();
+                        break;
+
+                    case LaunchFailType::THROWN:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Throw Failed. No action taken");
+                        break;
+
+                    default:
+                        gcs().send_text(MAV_SEVERITY_EMERGENCY, "Crash detected. No action taken");
+                        break;
+                }
+
             }
         }
         else {
