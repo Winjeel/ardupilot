@@ -320,6 +320,20 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
 
     // stay within the range of the start and end locations in altitude
     constrain_target_altitude_location_fn(loc, prev_WP_loc);
+
+    AP::logger().Write("APP", "TimeUS,TD,SH,DD,FT,FA,AH,FD,TAOC,LP,LOC_ALT", "Qffffffffff",
+                                            AP_HAL::micros64(),
+                                            (double)total_distance,
+                                            (double)sink_height,
+                                            (double)decel_distance,
+                                            (double)flare_time,
+                                            (double)flare_alt,
+                                            (double)aim_height,
+                                            (double)flare_distance,
+                                            (double)target_altitude_offset_cm,
+                                            (double)land_proportion,
+                                            (double)loc.alt);
+
 }
 
 int32_t AP_Landing::type_slope_get_target_airspeed_cm(void)
