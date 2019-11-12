@@ -1061,6 +1061,16 @@ bool NavEKF2::getHAGL(float &HAGL) const
     return core[primary].getHAGL(HAGL);
 }
 
+// return estimated height of terrain in metres above EKF origin
+// return false if not being estimated.
+bool NavEKF2::getTerrainHeight(float &height) const
+{
+    if (!core) {
+        return false;
+    }
+    return core[primary].getTerrainHeight(height);
+}
+
 // return the Euler roll, pitch and yaw angle in radians for the specified instance
 void NavEKF2::getEulerAngles(int8_t instance, Vector3f &eulers) const
 {
