@@ -311,6 +311,14 @@ bool NavEKF3_core::getHAGL(float &HAGL) const
     return !hgtTimeout && gndOffsetValid && healthy();
 }
 
+// return the estimated height of terrain in metres above EKF origin
+// return false if not being estimated
+bool NavEKF3_core::getTerrainHeight(float &height) const
+{
+    height = -terrainState;
+    return !hgtTimeout && gndOffsetValid && healthy();
+}
+
 // Return the last calculated latitude, longitude and height in WGS-84
 // If a calculated location isn't available, return a raw GPS measurement
 // The status will return true if a calculation or raw measurement is available
