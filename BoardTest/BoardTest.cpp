@@ -729,8 +729,9 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
     uint32_t testStartTime = AP_HAL::micros();
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
-    // Setup variable to track running average
-    float runningAverage = 0;
+    // Setup variables to track running average
+    std::vector<float> runningSamples(runningAverageSamples, 0);
+    int counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -739,14 +740,19 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
         ins.update();
 
         // Update the running average
-        float accelData = *accelSensor;
-        runningAverage = _approxRunningAverage(runningAverage, accelData);
+        if (counter >= runningAverageSamples){
+            counter = 0;
+        }
+        
+        runningSamples[counter] = *accelSensor;
+        float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if accelerometer is aligned with gravity
         if (_checkGravityAcceleration(runningAverage)){
             // If accelerometer is aligned, pass test and continue
             return true;
         }
+        counter++;
         hal.scheduler->delay(testLoopDelay);
     }
     return false;
@@ -760,8 +766,9 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
     uint32_t testStartTime = AP_HAL::micros();
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
-    // Setup variable to track running average
-    float runningAverage = 0;
+    // Setup variables to track running average
+    std::vector<float> runningSamples(runningAverageSamples, 0);
+    int counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -770,16 +777,19 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
         ins.update();
 
         // Update the running average
-        float gyroData = *gyroSensor;
-        runningAverage = _approxRunningAverage(runningAverage, gyroData);
+        if (counter >= runningAverageSamples){
+            counter = 0;
+        }
 
-        // hal.console->printf("Running average %.2f\n",runningAverage);
+        runningSamples[counter] = *gyroSensor;
+        float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if gyro detects positive rotation
         if (_checkRotation(runningAverage)){
             // If accelerometer is aligned, pass test and continue
             return true;
         }
+        counter++;
         hal.scheduler->delay(testLoopDelay);
     }
     return false;

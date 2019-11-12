@@ -6,7 +6,7 @@
 
 bool _checkGravityAcceleration(float acceleration);
 bool _checkRotation(float rotation);
-float _approxRunningAverage(float average, float newSample);
+float _calculateVectorAverage(std::vector<float> sampleWindow);
 
 void _initialiseRandomNumberGenerator(void);
 bool _flushUART(AP_HAL::UARTDriver* serialDevice);

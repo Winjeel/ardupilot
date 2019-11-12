@@ -12,11 +12,13 @@ bool _checkRotation(float rotation){
     return rotation > ins_gyro_tol;
 }
 
-float _approxRunningAverage(float average, float newSample){
-    average -= average / runningAverageSamples;
-    average += newSample / runningAverageSamples;
-    return average;
-    // https://stackoverflow.com/questions/12636613/how-to-calculate-moving-average-without-keeping-the-count-and-data-total
+float _calculateVectorAverage(std::vector<float> sampleWindow){
+    // Function to calculate the average value of a vector
+    float sum = 0;
+    for (int i = 0; i < sampleWindow.size(); i++){
+        sum += sampleWindow[i];
+    }
+    return sum / sampleWindow.size();
 }
 
 void _initialiseRandomNumberGenerator(void){
