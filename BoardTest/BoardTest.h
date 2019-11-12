@@ -120,6 +120,12 @@ static bool _PPDSCarrier_buzzerTest(void);
 static bool _PPDSCarrier_safetySwitchTest(void);
 static bool _PPDSCarrier_GPSTest(void);
 
+// Cervello debug test cases - forward declare
+static bool _cervelloDebug_Gyro(void);
+static bool _cervelloDebug_Accel(void);
+static bool _cervelloDebug_Baro(void);
+static bool _cervelloDebug_Mag(void);
+
 // test items
 const Test kTestItem[] = {
     { '?', nullptr,              _printInstructions, "Print these instructions.", },
@@ -150,5 +156,12 @@ const Test kTestItem[] = {
     { 'u', "PPDS Carrier Buzzer test",                                      _PPDSCarrier_buzzerTest,                                         "PPDS Carrier - Run Buzzer test.", },
     { 'i', "PPDS Carrier Safety Switch test",                               _PPDSCarrier_safetySwitchTest,                                   "PPDS Carrier - Run Safety Switch test.", },
     { 'o', "PPDS Carrier GPS test",                                         _PPDSCarrier_GPSTest,                                            "PPDS Carrier - Run GPS test.", },
+
+    // Cervello Debug tests
+    { 'z', "Cervello debug accelerometer test",                             _cervelloDebug_Accel,                                            "Cervello Debug - Accelerometer.", },
+    { 'x', "Cervello debug gyro test",                                      _cervelloDebug_Gyro,                                             "Cervello Debug - Gyro.", },
+    { 'c', "Cervello debug magnetometer test",                              _cervelloDebug_Mag,                                              "Cervello Debug - Magnetometer.", },
+    { 'v', "Cervello debug barometer test",                                 _cervelloDebug_Baro,                                             "Cervello Debug - Barometer.", },
+    
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
