@@ -15,7 +15,7 @@
 #define runningAverageSamples 50
 
 // cervello accelerometer & gyro test constants
-#define ins_accel_tol 0.3
+#define ins_accel_tol 0.5
 #define ins_gyro_tol 0.5
 
 // cervello barometer test constants
