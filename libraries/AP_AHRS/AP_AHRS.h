@@ -285,6 +285,10 @@ public:
 
     virtual bool get_hagl(float &height) const { return false; }
 
+    // return estimated height of terrain in metres above estimator origin
+    // return false if not being estimated.
+    virtual bool get_terrain_height(float &height) const { return false; }
+
     // return a wind estimation vector, in m/s
     virtual Vector3f wind_estimate(void) const = 0;
 

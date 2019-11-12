@@ -837,6 +837,29 @@ bool AP_AHRS_NavEKF::get_hagl(float &height) const
     }
 }
 
+// get latest height of terrain above estimator origin in metres and a validity flag
+bool AP_AHRS_NavEKF::get_terrain_height(float &height) const
+{
+    switch (active_EKF_type()) {
+    case EKF_TYPE_NONE:
+        height = 0.0f;
+        return false;
+
+    case EKF_TYPE2:
+    default:
+        return EKF2.getTerrainHeight(height);
+        
+    case EKF_TYPE3:
+        return EKF2.getTerrainHeight(height);
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    case EKF_TYPE_SITL:
+        height = 0.0f;
+        return false;
+#endif
+    }
+}
+
 // return a relative ground position to the origin in meters
 // North/East/Down order.
 bool AP_AHRS_NavEKF::get_relative_position_NED_origin(Vector3f &vec) const
