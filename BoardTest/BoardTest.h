@@ -36,6 +36,8 @@ char const * kResultStr[]  = {
     "PASS\n",
 };
 
+char const axis[] = {'X', 'Y', 'Z', };
+
 // Enumerates
 enum SerialDeviceList {
     SERIAL0=0, // J12 - USB - OTG

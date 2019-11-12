@@ -671,7 +671,6 @@ static bool _cervello_AccelTest(void){
     // Loop through each axis - X/Y/Z
     for (int i = 0; i < 3; i++){
 
-        char axis[] = {'X', 'Y', 'Z', };
         hal.console->printf("Orient the board with the %c axis facing down\n", axis[i]);
 
         // Loop through each accelerometer
@@ -705,7 +704,6 @@ static bool _cervello_GyroTest(void){
     // Loop through each axis - X/Y/Z
     for (int i = 0; i < 3; i++){
 
-        char axis[] = {'X', 'Y', 'Z', };
         hal.console->printf("Rotate the board clockwise around the positive %c axis\n", axis[i]);
 
         // Loop through each gyro
