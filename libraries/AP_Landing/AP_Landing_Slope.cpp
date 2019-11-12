@@ -141,8 +141,8 @@ bool AP_Landing::type_slope_verify_land(const Location &prev_WP_loc, Location &n
     land_WP_loc.offset_bearing(land_bearing_cd * 0.01f, prev_WP_loc.get_distance(current_loc) + 200);
     nav_controller->update_waypoint(prev_WP_loc, land_WP_loc);
 
-    // Post final landing statistic with sufficient time to be logged before disarm
-    if (type_slope_flags.post_stats && (AP_HAL::millis() - last_flying_ms - 100) >= get_disarm_delay()*1000UL) {
+    // Post final landing statistic as soon as the plane stops flying
+    if (type_slope_flags.post_stats && !is_flying) {
         gcs().send_text(MAV_SEVERITY_INFO, "Distance from LAND point=%.2fm", (double)current_loc.get_distance(next_WP_loc));
         type_slope_flags.post_stats = false;
     }
