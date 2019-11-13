@@ -7,7 +7,7 @@
 #define CRASH_DETECTION_DELAY_MS            500
 #define SHAKE_TO_START_LAUNCH_FAIL_DELAY_MS 10000
 #define IS_FLYING_IMPACT_TIMER_MS           3000
-#define GPS_IS_FLYING_SPEED_CMS             150
+#define GPS_MIN_SPD_THRESHOLD_CMS           50
 
 /*
   Do we think we are flying?
@@ -19,21 +19,23 @@ void Plane::update_is_flying_5Hz(void)
     bool is_flying_bool;
     uint32_t now_ms = AP_HAL::millis();
 
-    uint32_t ground_speed_thresh_cm = (aparm.min_gndspeed_cm > 0) ? ((uint32_t)(aparm.min_gndspeed_cm*0.9f)) : GPS_IS_FLYING_SPEED_CMS;
-    bool gps_confirmed_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_3D) &&
-                                    (gps.ground_speed_cm() >= ground_speed_thresh_cm);
+    // check ground speed using GPS receivers reported speed accuracy as the test threshold if available
+    float gps_spd_acc = 0;
+    bool use_spd_acc = (gps.status() >= AP_GPS::GPS_OK_FIX_3D) && gps.speed_accuracy(gps_spd_acc);
+    uint32_t gps_spd_acc_cms = (uint32_t)(gps_spd_acc * 100.0f);
+    uint32_t ground_speed_thresh_cms = (use_spd_acc && (gps_spd_acc_cms > GPS_MIN_SPD_THRESHOLD_CMS)) ? gps_spd_acc_cms : GPS_MIN_SPD_THRESHOLD_CMS;
+
+    // Require a larger threshold to confirm initial movement to avoid false positives prior to launch
+    uint32_t launch_threshold_cm = (uint32_t)aparm.min_gndspeed_cm;
+    ground_speed_thresh_cms = (isFlyingProbability < 0.5f) ? launch_threshold_cm + ground_speed_thresh_cms : ground_speed_thresh_cms;
+
+    bool gps_confirmed_movement = (gps.status() >= AP_GPS::GPS_OK_FIX_3D) && (gps.ground_speed_cm() >= ground_speed_thresh_cms);
 
     // airspeed at least 75% of stall speed?
-    const float airspeed_threshold = MAX(aparm.airspeed_min,2)*0.75f;
+    // Assume ARSPD_FBW_MIN set to 1.2 Vstall in accordance with parameter documentation
+    const float airspeed_threshold = MAX(aparm.airspeed_min,2)*0.625f;
     bool airspeed_movement = ahrs.airspeed_estimate(&aspeed) && (aspeed >= airspeed_threshold);
-
-    if (gps.status() < AP_GPS::GPS_OK_FIX_2D && arming.is_armed() && !airspeed_movement && isFlyingProbability > 0.3) {
-        // when flying with no GPS, use the last airspeed estimate to
-        // determine if we think we have airspeed movement. This
-        // prevents the crash detector from triggering when
-        // dead-reckoning under long GPS loss
-        airspeed_movement = aspeed >= airspeed_threshold;
-    }
+    bool airspeed_is_measured = airspeed.enabled() && airspeed.use();
 
     if (quadplane.is_flying()) {
         is_flying_bool = true;
@@ -41,17 +43,33 @@ void Plane::update_is_flying_5Hz(void)
     } else if(arming.is_armed()) {
         // when armed assuming flying and we need overwhelming evidence that we ARE NOT flying
         // short drop-outs of GPS are common during flight due to banking which points the antenna in different directions
+        // allow more time if we can't check flyung status using airspeed
+        uint32_t gps_timeout_ms = airspeed_is_measured ? 5000 : 30000;
         bool gps_lost_recently = (gps.last_fix_time_ms() > 0) && // we have locked to GPS before
                         (gps.status() < AP_GPS::GPS_OK_FIX_2D) && // and it's lost now
-                        (now_ms - gps.last_fix_time_ms() < 5000); // but it wasn't that long ago (<5s)
+                        (now_ms - gps.last_fix_time_ms() < gps_timeout_ms); // but it wasn't that long ago
 
         if ((auto_state.last_flying_ms > 0) && gps_lost_recently) {
-            // we've flown before, remove GPS constraints temporarily and only use airspeed
-            is_flying_bool = airspeed_movement; // moving through the air
+            // we've flown before, remove GPS constraints temporarily
+            if (airspeed_is_measured) {
+                // use estimated airspeed if based on a airspeed measurement
+                is_flying_bool = airspeed_movement;
+            } else {
+                // use most likely value from previous data
+                is_flying_bool = isFlyingProbability > 0.5f;
+            }
         } else {
-            // we've never flown yet, require good GPS movement
-            is_flying_bool = airspeed_movement || // moving through the air
+            // we've never flown yet or have lost GPS for a significant time so require good GPS movement
+            if (airspeed_is_measured) {
+                is_flying_bool = airspeed_movement || // moving through the air
                                 gps_confirmed_movement; // locked and we're moving
+            } else {
+                // if CRASH_DETECT is set to 1, this condition will cause the motor to disarmadn the vehicle
+                // to descend if GPS lock is lost for an extended period
+                // TODO - add IMU movement check to provide an alternative to GPS when there is no airspeed
+                // sensor fitted
+                is_flying_bool = gps_confirmed_movement; // locked and we're moving
+            }
         }
 
         if (control_mode == &mode_auto) {
@@ -114,12 +132,8 @@ void Plane::update_is_flying_5Hz(void)
                     }
 
                     // check GPS ground speed
-                    float gps_spd_acc;
-                    bool use_spd_acc = (gps.status() >= AP_GPS::GPS_OK_FIX_3D) && gps.speed_accuracy(gps_spd_acc);
-                    if (use_spd_acc) {
-                        if (gps.ground_speed() < gps_spd_acc) {
-                            crash_state.launch_gps_timer_ms = now_ms;
-                        }
+                    if (!gps_confirmed_movement) {
+                        crash_state.launch_gps_timer_ms = now_ms;
                     }
 
                     // ground proximity as measured using optical flow/forward speed and a negative pitch angle 
@@ -187,7 +201,13 @@ void Plane::update_is_flying_5Hz(void)
         }
     } else {
         // when disarmed assume not flying and need overwhelming evidence that we ARE flying
-        is_flying_bool = airspeed_movement && gps_confirmed_movement;
+        if (airspeed_is_measured) {
+            is_flying_bool = airspeed_movement && gps_confirmed_movement;
+        } else {
+            // If airspeed is esitmated from inertial data, then it cannot be used to detect start of flight
+            // because the estimate will be invalid due to lack of wind state knowledge
+            is_flying_bool = gps_confirmed_movement;
+        }
 
         if ((flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) || landing.is_flaring()) {
             is_flying_bool = false;
