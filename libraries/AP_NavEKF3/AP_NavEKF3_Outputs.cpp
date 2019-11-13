@@ -315,8 +315,11 @@ bool NavEKF3_core::getHAGL(float &HAGL) const
 // return false if not being estimated
 bool NavEKF3_core::getTerrainHeight(float &height) const
 {
-    height = -terrainState;
-    return !hgtTimeout && gndOffsetValid && healthy();
+    bool isValidHeight = !hgtTimeout && gndOffsetValid && healthy();
+    if (isValidHeight) {
+        height = -terrainState;
+    }
+    return isValidHeight;
 }
 
 // Return the last calculated latitude, longitude and height in WGS-84
