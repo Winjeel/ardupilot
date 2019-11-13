@@ -842,7 +842,6 @@ bool AP_AHRS_NavEKF::get_terrain_height(float &height) const
 {
     switch (active_EKF_type()) {
     case EKF_TYPE_NONE:
-        height = 0.0f;
         return false;
 
     case EKF_TYPE2:
@@ -854,7 +853,6 @@ bool AP_AHRS_NavEKF::get_terrain_height(float &height) const
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
     case EKF_TYPE_SITL:
-        height = 0.0f;
         return false;
 #endif
     }
