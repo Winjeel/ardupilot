@@ -174,6 +174,10 @@ public:
     // return false if ground height is not being estimated.
     bool getHAGL(float &HAGL) const;
 
+    // return estimated height of terrain in metres above EKF origin
+    // return false if not being estimated.
+    bool getTerrainHeight(float &height) const;
+
     // return the Euler roll, pitch and yaw angle in radians for the specified instance
     // An out of range instance (eg -1) returns data for the primary instance
     void getEulerAngles(int8_t instance, Vector3f &eulers) const;

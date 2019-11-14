@@ -577,7 +577,9 @@ float Plane::rangefinder_correction(void)
  */
 void Plane::rangefinder_height_update(void)
 {
-    bool using_estimator = g.rangefinder_landing == land_hagl_source::EKF && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && ahrs.get_hagl(rangefinder_state.height_estimate);
+    bool using_estimator = (g.rangefinder_landing == land_hagl_source::EKF) &&
+                            (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) &&
+                            ahrs.get_hagl(rangefinder_state.height_estimate);
     if (using_estimator) {
         rangefinder_state.in_range_count = 0;
         rangefinder_state.in_range = true;
@@ -633,7 +635,48 @@ void Plane::rangefinder_height_update(void)
     if (rangefinder_state.in_range) {
         // base correction is the difference between baro altitude and
         // rangefinder estimate
-        float correction = relative_altitude - rangefinder_state.height_estimate;
+        float correction;
+
+        // If terrain height is avilable from the estimator, then the correction is the difference between that and
+        // the height of the landing waypoint
+        // TODO - take runway gradient into account.
+        float terrain_height;
+        if (using_estimator && ahrs.get_terrain_height(terrain_height)) {
+            float runway_wp_alt = next_WP_loc.alt * 0.01;
+
+            // correct waypoint height so that it is relative to the EKF origin 
+            Location ekf_origin;
+            if (ahrs.get_origin(ekf_origin)) {
+                if (!next_WP_loc.relative_alt) {
+                    // waypoint runwway altitude is an absolute value in WGS-84 so subtract EKF origin
+                    runway_wp_alt -= ekf_origin.alt * 0.01f;
+                } else {
+                    // waypoint is relative to home so need to add height of home wrt EKF origin
+                    runway_wp_alt += (ahrs.get_home().alt - ekf_origin.alt) * 0.01f;
+                }
+            } else {
+                // should never be in this sitution flying without an origin, but if so, use HOME altitude as
+                // a surrogate
+                if (!next_WP_loc.relative_alt) {
+                    runway_wp_alt -= ahrs.get_home().alt * 0.01f;
+                }
+            }
+
+            // number of metres measured runway is above where the waypoint indicates it should be
+            // the aircraft demanded height needs to be increased by this amount.
+            correction = terrain_height - runway_wp_alt;
+
+            AP::logger().Write("TALT", "TimeUS,EKF,HOME,WP,MEA,CORR", "Qfffff",
+                                    AP_HAL::micros64(),
+                                    (double)ekf_origin.alt,
+                                    (double)ahrs.get_home().alt,
+                                    (double)runway_wp_alt,
+                                    (double)terrain_height,
+                                    (double)correction);
+        } else {
+            correction = relative_altitude - rangefinder_state.height_estimate;
+        }
+
 
 #if AP_TERRAIN_AVAILABLE
         // if we are terrain following then correction is based on terrain data

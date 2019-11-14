@@ -74,6 +74,10 @@ public:
     // get latest altitude estimate above ground level in meters and validity flag
     bool get_hagl(float &hagl) const override;
 
+    // return estimated height of terrain in metres above estimator origin
+    // return false if not being estimated.
+    bool get_terrain_height(float &height) const override;
+
     // status reporting of estimated error
     float           get_error_rp() const override;
     float           get_error_yaw() const override;
