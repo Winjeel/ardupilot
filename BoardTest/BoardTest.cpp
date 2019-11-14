@@ -671,7 +671,6 @@ static bool _cervello_AccelTest(void){
     // Loop through each axis - X/Y/Z
     for (int i = 0; i < 3; i++){
 
-        char axis[] = {'X', 'Y', 'Z', };
         hal.console->printf("Orient the board with the %c axis facing down\n", axis[i]);
 
         // Loop through each accelerometer
@@ -705,7 +704,6 @@ static bool _cervello_GyroTest(void){
     // Loop through each axis - X/Y/Z
     for (int i = 0; i < 3; i++){
 
-        char axis[] = {'X', 'Y', 'Z', };
         hal.console->printf("Rotate the board clockwise around the positive %c axis\n", axis[i]);
 
         // Loop through each gyro
@@ -731,8 +729,9 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
     uint32_t testStartTime = AP_HAL::micros();
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
-    // Setup variable to track running average
-    float runningAverage = 0;
+    // Setup variables to track running average
+    std::vector<float> runningSamples(runningAverageSamples, 0);
+    size_t counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -741,8 +740,12 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
         ins.update();
 
         // Update the running average
-        float accelData = *accelSensor;
-        runningAverage = _approxRunningAverage(runningAverage, accelData);
+        if (counter >= runningAverageSamples){
+            counter = 0;
+        }
+        
+        runningSamples[counter++] = *accelSensor;
+        float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if accelerometer is aligned with gravity
         if (_checkGravityAcceleration(runningAverage)){
@@ -762,8 +765,9 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
     uint32_t testStartTime = AP_HAL::micros();
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
-    // Setup variable to track running average
-    float runningAverage = 0;
+    // Setup variables to track running average
+    std::vector<float> runningSamples(runningAverageSamples, 0);
+    size_t counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -772,10 +776,12 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
         ins.update();
 
         // Update the running average
-        float gyroData = *gyroSensor;
-        runningAverage = _approxRunningAverage(runningAverage, gyroData);
+        if (counter >= runningAverageSamples){
+            counter = 0;
+        }
 
-        // hal.console->printf("Running average %.2f\n",runningAverage);
+        runningSamples[counter++] = *gyroSensor;
+        float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if gyro detects positive rotation
         if (_checkRotation(runningAverage)){
@@ -1491,6 +1497,137 @@ static bool _PPDSCarrier_GPSTest(void){
 
     hal.console->printf("GPS Device could not be found\n");
     return false;
+}
+
+static bool _cervelloDebug_Accel(void){
+    // Initialise the INS
+    _initialiseINS();
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    hal.console->printf("\n");
+
+    // Poll the INS data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update accelerometer and retrieve data
+        ins.update();
+
+        // Loop through each device
+        for (uint8_t j = 0; j < ins.get_accel_count(); j++) {
+            hal.console->printf("Accel%u - ", j);
+
+            // Loop through each axis - X/Y/Z
+            for (int i = 0; i < 3; i++){
+                hal.console->printf("%c:%+.2f ", axis[i], ins.get_accel(j)[i]);
+            }
+        }
+        hal.console->printf("\n");
+        hal.scheduler->delay(testLoopDelay);
+    }
+    return true;
+}
+
+static bool _cervelloDebug_Gyro(void){
+    // Initialise the INS
+    _initialiseINS();
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    hal.console->printf("\n");
+
+    // Poll the Gyro data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update gyro and retrieve data
+        ins.update();
+
+        // Loop through each device
+        for (uint8_t j = 0; j < ins.get_gyro_count(); j++) {
+            hal.console->printf("Gyro%u - ", j);
+
+            // Loop through each axis - X/Y/Z
+            for (int i = 0; i < 3; i++){
+                hal.console->printf("%c:%+.2f ", axis[i], ins.get_gyro(j)[i]);
+            }
+        }
+        hal.console->printf("\n");
+        hal.scheduler->delay(testLoopDelay);
+    }
+    return true;
+}
+
+static bool _cervelloDebug_Mag(void){
+    // Initialise the Magnetometer
+    _initialiseCompass();
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    hal.console->printf("\n");
+    
+    // Poll the Mag data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update mag and retrieve data
+        compass.read();
+
+        // Loop through each device
+        for (uint8_t j = 0; j < compass.get_count(); j++) {
+            hal.console->printf("Mag%u - ", j);
+
+            // Loop through each axis - X/Y/Z
+            for (int i = 0; i < 3; i++){
+                hal.console->printf("%c:%.1f ", axis[i], compass.get_field(j)[i]);
+            }
+        }
+        hal.console->printf("\n");
+        hal.scheduler->delay(testLoopDelay);
+    }
+    return true;
+}
+
+static bool _cervelloDebug_Baro(void){
+    // Initialise the Barometer
+    _initialiseBarometer();
+
+    // Expect delay based on timeout duration;
+    EXPECT_DELAY_MS((int)testTimeout);
+
+    // Setup test duration
+    uint32_t testStartTime = AP_HAL::micros();
+    uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
+
+    hal.console->printf("\n");
+
+    // Poll the Baro data
+    while(AP_HAL::micros() < testEndTime){
+
+        // Update mag and retrieve data
+        barometer.update();
+
+        // Loop through each Baro
+        for (int i = 0; i < barometer.num_instances(); i++){
+            hal.console->printf("Baro%i - Pressure: %+.2fPa Temperature: %+.2fdegC ", i, barometer.get_pressure(i), barometer.get_temperature(i));
+        }
+        hal.console->printf("\n");
+        hal.scheduler->delay(testLoopDelay);
+    }
+    return true;
 }
 
 const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
