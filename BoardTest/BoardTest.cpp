@@ -731,7 +731,7 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
 
     // Setup variables to track running average
     std::vector<float> runningSamples(runningAverageSamples, 0);
-    int counter = 0;
+    size_t counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -744,7 +744,7 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
             counter = 0;
         }
         
-        runningSamples[counter] = *accelSensor;
+        runningSamples[counter++] = *accelSensor;
         float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if accelerometer is aligned with gravity
@@ -752,7 +752,6 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
             // If accelerometer is aligned, pass test and continue
             return true;
         }
-        counter++;
         hal.scheduler->delay(testLoopDelay);
     }
     return false;
@@ -768,7 +767,7 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
 
     // Setup variables to track running average
     std::vector<float> runningSamples(runningAverageSamples, 0);
-    int counter = 0;
+    size_t counter = 0;
 
     // Poll the gyro data
     while(AP_HAL::micros() < testEndTime){
@@ -781,7 +780,7 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
             counter = 0;
         }
 
-        runningSamples[counter] = *gyroSensor;
+        runningSamples[counter++] = *gyroSensor;
         float runningAverage = _calculateVectorAverage(runningSamples);
 
         // Check if gyro detects positive rotation
@@ -789,7 +788,6 @@ static bool _cervello_GyroTest_SingleAxis(float const * const gyroSensor){
             // If accelerometer is aligned, pass test and continue
             return true;
         }
-        counter++;
         hal.scheduler->delay(testLoopDelay);
     }
     return false;
@@ -1581,8 +1579,6 @@ static bool _cervelloDebug_Mag(void){
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     hal.console->printf("\n");
-    Matrix3f dcm_matrix;
-    dcm_matrix.from_euler(0, 0, 0);
     
     // Poll the Mag data
     while(AP_HAL::micros() < testEndTime){
