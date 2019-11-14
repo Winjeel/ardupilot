@@ -264,7 +264,7 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     // find the average sink rate needed to fly through the landing waypoint without flaring
     float avg_sink_rate = MAX(sink_height / sink_time, 0.1f);
 
-    // Calculate by how much the flare maouevre will increase the time to touchdown.
+    // Calculate by how much the flare manoeuvre will increase the time to touchdown.
     // This depends on the average sink rate in flare vs sink rate prior to flare.
     // This is a rough calculation as the vehicles instantaneous sink rate is noisy
     // and sink rate control in flare is affected by gusts and airspeed variation.
@@ -275,7 +275,7 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     float flare_time = flare_sec * (avg_sink_rate / avg_flare_sink_rate) - flare_sec;
 
     // Distance to flare is based on ground speed, adjusted as we get closer. This takes into account varying wind
-    // Limit the flare maouevre alllowance to no more than 20% of the glide slope length to prevent excessive slope
+    // Limit the flare manoeuvre alllowance to no more than 20% of the glide slope length to prevent excessive slope
     float flare_distance = MIN(groundspeed * flare_time, total_distance * 0.2f);
 
     // calculate slope to landing point
@@ -286,7 +286,7 @@ void AP_Landing::type_slope_setup_landing_glide_slope(const Location &prev_WP_lo
     }
 
     // Use an aim point below the landing point with the height set so that the demanded flight path intersects a
-    // point on the runway ther equired distance before the landing waypoint to allow for distance required to flare and slide
+    // point on the runway the required distance before the landing waypoint to allow for distance required to flare and slide
     float slope_new = slope * total_distance / (total_distance - flare_distance - decel_distance);
     float aim_height = -slope_new * (flare_distance + decel_distance);
     Location loc = next_WP_loc;
