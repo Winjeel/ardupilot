@@ -517,8 +517,8 @@ void SITL_State::_simulator_servos(struct sitl_input &input)
                 // lose 0.7V at full throttle
                 voltage = _sitl->batt_voltage - 0.7f*fabsf(throttle);
 
-                // assume 50A at full throttle
-                _current = 50.0f * fabsf(throttle);
+                // assume 30A at full throttle
+                _current = 30.0f * fabsf(throttle);
             }
         } else {
             // FDM provides voltage and current
