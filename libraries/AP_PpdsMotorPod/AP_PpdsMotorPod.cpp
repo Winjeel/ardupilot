@@ -152,7 +152,8 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
                 msg.severity = CV_SEV_DEBUG;
             }
 
-            gcs().send_text(kSeverityMap[msg.severity], "MotorPod Msg: %.*s", sizeof(msg.text), msg.text);
+            msg.text[sizeof(msg.text) - 1] = '\0';
+            gcs().send_text(kSeverityMap[msg.severity], "MotorPod Msg: %s", msg.text);
 
             break;
         }
@@ -160,7 +161,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
         case OPTICAL_FLOW_STATE: {
             WITH_SEMAPHORE(_flow_sem);
 
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got OpticalFlow msg 0x%02x (sz: %u)", msg_id, dataSz);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got OpticalFlow msg 0x%02x (sz: %u)", kMsg_id, msg_buffer.getDataSz());
 
             uint8_t tmp[getOpticalFlowStateMaxDataLength()];
             msg_buffer.copyData(tmp, sizeof(tmp));
@@ -188,7 +189,7 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
         case ADC_STATE: {
             WITH_SEMAPHORE(_adc_sem);
 
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got ADC msg 0x%02x (sz: %u)", msg_id, dataSz);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod: got ADC msg 0x%02x (sz: %u)", kMsg_id, msg_buffer.getDataSz());
 
             uint8_t tmp[getAdcStateMaxDataLength()];
             msg_buffer.copyData(tmp, sizeof(tmp));
@@ -223,9 +224,9 @@ void AP_PpdsMotorPod::_handleMsg(size_t const kUartNumBytes) {
             break;
         }
 
-        // TODO: Handle other received messages
+        // Handle other received messages
         default: {
-            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod:   got msg 0x%02x", msg_id);
+            _debug_sample(MAV_SEVERITY_DEBUG, "\tMotorPod:   got msg 0x%02x", kMsg_id);
             break;
         }
     }
