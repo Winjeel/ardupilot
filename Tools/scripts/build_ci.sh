@@ -58,6 +58,9 @@ function run_autotest() {
     if [ $NAME == "Rover" ]; then
         w="$w --enable-math-check-indexes"
     fi
+    if [ "x$CI_BUILD_DEBUG" != "x" ]; then
+        w="$w --debug"
+    fi
     Tools/autotest/autotest.py --waf-configure-args="$w" "$BVEHICLE" "$RVEHICLE"
     ccache -s && ccache -z
 }
@@ -85,17 +88,29 @@ for t in $CI_BUILD_TARGET; do
         continue
     fi
 
-    if [ "$t" == "sitl-scripting" ]; then
-        echo "Building scripting"
-        $waf configure --enable-scripting
-        $waf clean
-        $waf all
-        continue
-    fi
-
     if [ "$t" == "revo-bootloader" ]; then
         echo "Building revo bootloader"
         $waf configure --board revo-mini --bootloader
+        $waf clean
+        $waf bootloader
+        continue
+    fi
+
+    if [ "$t" == "periph-build" ]; then
+        echo "Building f103 bootloader"
+        $waf configure --board f103-periph --bootloader
+        $waf clean
+        $waf bootloader
+        echo "Building f103 peripheral fw"
+        $waf configure --board f103-periph
+        $waf clean
+        $waf AP_Periph
+        continue
+    fi
+    
+    if [ "$t" == "CubeOrange-bootloader" ]; then
+        echo "Building CubeOrange bootloader"
+        $waf configure --board CubeOrange --bootloader
         $waf clean
         $waf bootloader
         continue
@@ -110,8 +125,8 @@ for t in $CI_BUILD_TARGET; do
     fi
 
     if [ "$t" == "stm32h7" ]; then
-        echo "Building Pixhawk6"
-        $waf configure --board Pixhawk6
+        echo "Building Durandal"
+        $waf configure --board Durandal
         $waf clean
         $waf copter
         continue
@@ -156,11 +171,11 @@ for t in $CI_BUILD_TARGET; do
     fi
 done
 
-python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle APMrover2
-python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle AntennaTracker
-python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduCopter
-python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduPlane
-python Tools/autotest/param_metadata/param_parse.py --no-emit --vehicle ArduSub
+python Tools/autotest/param_metadata/param_parse.py --vehicle APMrover2
+python Tools/autotest/param_metadata/param_parse.py --vehicle AntennaTracker
+python Tools/autotest/param_metadata/param_parse.py --vehicle ArduCopter
+python Tools/autotest/param_metadata/param_parse.py --vehicle ArduPlane
+python Tools/autotest/param_metadata/param_parse.py --vehicle ArduSub
 
 echo build OK
 exit 0

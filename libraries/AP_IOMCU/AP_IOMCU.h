@@ -103,6 +103,9 @@ public:
     bool setup_mixing(RCMapper *rcmap, int8_t override_chan,
                       float mixing_gain, uint16_t manual_rc_mask);
     
+    // channel group masks
+    const uint8_t ch_masks[3] = { 0x03,0x0C,0xF0 };
+
 private:
     AP_HAL::UARTDriver &uart;
 
@@ -134,7 +137,6 @@ private:
     uint32_t last_status_read_ms;
     uint32_t last_rc_read_ms;
     uint32_t last_servo_read_ms;
-    uint32_t last_debug_ms;
     uint32_t last_safety_option_check_ms;
 
     // last value of safety options
@@ -147,7 +149,6 @@ private:
     void read_rc_input(void);
     void read_servo(void);
     void read_status(void);
-    void print_debug(void);
     void discard_input(void);
     void event_failed(uint8_t event);
     void update_safety_options(void);
@@ -157,9 +158,11 @@ private:
 
     // PAGE_STATUS values
     struct page_reg_status reg_status;
+    uint32_t last_log_ms;
 
     // PAGE_RAW_RCIN values
     struct page_rc_input rc_input;
+    uint32_t rc_last_input_ms;
 
     // MIXER values
     struct page_mixing mixing;
@@ -206,13 +209,18 @@ private:
 
     uint32_t protocol_fail_count;
     uint32_t protocol_count;
+    uint32_t total_errors;
+    uint32_t num_delayed;
     uint32_t last_iocmu_timestamp_ms;
+    uint32_t read_status_errors;
+    uint32_t read_status_ok;
 
     // firmware upload
     const char *fw_name = "io_firmware.bin";
     uint8_t *fw;
     uint32_t fw_size;
 
+    size_t write_wait(const uint8_t *pkt, uint8_t len);
     bool upload_fw(void);
     bool recv_byte_with_timeout(uint8_t *c, uint32_t timeout_ms);
     bool recv_bytes(uint8_t *p, uint32_t count);

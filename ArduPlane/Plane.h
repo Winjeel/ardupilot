@@ -170,6 +170,7 @@ public:
     friend class ModeQRTL;
     friend class ModeQAcro;
     friend class ModeQAutotune;
+    friend class ModeTakeoff;
 
     Plane(void);
 
@@ -226,7 +227,7 @@ private:
 
     AP_InertialSensor ins;
 
-    RangeFinder rangefinder{serial_manager};
+    RangeFinder rangefinder;
 
     AP_Vehicle::FixedWing::Rangefinder_State rangefinder_state;
 
@@ -291,11 +292,11 @@ private:
     AP_Relay relay;
 
     // handle servo and relay events
-    AP_ServoRelayEvents ServoRelayEvents{relay};
+    AP_ServoRelayEvents ServoRelayEvents;
 
     // Camera
 #if CAMERA == ENABLED
-    AP_Camera camera{&relay, MASK_LOG_CAMERA, current_loc, ahrs};
+    AP_Camera camera{MASK_LOG_CAMERA, current_loc};
 #endif
 
 #if OPTFLOW == ENABLED
@@ -335,6 +336,7 @@ private:
     ModeQRTL mode_qrtl;
     ModeQAcro mode_qacro;
     ModeQAutotune mode_qautotune;
+    ModeTakeoff mode_takeoff;
 
     // This is the state of the flight control system
     // There are multiple states defined such as MANUAL, FBW-A, AUTO
@@ -353,17 +355,20 @@ private:
     // This is used to enable the inverted flight feature
     bool inverted_flight;
 
+    // last time we ran roll/pitch stabilization
+    uint32_t last_stabilize_ms;
+    
     // Failsafe
     struct {
         // Used to track if the value on channel 3 (throtttle) has fallen below the failsafe threshold
         // RC receiver should be set up to output a low throttle value when signal is lost
-        bool rc_failsafe:1;
+        bool rc_failsafe;
 
         // has the saved mode for failsafe been set?
-        bool saved_mode_set:1;
+        bool saved_mode_set;
 
         // true if an adsb related failsafe has occurred
-        bool adsb:1;
+        bool adsb;
 
         // saved flight mode
         enum Mode::Number saved_mode_number;
@@ -476,52 +481,19 @@ private:
         // Direction held during phases of takeoff and landing centidegrees
         // A value of -1 indicates the course has not been set/is not in use
         // this is a 0..36000 value, or -1 for disabled
-        int32_t hold_course_cd;
+        int32_t hold_course_cd = -1;
 
         // locked_course and locked_course_cd are used in stabilize mode
         // when ground steering is active, and for steering in auto-takeoff
         bool locked_course;
         float locked_course_err;
-    } steer_state { -1, false, 0 };
+    } steer_state;
 
     // flight mode specific
     struct {
-        // Flag for using gps ground course instead of INS yaw.  Set false when takeoff command in process.
-        bool takeoff_complete:1;
-
-        // are we headed to the land approach waypoint? Works for any nav type
-        bool wp_is_land_approach:1;
-
-        // should we fly inverted?
-        bool inverted_flight:1;
-
-        // should we enable cross-tracking for the next waypoint?
-        bool next_wp_crosstrack:1;
-
-        // should we use cross-tracking for this waypoint?
-        bool crosstrack:1;
-
-        // in FBWA taildragger takeoff mode
-        bool fbwa_tdrag_takeoff_mode:1;
-
-        // have we checked for an auto-land?
-        bool checked_for_autoland:1;
-
-        // Altitude threshold to complete a takeoff command in autonomous modes.  Centimeters
-        // are we in idle mode? used for balloon launch to stop servo
-        // movement until altitude is reached
-        bool idle_mode:1;
-
-        // used to 'wiggle' servos in idle mode to prevent them freezing
-        // at high altitudes
-        uint8_t idle_wiggle_stage;
-
         // Altitude threshold to complete a takeoff command in autonomous
         // modes.  Centimeters above home
         int32_t takeoff_altitude_rel_cm;
-
-        // Minimum pitch to hold during takeoff command execution.  Hundredths of a degree
-        int16_t takeoff_pitch_cd;
 
         // Begin leveling out the enforced takeoff pitch angle min at this height to reduce/eliminate overshoot
         int32_t height_below_takeoff_to_level_off_cm;
@@ -529,9 +501,6 @@ private:
         // the highest airspeed we have reached since entering AUTO. Used
         // to control ground takeoff
         float highest_airspeed;
-
-        // initial pitch. Used to detect if nose is rising in a tail dragger
-        int16_t initial_pitch_cd;
 
         // turn angle for next leg of mission
         float next_turn_angle {90};
@@ -557,12 +526,50 @@ private:
         // barometric altitude at start of takeoff
         float baro_takeoff_alt;
 
+        // initial pitch. Used to detect if nose is rising in a tail dragger
+        int16_t initial_pitch_cd;
+
+        // Minimum pitch to hold during takeoff command execution.  Hundredths of a degree
+        int16_t takeoff_pitch_cd;
+
+        // used to 'wiggle' servos in idle mode to prevent them freezing
+        // at high altitudes
+        uint8_t idle_wiggle_stage;
+
+        // Flag for using gps ground course instead of INS yaw.  Set false when takeoff command in process.
+        bool takeoff_complete;
+
+        // are we headed to the land approach waypoint? Works for any nav type
+        bool wp_is_land_approach;
+
+        // should we fly inverted?
+        bool inverted_flight;
+
+        // should we enable cross-tracking for the next waypoint?
+        bool next_wp_crosstrack;
+
+        // should we use cross-tracking for this waypoint?
+        bool crosstrack;
+
+        // in FBWA taildragger takeoff mode
+        bool fbwa_tdrag_takeoff_mode;
+
+        // have we checked for an auto-land?
+        bool checked_for_autoland;
+
+        // Altitude threshold to complete a takeoff command in autonomous modes.  Centimeters
+        // are we in idle mode? used for balloon launch to stop servo
+        // movement until altitude is reached
+        bool idle_mode;
+
         // are we in VTOL mode in AUTO?
-        bool vtol_mode:1;
+        bool vtol_mode;
 
         // are we doing loiter mode as a VTOL?
-        bool vtol_loiter:1;
+        bool vtol_loiter;
 
+        // how much correction have we added for terrain data
+        float terrain_correction;
     } auto_state;
 
     // Used for control surface movement test
@@ -606,13 +613,13 @@ private:
     struct {
         // on hard landings, only check once after directly a landing so you
         // don't trigger a crash when picking up the aircraft
-        bool checkedHardLanding:1;
+        bool checkedHardLanding;
 
         // crash detection. True when we are crashed
-        bool is_crashed:1;
+        bool is_crashed;
 
         // impact detection flag. Expires after a few seconds via impact_timer_ms
-        bool impact_detected:1;
+        bool impact_detected;
 
         // debounce timer
         uint32_t debounce_timer_ms;
@@ -716,11 +723,11 @@ private:
     AP_ADSB adsb;
 
     // avoidance of adsb enabled vehicles (normally manned vheicles)
-    AP_Avoidance_Plane avoidance_adsb{ahrs, adsb};
+    AP_Avoidance_Plane avoidance_adsb{adsb};
 
     // Outback Challenge Failsafe Support
 #if ADVANCED_FAILSAFE == ENABLED
-    AP_AdvancedFailsafe_Plane afs {mission, gps};
+    AP_AdvancedFailsafe_Plane afs {mission};
 #endif
 
     /*
@@ -814,7 +821,7 @@ private:
         uint32_t last_elev_check_us;
     } target_altitude {};
 
-    float relative_altitude = 0.0f;
+    float relative_altitude;
 
     // INS variables
     // The main loop execution time.  Seconds
@@ -877,7 +884,6 @@ private:
     void Log_Write_Nav_Tuning();
     void Log_Write_Status();
     void Log_Write_Sonar();
-    void Log_Arm_Disarm();
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Write_AOA_SSA();
@@ -909,6 +915,7 @@ private:
     float lookahead_adjustment(void);
     float rangefinder_correction(void);
     void rangefinder_height_update(void);
+    void rangefinder_terrain_correction(float &height);
     void set_next_WP(const struct Location &loc);
     void set_guided_WP(void);
     void update_home();
@@ -955,6 +962,7 @@ private:
     bool geofence_check_minalt(void);
     bool geofence_check_maxalt(void);
     void geofence_check(bool altitude_check_only);
+    bool geofence_prearm_check(void);
     bool geofence_stickmixing(void);
     void geofence_send_status(mavlink_channel_t chan);
     bool geofence_breached(void);
@@ -981,6 +989,7 @@ private:
     int16_t rudder_input(void);
     void control_failsafe();
     bool trim_radio();
+    bool rc_throttle_value_ok(void) const;
     bool rc_failsafe_active(void) const;
     void read_rangefinder(void);
     void read_airspeed(void);
@@ -995,10 +1004,7 @@ private:
     void startup_INS_ground(void);
     bool should_log(uint32_t mask);
     int8_t throttle_percentage(void);
-    void change_arm_state(void);
-    bool disarm_motors(void);
     bool create_into_wind_landing_sequence(void);
-    bool arm_motors(AP_Arming::Method method, bool do_arming_checks=true);
     bool auto_takeoff_check(void);
     void takeoff_calc_roll(void);
     void takeoff_calc_pitch(void);
@@ -1103,7 +1109,6 @@ private:
     void publish_osd_info();
 #endif
     void accel_cal_update(void);
-    void update_soft_armed();
 #if SOARING_ENABLED == ENABLED
     void update_soaring();
 #endif

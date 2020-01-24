@@ -80,22 +80,22 @@ public:
         k_param_takeoff_throttle_min_dist,
         k_param_level_roll_limit,
         k_param_hil_servos,
-        k_param_vtail_output, // unused
+        k_param_vtail_output,
         k_param_nav_controller,
-        k_param_elevon_output, // unused
+        k_param_elevon_output,
         k_param_att_controller,
         k_param_mixing_gain,
         k_param_scheduler,
         k_param_relay,
         k_param_takeoff_throttle_delay,
-        k_param_takeoff_criteria_timeout,
+        k_param_mode_takeoff, // was skip_gyro_cal
         k_param_auto_fbw_steer,
         k_param_waypoint_max_radius,
-        k_param_ground_steer_alt,        
+        k_param_ground_steer_alt,
         k_param_ground_steer_dps,
         k_param_rally_limit_km_old, //unused anymore -- just holding this index
         k_param_hil_err_limit,
-        k_param_sonar_old, // unused
+        k_param_takeoff_criteria_timeout, // was k_param_sonar_old
         k_param_log_bitmask,
         k_param_BoardConfig,
         k_param_rssi_range,     // unused, replaced by rssi_ library parameters
@@ -469,7 +469,7 @@ public:
     AP_Int8 flap_1_speed;
     AP_Int8 flap_2_percent;
     AP_Int8 flap_2_speed;
-    AP_Int8 takeoff_flap_percent;  
+    AP_Int8 takeoff_flap_percent;
     AP_Int8 stick_mixing;
     AP_Float takeoff_throttle_min_speed;
     AP_Float takeoff_throttle_min_accel;
@@ -531,7 +531,7 @@ public:
 
     // RC input channels
     RC_Channels_Plane rc_channels;
-    
+
     // control over servo output ranges
     SRV_Channels servo_channels;
 

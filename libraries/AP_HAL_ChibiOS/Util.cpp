@@ -138,9 +138,10 @@ void Util::set_imu_temp(float current)
     uint32_t now = AP_HAL::millis();
     if (now - heater.last_update_ms < 1000) {
 #if defined(HAL_HEATER_GPIO_PIN)
-        // output as duty cycle to local pin
-        hal.gpio->write(HAL_HEATER_GPIO_PIN, heater.duty_counter < heater.output);
-        heater.duty_counter = (heater.duty_counter+1) % 100;
+        // output as duty cycle to local pin. Use a random sequence to
+        // prevent a periodic change to magnetic field
+        bool heater_on = (get_random16() < uint32_t(heater.output) * 0xFFFFU / 100U);
+        hal.gpio->write(HAL_HEATER_GPIO_PIN, heater_on);
 #endif
         return;
     }
@@ -223,7 +224,7 @@ uint64_t Util::get_hw_rtc() const
     return stm32_get_utc_usec();
 }
 
-#ifndef HAL_NO_FLASH_SUPPORT
+#if !defined(HAL_NO_FLASH_SUPPORT) && !defined(HAL_NO_ROMFS_SUPPORT)
 
 bool Util::flash_bootloader()
 {
@@ -237,6 +238,9 @@ bool Util::flash_bootloader()
         hal.console->printf("failed to find %s\n", fw_name);
         return false;
     }
+
+    // make sure size is multiple of 32
+    fw_size = (fw_size + 31U) & ~31U;
 
     const uint32_t addr = hal.flash->getpageaddr(0);
     if (!memcmp(fw, (const void*)addr, fw_size)) {
@@ -271,7 +275,7 @@ bool Util::flash_bootloader()
     free(fw);
     return false;
 }
-#endif //#ifndef HAL_NO_FLASH_SUPPORT
+#endif // !HAL_NO_FLASH_SUPPORT && !HAL_NO_ROMFS_SUPPORT
 
 /*
   display system identifer - board type and serial number

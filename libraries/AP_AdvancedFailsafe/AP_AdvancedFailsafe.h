@@ -23,8 +23,6 @@
 #include <AP_Common/AP_Common.h>
 #include <AP_Param/AP_Param.h>
 #include <AP_Mission/AP_Mission.h>
-#include <AP_Baro/AP_Baro.h>
-#include <AP_GPS/AP_GPS.h>
 #include <AP_RCMapper/AP_RCMapper.h>
 #include <inttypes.h>
 
@@ -51,11 +49,8 @@ public:
     };
 
     // Constructor
-    AP_AdvancedFailsafe(AP_Mission &_mission, const AP_GPS &_gps) :
-        mission(_mission),
-        gps(_gps),
-        _gps_loss_count(0),
-        _comms_loss_count(0)
+    AP_AdvancedFailsafe(AP_Mission &_mission) :
+        mission(_mission)
         {
             AP_Param::setup_object_defaults(this, var_info);
             
@@ -100,7 +95,6 @@ protected:
     enum state _state;
 
     AP_Mission &mission;
-    const AP_GPS &gps;
 
     AP_Int8 _enable;
     // digital output pins for communicating with the failsafe board
@@ -124,6 +118,7 @@ protected:
     AP_Int8  _enable_RC_fs;
     AP_Int8  _rc_term_manual_only;
     AP_Int8  _enable_dual_loss;
+    AP_Int16  _max_range_km;
 
     bool _heartbeat_pin_value;
 
@@ -145,5 +140,13 @@ protected:
     // have the failsafe values been setup?
     bool _failsafe_setup:1;
 
+    Location _first_location;
+    bool _have_first_location;
+    uint32_t _term_range_notice_ms;
+
     bool check_altlimit(void);
+
+private:
+    // update maximum range check
+    void max_range_update();
 };
