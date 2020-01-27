@@ -10,7 +10,7 @@ struct RGB {
     uint8_t b;
 };
 
-struct RGB rgb[] = {
+static struct RGB const sRGB[] = {
     { 0, 0, 0, }, // black
     { 1, 0, 0, }, // red
     { 1, 1, 0, }, // yellow
@@ -31,7 +31,7 @@ typedef struct {
     char const * const description;
 } Test;
 
-char const * kResultStr[]  = {
+char const * const kResultStr[]  = {
     "FAIL\n",
     "PASS\n",
 };
@@ -162,6 +162,6 @@ const Test kTestItem[] = {
     { 'x', "Cervello debug gyro test",                                      _cervelloDebug_Gyro,                                             "Cervello Debug - Gyro.", },
     { 'c', "Cervello debug magnetometer test",                              _cervelloDebug_Mag,                                              "Cervello Debug - Magnetometer.", },
     { 'v', "Cervello debug barometer test",                                 _cervelloDebug_Baro,                                             "Cervello Debug - Barometer.", },
-    
+
 };
 const size_t kNumTestItems = sizeof(kTestItem) / sizeof(kTestItem[0]);
