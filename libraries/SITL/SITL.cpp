@@ -189,10 +189,10 @@ const AP_Param::GroupInfo SITL::var_info2[] = {
     // extra delay per main loop
     AP_GROUPINFO("LOOP_DELAY",  55, SITL,  loop_delay, 0),
 
-    AP_GROUPINFO("MAG_SCALING",    60, SITL,  mag_scaling, 1),
+    AP_GROUPINFO("MAG_SCALING",    56, SITL,  mag_scaling, 1),
 
     // launch parameters
-    AP_GROUPINFO("LAUNCH_ELE",   42, SITL,  launch_elevation,  20.0f),
+    AP_GROUPINFO("LAUNCH_ELE",  57, SITL,  launch_elevation,  20.0f),
 
     AP_GROUPEND
 
