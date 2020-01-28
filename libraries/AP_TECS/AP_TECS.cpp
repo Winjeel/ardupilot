@@ -287,7 +287,7 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @Description: This allows the enabling of special features in the speed/height controller
     // @Bitmask: 0:GliderOnly
     // @User: Advanced
-    AP_GROUPINFO("OPTIONS", 28, AP_TECS, _options, 0),
+    AP_GROUPINFO("OPTIONS", 33, AP_TECS, _options, 0),
 
     AP_GROUPEND
 };
