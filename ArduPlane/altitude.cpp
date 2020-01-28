@@ -613,6 +613,7 @@ void Plane::rangefinder_height_update(void)
     if (using_estimator) {
         rangefinder_state.in_range_count = 0;
         rangefinder_state.in_range = true;
+        rangefinder_terrain_correction(rangefinder_state.height_estimate);
         if (!rangefinder_state.in_use && flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND)
         {
             rangefinder_state.in_use = true;
