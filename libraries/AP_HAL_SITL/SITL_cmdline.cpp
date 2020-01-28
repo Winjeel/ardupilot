@@ -166,7 +166,7 @@ void SITL_State::_parse_command_line(int argc, char * const argv[])
     _instance = 0;
     _synthetic_clock_mode = false;
     // default to Bolinda Station
-    const char *home_str = "-37.4300449702799,144.808650612831,363.5";
+    const char *home_str = "-37.4300449702799,144.808650612831,363.5,0";
     const char *model_str = nullptr;
     _use_fg_view = true;
     char *autotest_dir = nullptr;
