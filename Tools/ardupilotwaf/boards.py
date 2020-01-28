@@ -95,7 +95,7 @@ class Board:
         ])
 
     def configure_env(self, cfg, env):
-        # Use a dictionary instead of the convetional list for definitions to
+        # Use a dictionary instead of the conventional list for definitions to
         # make easy to override them. Convert back to list before consumption.
         env.DEFINES = {}
 
@@ -228,10 +228,12 @@ class Board:
                 '-Werror=unused-but-set-variable'
             ]
             (major, minor, patchlevel) = cfg.env.CC_VERSION
-            if int(major) >= 5 and int(minor) > 1 and not self.with_uavcan:
-                env.CXXFLAGS += [
-                    '-Werror=suggest-override',
-                ]
+            if int(major) >= 5 and int(minor) > 1:
+                uses_gtest = self.with_uavcan or cfg.env.OPTIONS['board'] == 'linux'
+                if not uses_gtest:
+                    env.CXXFLAGS += [
+                        '-Werror=suggest-override',
+                    ]
 
         if cfg.env.DEBUG:
             env.CXXFLAGS += [
