@@ -1264,10 +1264,10 @@ struct PACKED log_Arm_Disarm {
 #define MAG_UNITS "sGGGGGGGGG-s"
 #define MAG_MULTS "FCCCCCCCCC-F"
 
-#define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF"
-#define PID_FMT    "Qfffffff"
-#define PID_UNITS  "s-------"
-#define PID_MULTS  "F-------"
+#define PID_LABELS "TimeUS,Tar,Act,Err,P,I,D,FF,Dmod"
+#define PID_FMT    "Qffffffff"
+#define PID_UNITS  "s--------"
+#define PID_MULTS  "F--------"
 
 #define QUAT_LABELS "TimeUS,Q1,Q2,Q3,Q4"
 #define QUAT_FMT    "Qffff"
