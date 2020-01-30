@@ -2,61 +2,83 @@
 
 void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t reason)
 {
+    if (g.fs_action_short == FS_ACTION_SHORT_DISABLED) {
+        return;
+    }
+
+    Mode *failsafe_mode = control_mode;
+
     // This is how to handle a short loss of control signal failsafe.
     failsafe.state = fstype;
     failsafe.short_timer_ms = millis();
     gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe. Short event on: type=%u/reason=%u", fstype, reason);
     switch (control_mode->mode_number())
     {
-    case Mode::Number::MANUAL:
-    case Mode::Number::STABILIZE:
-    case Mode::Number::ACRO:
-    case Mode::Number::FLY_BY_WIRE_A:
-    case Mode::Number::AUTOTUNE:
-    case Mode::Number::FLY_BY_WIRE_B:
-    case Mode::Number::CRUISE:
-    case Mode::Number::TRAINING:
-        failsafe.saved_mode_number = control_mode->mode_number();
-        failsafe.saved_mode_set = true;
-        if(g.fs_action_short == FS_ACTION_SHORT_FBWA) {
-            set_mode(mode_fbwa, reason);
-        } else {
-            set_mode(mode_circle, reason);
-        }
-        break;
+        case Mode::Number::CIRCLE:
+        case Mode::Number::RTL:
+            // ignored in these modes
+            break;
 
-    case Mode::Number::QSTABILIZE:
-    case Mode::Number::QLOITER:
-    case Mode::Number::QHOVER:
-    case Mode::Number::QAUTOTUNE:
-    case Mode::Number::QACRO:
-        failsafe.saved_mode_number = control_mode->mode_number();
-        failsafe.saved_mode_set = true;
-        set_mode(mode_qland, reason);
-        break;
-
-    case Mode::Number::AUTO:
-    case Mode::Number::AVOID_ADSB:
-    case Mode::Number::GUIDED:
-    case Mode::Number::LOITER:
-        if(g.fs_action_short != FS_ACTION_SHORT_BESTGUESS) {
-            failsafe.saved_mode_number = control_mode->mode_number();
-            failsafe.saved_mode_set = true;
-            if(g.fs_action_short == FS_ACTION_SHORT_FBWA) {
-                set_mode(mode_fbwa, reason);
+        // stabilisation modes
+        case Mode::Number::MANUAL:
+        case Mode::Number::STABILIZE:
+        case Mode::Number::TRAINING:
+        case Mode::Number::ACRO:
+        case Mode::Number::FLY_BY_WIRE_A:
+        case Mode::Number::FLY_BY_WIRE_B:
+        case Mode::Number::CRUISE:
+        case Mode::Number::AUTOTUNE:
+            if (g.fs_action_short == FS_ACTION_SHORT_FBWA) {
+                failsafe_mode = &mode_fbwa;
+            } else if (g.fs_action_short == FS_ACTION_SHORT_CIRCLE) {
+                failsafe_mode = &mode_circle;
+            } else if (g.fs_action_short == FS_ACTION_SHORT_BESTGUESS) {
+                failsafe_mode = &mode_circle;
             } else {
-                set_mode(mode_circle, reason);
+                // unexpected action, so Circle
+                gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Defaulting to Circle mode.");
+                failsafe_mode = &mode_circle;
             }
-        }
-        break;
+            break;
 
-    case Mode::Number::CIRCLE:
-    case Mode::Number::RTL:
-    case Mode::Number::QLAND:
-    case Mode::Number::QRTL:
-    case Mode::Number::INITIALISING:
-        break;
+        case Mode::Number::QSTABILIZE:
+        case Mode::Number::QHOVER:
+        case Mode::Number::QLOITER:
+        case Mode::Number::QLAND:
+        case Mode::Number::QRTL:
+        case Mode::Number::QAUTOTUNE:
+        case Mode::Number::QACRO:
+            failsafe_mode = &mode_qland;
+            break;
+
+        case Mode::Number::AUTO:
+        case Mode::Number::LOITER:
+        case Mode::Number::AVOID_ADSB:
+        case Mode::Number::GUIDED:
+            if (g.fs_action_short != FS_ACTION_SHORT_BESTGUESS) {
+                if (g.fs_action_short == FS_ACTION_SHORT_FBWA) {
+                    failsafe_mode = &mode_fbwa;
+                } else if (g.fs_action_short == FS_ACTION_SHORT_CIRCLE) {
+                    failsafe_mode = &mode_circle;
+                } else if (g.fs_action_short == FS_ACTION_SHORT_BESTGUESS) {
+                    // stay in current auto mode
+                } else {
+                    // unexpected action, so stay in current auto mode
+                    gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Remaining in current auto mode.");
+                }
+            }
+            break;
+
+        case Mode::Number::INITIALISING:
+            break;
     }
+
+    if (failsafe_mode != control_mode) {
+        failsafe.saved_mode_number = control_mode->mode_number();
+        failsafe.saved_mode_set = true;
+        set_mode(*failsafe_mode, reason);
+    }
+
     gcs().send_text(MAV_SEVERITY_INFO, "Flight mode = %u", (unsigned)control_mode->mode_number());
 }
 
