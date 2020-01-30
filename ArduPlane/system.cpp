@@ -331,12 +331,8 @@ void Plane::check_long_failsafe()
     bool const has_rssi = last_remRSSI_ms == 0 ||
                           ((now_ms - last_remRSSI_ms) < fs_timeout_long_ms);
 
-    uint32_t radio_timeout_ms = failsafe.last_valid_rc_ms;
-    if (failsafe.state == FAILSAFE_SHORT) {
-        radio_timeout_ms = failsafe.short_timer_ms;
-    }
     bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
-                                      ((now_ms - radio_timeout_ms) > fs_timeout_long_ms);
+                                      ((now_ms - failsafe.last_valid_rc_ms) > fs_timeout_long_ms);
 
     bool in_GCS_failsafe_state = false;
     switch (g.gcs_heartbeat_fs_enabled) {
