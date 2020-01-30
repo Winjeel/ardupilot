@@ -46,6 +46,9 @@
 
 #define AP_UAVCAN_MAX_LED_DEVICES 4
 
+// fwd-declare callback classes
+class ButtonCb;
+
 /*
     Frontend Backend-Registry Binder: Whenever a message of said DataType_ from new node is received,
     the Callback will invoke registery to register the node as separate backend.
@@ -81,6 +84,11 @@ public:
     ///// LED /////
     bool led_write(uint8_t led_index, uint8_t red, uint8_t green, uint8_t blue);
 
+    // buzzer
+    void set_buzzer_tone(float frequency, float duration_s);
+
+    // send RTCMStream packets
+    void send_RTCMStream(const uint8_t *data, uint32_t len);
 
     template <typename DataType_>
     class RegistryBinder {
@@ -147,6 +155,15 @@ private:
     ///// LED /////
     void led_out_send();
 
+    // buzzer
+    void buzzer_send();
+
+    // SafetyState
+    void safety_state_send();
+
+    // send GNSS injection
+    void rtcm_stream_send();
+
     uavcan::PoolAllocator<UAVCAN_NODE_POOL_SIZE, UAVCAN_NODE_POOL_BLOCK_SIZE, AP_UAVCAN::RaiiSynchronizer> _node_allocator;
 
     // UAVCAN parameters
@@ -190,6 +207,27 @@ private:
     } _led_conf;
 
     HAL_Semaphore _led_out_sem;
+
+    // buzzer
+    struct {
+        HAL_Semaphore sem;
+        float frequency;
+        float duration;
+        uint8_t pending_mask; // mask of interfaces to send to
+    } _buzzer;
+
+    // GNSS RTCM injection
+    struct {
+        HAL_Semaphore sem;
+        uint32_t last_send_ms;
+        ByteBuffer *buf;
+    } _rtcm_stream;
+    
+    // safety status send state
+    uint32_t _last_safety_state_ms;
+
+    // safety button handling
+    static void handle_button(AP_UAVCAN* ap_uavcan, uint8_t node_id, const ButtonCb &cb);
 };
 
 #endif /* AP_UAVCAN_H_ */

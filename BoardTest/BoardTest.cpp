@@ -137,7 +137,7 @@ static bool _initialiseLogger(void){
 static bool _initialiseRAMTRON(void){
     bool ramtronStatus = ramtron.init();
     if (ramtronStatus){
-        hal.console->printf("RAMTRON Memory: %uKB\n", (uint)ramtron.get_size());
+        hal.console->printf("RAMTRON Memory: %luKB\n", ramtron.get_size());
     }
     return ramtronStatus;
 }
@@ -240,15 +240,15 @@ static void _setLED_RGB(struct RGB rgb) {
     hal.gpio->write(HAL_GPIO_C_LED_PIN, (rgb.b > 0) ? HAL_GPIO_LED_ON : HAL_GPIO_LED_OFF);
 }
 
-void _updateLED(void){
+void _updateLED(void) {
     static uint32_t sNow_ms = 0;
-    const size_t kNumColours = sizeof(rgb) / sizeof(rgb[0]);
+    const size_t kNumColours = sizeof(sRGB) / sizeof(sRGB[0]);
 
     uint32_t now_ms = AP_HAL::millis();
     const uint32_t kLED_delta_ms = 512;
     if ((now_ms - sNow_ms) > kLED_delta_ms) {
         static uint8_t j = 0;
-        _setLED_RGB(rgb[j]);
+        _setLED_RGB(sRGB[j]);
         j = (j + 1) % kNumColours;
         sNow_ms += kLED_delta_ms;
     }
@@ -295,11 +295,12 @@ static bool _testNotImplemented(void) {
 }
 
 static char const * _getResultStr(bool result) {
-    char const * kResultStr[]  = {
+    // TODO: clean-up shadow of kResultStr in header
+    char const * const _kResultStr[]  = {
         "FAIL",
         "PASS",
     };
-    return kResultStr[!!result];
+    return _kResultStr[!!result];
 }
 
 static void _consoleKeypress(void){
@@ -743,7 +744,7 @@ static bool _cervello_AccelTest_SingleAxis(float const * const accelSensor){
         if (counter >= runningAverageSamples){
             counter = 0;
         }
-        
+
         runningSamples[counter++] = *accelSensor;
         float runningAverage = _calculateVectorAverage(runningSamples);
 
@@ -1579,7 +1580,7 @@ static bool _cervelloDebug_Mag(void){
     uint32_t testEndTime = testStartTime + (uint32_t)testTimeout;
 
     hal.console->printf("\n");
-    
+
     // Poll the Mag data
     while(AP_HAL::micros() < testEndTime){
 
@@ -1630,7 +1631,7 @@ static bool _cervelloDebug_Baro(void){
     return true;
 }
 
-const struct AP_Param::GroupInfo        GCS_MAVLINK::var_info[] = {
+const struct AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     AP_GROUPEND
 };
 GCS_Dummy _gcs;

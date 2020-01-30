@@ -16,7 +16,7 @@ STM32_VDD 330U
 FLASH_SIZE_KB 2048
 
 # with 2M flash we can afford to optimize for speed
-env OPTIMIZE -O3
+env OPTIMIZE -O2
 
 # Allocate space for fallback to flash if no FRAM is fitted:
 #   - The first four (4) flash pages are 16kB each.
@@ -110,7 +110,7 @@ PC3 LED_SAFETY OUTPUT HIGH
 PC4 SAFETY_IN INPUT
 PC5 PWR_SENSORS_EN OUTPUT HIGH
 PC6 SBUS_INV OUTPUT HIGH
-PC7 TIM8_CH2 TIM8 RCIN FLOAT LOW # also USART6_RX for serial RC
+PC7 TIM8_CH2 TIM8 RCININT FLOAT LOW # also USART6_RX for serial RC
 
 PC8 SDIO_D0 SDIO
 PC9 SDIO_D1 SDIO

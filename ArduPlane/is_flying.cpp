@@ -64,7 +64,7 @@ void Plane::update_is_flying_5Hz(void)
                 is_flying_bool = airspeed_movement || // moving through the air
                                 gps_confirmed_movement; // locked and we're moving
             } else {
-                // if CRASH_DETECT is set to 1, this condition will cause the motor to disarmadn the vehicle
+                // if CRASH_DETECT is set to 1, this condition will cause the motor to disarm the vehicle
                 // to descend if GPS lock is lost for an extended period
                 // TODO - add IMU movement check to provide an alternative to GPS when there is no airspeed
                 // sensor fitted
@@ -136,7 +136,7 @@ void Plane::update_is_flying_5Hz(void)
                         crash_state.launch_gps_timer_ms = now_ms;
                     }
 
-                    // ground proximity as measured using optical flow/forward speed and a negative pitch angle 
+                    // ground proximity as measured using optical flow/forward speed and a negative pitch angle
                     // indicate impending ground contact.
                     if (use_spd_acc && crash_state.launch_flow_timer_ms == now_ms) {
                         float hagl_est = rel_vel_bf.x / (optflow.flowRate().y - optflow.bodyRate().y);
@@ -162,7 +162,7 @@ void Plane::update_is_flying_5Hz(void)
                         crash_state.is_crashed = true;
                         is_flying_bool = false;
                         isFlyingProbability = 0.0f;
-                        plane.disarm_motors();
+                        arming.disarm();
                         gcs().send_text(MAV_SEVERITY_INFO, "Hit ground after launch - disarming");
                     }
                 }
@@ -311,7 +311,7 @@ void Plane::crash_detection_update(void)
             if (!crash_state.checkedHardLanding && // only check once
                 been_auto_flying &&
                 (labs(ahrs.roll_sensor) > 6000 || labs(ahrs.pitch_sensor) > 6000)) {
-                
+
                 crashed = true;
 
                 // did we "crash" within 75m of the landing location? Probably just a hard landing
@@ -413,14 +413,14 @@ void Plane::crash_detection_update(void)
                         // Special case where operator has not thrown vehicle after starting motors
                         // Must always disarm in this situation even when crash detection is disabled
                         gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Time Exceeded");
-                        disarm_motors();
+                        arming.disarm();
                         break;
 
                     case LaunchFailType::ANGLE:
                         // Special case where operator has lost grip of vehicle before throwing it
                         // Must always disarm in this situation even when crash detection is disabled
                         gcs().send_text(MAV_SEVERITY_EMERGENCY, "Launch Angle Exceeded");
-                        disarm_motors();
+                        arming.disarm();
                         break;
 
                     case LaunchFailType::THROWN:
@@ -436,7 +436,7 @@ void Plane::crash_detection_update(void)
         }
         else {
             if (aparm.crash_detection_enable & CRASH_DETECT_ACTION_BITMASK_DISARM) {
-                disarm_motors();
+                arming.disarm();
             }
             if (crashed_near_land_waypoint) {
                 gcs().send_text(MAV_SEVERITY_CRITICAL, "Hard landing detected");
@@ -467,12 +467,14 @@ void Plane::crash_detection_update(void)
 /*
  * return true if we are in a pre-launch phase of an auto-launch, typically used in bungee launches
  */
-bool Plane::in_preLaunch_flight_stage(void) {
+bool Plane::in_preLaunch_flight_stage(void)
+{
+    if (control_mode == &mode_takeoff && throttle_suppressed) {
+        return true;
+    }
     return (control_mode == &mode_auto &&
             throttle_suppressed &&
             flight_stage == AP_Vehicle::FixedWing::FLIGHT_NORMAL &&
             mission.get_current_nav_cmd().id == MAV_CMD_NAV_TAKEOFF &&
             !quadplane.is_vtol_takeoff(mission.get_current_nav_cmd().id));
 }
-
-

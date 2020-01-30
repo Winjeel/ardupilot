@@ -3,12 +3,12 @@
    it under the terms of the GNU General Public License as published by
    the Free Software Foundation, either version 3 of the License, or
    (at your option) any later version.
-   
+
    This program is distributed in the hope that it will be useful,
    but WITHOUT ANY WARRANTY; without even the implied warranty of
    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
    GNU General Public License for more details.
-   
+
    You should have received a copy of the GNU General Public License
    along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
@@ -75,7 +75,7 @@ const AP_Param::GroupInfo AP_RollController::var_info[] = {
 
 	// @Param: FF
 	// @DisplayName: Feed forward Gain
-	// @Description: Gain from demanded rate to aileron output. 
+	// @Description: Gain from demanded rate to aileron output.
 	// @Range: 0.1 4.0
 	// @Increment: 0.1
 	// @User: User
@@ -115,7 +115,7 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 		dt = 0;
 	}
 	_last_t = tnow;
-	
+
 	// Calculate equivalent gains so that values for K_P and K_I can be taken across from the old PID law
     // No conversion is required for K_D
 	float ki_rate = gains.I * gains.tau;
@@ -125,11 +125,11 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	float delta_time    = (float)dt * 0.001f;
     // Get body rate vector (radians/sec)
 	float omega_x = _ahrs.get_gyro().x;
-	
+
 	// Calculate the roll rate error (deg/sec) and apply gain scaler
     float achieved_rate = ToDeg(omega_x);
 	float rate_error = (desired_rate - achieved_rate) * scaler;
-	
+
 	// Get an airspeed estimate - default to zero if none available
 	float aspeed;
 	if (!_ahrs.airspeed_estimate(&aspeed)) {
@@ -156,21 +156,21 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 	} else {
 		_pid_info.I = 0;
 	}
-	
+
     // Scale the integration limit
     float intLimScaled = gains.imax * 0.01f;
 
     // Constrain the integrator state
     _pid_info.I = constrain_float(_pid_info.I, -intLimScaled, intLimScaled);
-	
+
 	// Calculate the demanded control surface deflection
 	// Note the scaler is applied again. We want a 1/speed scaler applied to the feed-forward
-	// path, but want a 1/speed^2 scaler applied to the rate error path. 
+	// path, but want a 1/speed^2 scaler applied to the rate error path.
 	// This is because acceleration scales with speed^2, but rate scales with speed.
     _pid_info.D = rate_error * gains.D * scaler;
     _pid_info.P = desired_rate * kp_ff * scaler;
     _pid_info.FF = desired_rate * k_ff * scaler;
-    _pid_info.desired = desired_rate;
+    _pid_info.target = desired_rate;
     _pid_info.actual = achieved_rate;
 
     // Calculate the slew rate amplitude produced by the unmodified D term
@@ -189,12 +189,12 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
     _pid_info.Dmod = _D_gain_modifier = _slew_rate_max / fmaxf(_slew_rate_amplitude, _slew_rate_max);
     _pid_info.D *= _D_gain_modifier;
 
-    _pid_info.desired = desired_rate;
+    _pid_info.target = desired_rate;
 
     _last_out = _pid_info.FF + _pid_info.P + _pid_info.D;
 
     if (autotune.running && aspeed > aparm.airspeed_min) {
-        // let autotune have a go at the values 
+        // let autotune have a go at the values
         // Note that we don't pass the integrator component so we get
         // a better idea of how much the base PD controller
         // contributed
@@ -202,7 +202,7 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
     }
 
 	_last_out += _pid_info.I;
-	
+
 	// Convert to centi-degrees and constrain
 	return constrain_float(_last_out * 100, -4500, 4500);
 }
@@ -211,7 +211,7 @@ int32_t AP_RollController::_get_rate_out(float desired_rate, float scaler, bool 
 /*
  Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500
  A positive demand is up
- Inputs are: 
+ Inputs are:
  1) desired roll rate in degrees/sec
  2) control gain scaler = scaling_speed / aspeed
 */
@@ -223,7 +223,7 @@ int32_t AP_RollController::get_rate_out(float desired_rate, float scaler)
 /*
  Function returns an equivalent aileron deflection in centi-degrees in the range from -4500 to 4500
  A positive demand is up
- Inputs are: 
+ Inputs are:
  1) demanded bank angle in centi-degrees
  2) control gain scaler = scaling_speed / aspeed
  3) boolean which is true when stabilise mode is active
@@ -234,7 +234,7 @@ int32_t AP_RollController::get_servo_out(int32_t angle_err, float scaler, bool d
     if (gains.tau < 0.1f) {
         gains.tau.set(0.1f);
     }
-	
+
 	// Calculate the desired roll rate (deg/sec) from the angle error
 	float desired_rate = angle_err * 0.01f / gains.tau;
 
