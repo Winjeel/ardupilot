@@ -90,6 +90,10 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
                 set_mode(mode_rtl, reason);
             } else if (g.fs_action_long == FS_ACTION_LONG_CONTINUE) {
                 set_mode(mode_rtl, reason);
+            } else {
+                // unexpected action, so RTL
+                gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid long action! Defaulting to RTL mode.");
+                set_mode(mode_rtl, reason);
             }
             break;
 
@@ -109,6 +113,9 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
                 set_mode(mode_rtl, reason);
             } else if (g.fs_action_long == FS_ACTION_LONG_CONTINUE) {
                 // continue in the current auto mode
+            } else {
+                // unexpected action, so continue in the current auto mode
+                gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid long action! Defaulting to current mode.");
             }
             break;
 
