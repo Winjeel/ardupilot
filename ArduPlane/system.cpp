@@ -355,22 +355,22 @@ void Plane::check_long_failsafe()
     }
 
     // only act on changes
-    if (failsafe.state != FAILSAFE_LONG && failsafe.state != FAILSAFE_GCS) {
+    if (failsafe.state != FailsafeState::Long_Radio && failsafe.state != FailsafeState::Long_GCS) {
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
             return;
         }
 
         if (in_RC_failsafe_state) {
-            failsafe_long_on_event(FAILSAFE_LONG, MODE_REASON_RADIO_FAILSAFE);
+            failsafe_long_on_event(FailsafeState::Long_Radio, MODE_REASON_RADIO_FAILSAFE);
         } else if (in_GCS_failsafe_state) {
-            failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
+            failsafe_long_on_event(FailsafeState::Long_GCS, MODE_REASON_GCS_FAILSAFE);
         }
     } else {
-        if (failsafe.state == FAILSAFE_LONG) {
+        if (failsafe.state == FailsafeState::Long_Radio) {
             if (!in_RC_failsafe_state) {
                 failsafe_long_off_event(MODE_REASON_RADIO_FAILSAFE);
             }
-        } else if (failsafe.state == FAILSAFE_GCS) {
+        } else if (failsafe.state == FailsafeState::Long_GCS) {
             if (!in_GCS_failsafe_state) {
                 failsafe_long_off_event(MODE_REASON_GCS_FAILSAFE);
             }
@@ -389,15 +389,15 @@ void Plane::check_short_failsafe()
                                       ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_short_ms);
 
     // only act on changes
-    if (failsafe.state == FAILSAFE_NONE) {
+    if (failsafe.state == FailsafeState::None) {
         if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
             return;
         }
 
         if (in_RC_failsafe_state) {
-            failsafe_short_on_event(FAILSAFE_SHORT, MODE_REASON_RADIO_FAILSAFE);
+            failsafe_short_on_event(FailsafeState::Short, MODE_REASON_RADIO_FAILSAFE);
         }
-    } else if (failsafe.state == FAILSAFE_SHORT) {
+    } else if (failsafe.state == FailsafeState::Short) {
         if (!in_RC_failsafe_state) {
             failsafe_short_off_event(MODE_REASON_RADIO_FAILSAFE);
         }

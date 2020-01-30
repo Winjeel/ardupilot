@@ -1,6 +1,6 @@
 #include "Plane.h"
 
-void Plane::failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t reason)
+void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t reason)
 {
     // This is how to handle a short loss of control signal failsafe.
     failsafe.state = fstype;
@@ -34,7 +34,7 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t re
         failsafe.saved_mode_set = true;
         set_mode(mode_qland, reason);
         break;
-        
+
     case Mode::Number::AUTO:
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
@@ -60,7 +60,7 @@ void Plane::failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t re
     gcs().send_text(MAV_SEVERITY_INFO, "Flight mode = %u", (unsigned)control_mode->mode_number());
 }
 
-void Plane::failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t reason)
+void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reason)
 {
     // This is how to handle a long loss of control signal failsafe.
     gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe. Long event on: type=%u/reason=%u", fstype, reason);
@@ -96,7 +96,7 @@ void Plane::failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t rea
     case Mode::Number::QAUTOTUNE:
         set_mode(mode_qland, reason);
         break;
-        
+
     case Mode::Number::AUTO:
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
@@ -125,7 +125,7 @@ void Plane::failsafe_short_off_event(mode_reason_t reason)
 {
     // We're back in radio contact
     gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe. Short event off: reason=%u", reason);
-    failsafe.state = FAILSAFE_NONE;
+    failsafe.state = FailsafeState::None;
 
     // re-read the switch so we can return to our preferred mode
     // --------------------------------------------------------
@@ -139,7 +139,7 @@ void Plane::failsafe_long_off_event(mode_reason_t reason)
 {
     // We're back in radio contact
     gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe. Long event off: reason=%u", reason);
-    failsafe.state = FAILSAFE_NONE;
+    failsafe.state = FailsafeState::None;
 }
 
 void Plane::handle_battery_failsafe(const char *type_str, const int8_t action)
