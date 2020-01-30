@@ -332,7 +332,7 @@ void Plane::check_long_failsafe()
                           ((now_ms - last_remRSSI_ms) < fs_timeout_long_ms);
 
     bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
-                                      ((now_ms - failsafe.last_valid_rc_ms) > fs_timeout_long_ms);
+                                      ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_long_ms);
 
     bool in_GCS_failsafe_state = false;
     switch (g.gcs_heartbeat_fs_enabled) {
@@ -380,19 +380,25 @@ void Plane::check_long_failsafe()
 
 void Plane::check_short_failsafe()
 {
+    uint32_t const now_ms = millis();
+    uint32_t const fs_timeout_short_ms = g.fs_timeout_short * 1000;
+
+    // The rc_failsafe flag is set in radio.cpp
+    bool const in_RC_failsafe_state = (g.fs_action_short != FS_ACTION_SHORT_DISABLED) &&
+                                      failsafe.rc_failsafe &&
+                                      ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_short_ms);
+
     // only act on changes
-    // -------------------
-    if (g.fs_action_short != FS_ACTION_SHORT_DISABLED &&
-       failsafe.state == FAILSAFE_NONE &&
-       flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND) {
-        // The condition is checked and the flag rc_failsafe is set in radio.cpp
-        if(failsafe.rc_failsafe) {
+    if (failsafe.state == FAILSAFE_NONE) {
+        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
+            return;
+        }
+
+        if (in_RC_failsafe_state) {
             failsafe_short_on_event(FAILSAFE_SHORT, MODE_REASON_RADIO_FAILSAFE);
         }
-    }
-
-    if(failsafe.state == FAILSAFE_SHORT) {
-        if(!failsafe.rc_failsafe || g.fs_action_short == FS_ACTION_SHORT_DISABLED) {
+    } else if (failsafe.state == FAILSAFE_SHORT) {
+        if (!in_RC_failsafe_state) {
             failsafe_short_off_event(MODE_REASON_RADIO_FAILSAFE);
         }
     }

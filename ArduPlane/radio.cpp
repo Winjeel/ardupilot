@@ -83,7 +83,7 @@ void Plane::init_rc_out_main()
     SRV_Channels::set_failsafe_limit(SRV_Channel::k_elevator, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
     SRV_Channels::set_failsafe_limit(SRV_Channel::k_throttle, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
     SRV_Channels::set_failsafe_limit(SRV_Channel::k_rudder, SRV_Channel::SRV_CHANNEL_LIMIT_TRIM);
-    
+
     // setup PX4 to output the min throttle when safety off if arming
     // is setup for min on disarm
     if (arming.arming_required() == AP_Arming::Required::YES_MIN_PWM) {
@@ -99,9 +99,9 @@ void Plane::init_rc_out_aux()
     SRV_Channels::enable_aux_servos();
 
     SRV_Channels::cork();
-    
+
     servos_output();
-    
+
     // setup PWM values to send if the FMU firmware dies
     // allows any VTOL motors to shut off
     SRV_Channels::setup_failsafe_trim_all_non_motors();
@@ -130,7 +130,7 @@ void Plane::rudder_arm_disarm_check()
     if (auto_throttle_mode &&
         (control_mode != &mode_cruise && control_mode != &mode_fbwb)) {
         rudder_arm_timer = 0;
-        return;      
+        return;
     }
 
 	if (!arming.is_armed()) {
@@ -237,7 +237,7 @@ int16_t Plane::rudder_input(void)
     }
 
     return 0;
-    
+
 }
 
 void Plane::control_failsafe()
@@ -285,6 +285,7 @@ void Plane::control_failsafe()
             failsafe.throttle_counter++;
             if (failsafe.throttle_counter == 10) {
                 gcs().send_text(MAV_SEVERITY_WARNING, "Throttle failsafe on");
+                failsafe.rc_failsafe_activated_ms = millis();
                 failsafe.rc_failsafe = true;
                 AP_Notify::flags.failsafe_radio = true;
             }
@@ -341,7 +342,7 @@ bool Plane::trim_radio()
     // trim vtail
     SRV_Channels::set_trim_to_servo_out_for(SRV_Channel::k_vtail_left);
     SRV_Channels::set_trim_to_servo_out_for(SRV_Channel::k_vtail_right);
-    
+
     if (SRV_Channels::get_output_scaled(SRV_Channel::k_rudder) == 0) {
         // trim differential spoilers if no rudder input
         SRV_Channels::set_trim_to_servo_out_for(SRV_Channel::k_dspoilerLeft1);
