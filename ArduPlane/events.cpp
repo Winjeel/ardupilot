@@ -67,56 +67,65 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
     //  If the GCS is locked up we allow control to revert to RC
     RC_Channels::clear_overrides();
     failsafe.state = fstype;
+
     switch (control_mode->mode_number())
     {
-    case Mode::Number::MANUAL:
-    case Mode::Number::STABILIZE:
-    case Mode::Number::ACRO:
-    case Mode::Number::FLY_BY_WIRE_A:
-    case Mode::Number::AUTOTUNE:
-    case Mode::Number::FLY_BY_WIRE_B:
-    case Mode::Number::CRUISE:
-    case Mode::Number::TRAINING:
-    case Mode::Number::CIRCLE:
-        if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
+        // stabilise modes
+        case Mode::Number::MANUAL:
+        case Mode::Number::CIRCLE:
+        case Mode::Number::STABILIZE:
+        case Mode::Number::TRAINING:
+        case Mode::Number::ACRO:
+        case Mode::Number::FLY_BY_WIRE_A:
+        case Mode::Number::FLY_BY_WIRE_B:
+        case Mode::Number::CRUISE:
+        case Mode::Number::AUTOTUNE:
+            if (g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
 #if PARACHUTE == ENABLED
-            parachute_release();
+                parachute_release();
 #endif
-        } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
-            set_mode(mode_fbwa, reason);
-        } else {
-            set_mode(mode_rtl, reason);
-        }
-        break;
+            } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
+                set_mode(mode_fbwa, reason);
+            } else if (g.fs_action_long == FS_ACTION_LONG_RTL) {
+                set_mode(mode_rtl, reason);
+            } else if (g.fs_action_long == FS_ACTION_LONG_CONTINUE) {
+                set_mode(mode_rtl, reason);
+            }
+            break;
 
-    case Mode::Number::QSTABILIZE:
-    case Mode::Number::QHOVER:
-    case Mode::Number::QLOITER:
-    case Mode::Number::QACRO:
-    case Mode::Number::QAUTOTUNE:
-        set_mode(mode_qland, reason);
-        break;
-
-    case Mode::Number::AUTO:
-    case Mode::Number::AVOID_ADSB:
-    case Mode::Number::GUIDED:
-    case Mode::Number::LOITER:
-        if(g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
+        // auto modes
+        case Mode::Number::AUTO:
+        case Mode::Number::RTL:
+        case Mode::Number::LOITER:
+        case Mode::Number::AVOID_ADSB:
+        case Mode::Number::GUIDED:
+            if (g.fs_action_long == FS_ACTION_LONG_PARACHUTE) {
 #if PARACHUTE == ENABLED
-            parachute_release();
+                parachute_release();
 #endif
-        } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
-            set_mode(mode_fbwa, reason);
-        } else if (g.fs_action_long == FS_ACTION_LONG_RTL) {
-            set_mode(mode_rtl, reason);
-        }
-        break;
+            } else if (g.fs_action_long == FS_ACTION_LONG_GLIDE) {
+                set_mode(mode_fbwa, reason);
+            } else if (g.fs_action_long == FS_ACTION_LONG_RTL) {
+                set_mode(mode_rtl, reason);
+            } else if (g.fs_action_long == FS_ACTION_LONG_CONTINUE) {
+                // continue in the current auto mode
+            }
+            break;
 
-    case Mode::Number::RTL:
-    case Mode::Number::QLAND:
-    case Mode::Number::QRTL:
-    case Mode::Number::INITIALISING:
-        break;
+        // TODO: Why are the Q modes different?
+        case Mode::Number::QSTABILIZE:
+        case Mode::Number::QHOVER:
+        case Mode::Number::QLOITER:
+        case Mode::Number::QLAND:
+        case Mode::Number::QRTL:
+        case Mode::Number::QAUTOTUNE:
+        case Mode::Number::QACRO:
+            set_mode(mode_qland, reason);
+            break;
+
+        // if we're starting up, don't do anything
+        case Mode::Number::INITIALISING:
+            break;
     }
     gcs().send_text(MAV_SEVERITY_INFO, "Flight mode = %u", (unsigned)control_mode->mode_number());
 }
