@@ -14,6 +14,8 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
     gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe. Short event on: type=%u/reason=%u", fstype, reason);
     switch (control_mode->mode_number())
     {
+        case Mode::Number::INITIALISING:
+        case Mode::Number::TAKEOFF:
         case Mode::Number::CIRCLE:
         case Mode::Number::RTL:
             // ignored in these modes
@@ -75,10 +77,6 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
                 gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Remaining in current auto mode.");
             }
             break;
-
-    case Mode::Number::TAKEOFF:
-        case Mode::Number::INITIALISING:
-            break;
     }
 
     if (failsafe_mode != control_mode) {
@@ -128,11 +126,6 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
             break;
 
         // auto modes
-        if (quadplane.options & QuadPlane::OPTION_FS_QRTL) {
-            set_mode(mode_qrtl, reason);
-        } else {
-            set_mode(mode_qland, reason);
-        }
         case Mode::Number::AUTO:
         case Mode::Number::RTL:
         case Mode::Number::LOITER:
@@ -154,7 +147,6 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
             }
             break;
 
-        // TODO: Why are the Q modes different?
         case Mode::Number::QSTABILIZE:
         case Mode::Number::QHOVER:
         case Mode::Number::QLOITER:
@@ -162,11 +154,16 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
         case Mode::Number::QRTL:
         case Mode::Number::QAUTOTUNE:
         case Mode::Number::QACRO:
-            set_mode(mode_qland, reason);
+            if (quadplane.options & QuadPlane::OPTION_FS_QRTL) {
+                set_mode(mode_qrtl, reason);
+            } else {
+                set_mode(mode_qland, reason);
+            }
             break;
 
         // if we're starting up, don't do anything
         case Mode::Number::INITIALISING:
+        case Mode::Number::TAKEOFF:
             break;
     }
     gcs().send_text(MAV_SEVERITY_INFO, "Flight mode = %u", (unsigned)control_mode->mode_number());
