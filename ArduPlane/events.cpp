@@ -34,6 +34,8 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
                 failsafe_mode = &mode_circle;
             } else if (g.fs_action_short == FS_ACTION_SHORT_BESTGUESS) {
                 failsafe_mode = &mode_circle;
+            } else if (g.fs_action_short == FS_ACTION_SHORT_LOITER) {
+                failsafe_mode = &mode_loiter;
             } else {
                 // unexpected action, so Circle
                 gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Defaulting to Circle mode.");
@@ -55,17 +57,17 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
         case Mode::Number::LOITER:
         case Mode::Number::AVOID_ADSB:
         case Mode::Number::GUIDED:
-            if (g.fs_action_short != FS_ACTION_SHORT_BESTGUESS) {
-                if (g.fs_action_short == FS_ACTION_SHORT_FBWA) {
-                    failsafe_mode = &mode_fbwa;
-                } else if (g.fs_action_short == FS_ACTION_SHORT_CIRCLE) {
-                    failsafe_mode = &mode_circle;
-                } else if (g.fs_action_short == FS_ACTION_SHORT_BESTGUESS) {
-                    // stay in current auto mode
-                } else {
-                    // unexpected action, so stay in current auto mode
-                    gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Remaining in current auto mode.");
-                }
+            if (g.fs_action_short == FS_ACTION_SHORT_FBWA) {
+                failsafe_mode = &mode_fbwa;
+            } else if (g.fs_action_short == FS_ACTION_SHORT_CIRCLE) {
+                failsafe_mode = &mode_circle;
+            } else if (g.fs_action_short == FS_ACTION_SHORT_BESTGUESS) {
+                // stay in current auto mode
+            } else if (g.fs_action_short == FS_ACTION_SHORT_LOITER) {
+                failsafe_mode = &mode_loiter;
+            } else {
+                // unexpected action, so stay in current auto mode
+                gcs().send_text(MAV_SEVERITY_WARNING, "Failsafe: Invalid short action! Remaining in current auto mode.");
             }
             break;
 
