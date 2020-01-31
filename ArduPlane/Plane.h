@@ -387,7 +387,7 @@ private:
         //Does not count rc inputs as valid if the standard failsafe is on
         uint32_t AFS_last_valid_rc_ms;
 
-        // captures when the rc_failsafe was activated, so timeouts can ce calculated
+        // captures when the rc_failsafe was activated, so timeouts can be calculated
         uint32_t rc_failsafe_activated_ms;
     } failsafe;
 
