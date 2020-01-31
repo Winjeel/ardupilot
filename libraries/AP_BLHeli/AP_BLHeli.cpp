@@ -421,6 +421,7 @@ void AP_BLHeli::msp_process_command(void)
         debug("MSP_SET_MOTOR %u", nmotors);
         SRV_Channels::set_disabled_channel_mask(0xFFFF);
         motors_disabled = true;
+        EXPECT_DELAY_MS(1000);
         hal.rcout->cork();
         for (uint8_t i = 0; i < nmotors; i++) {
             if (i >= num_motors) {
@@ -524,6 +525,7 @@ bool AP_BLHeli::BL_SendBuf(const uint8_t *buf, uint16_t len)
     if (blheli.chan >= num_motors) {
         return false;
     }
+    EXPECT_DELAY_MS(1000);
     if (!hal.rcout->serial_setup_output(motor_map[blheli.chan], 19200, motor_mask)) {
         blheli.ack = ACK_D_GENERAL_ERROR;
         return false;
@@ -557,6 +559,7 @@ bool AP_BLHeli::BL_ReadBuf(uint8_t *buf, uint16_t len)
 {
     bool check_crc = isMcuConnected() && len > 0;
     uint16_t req_bytes = len+(check_crc?3:1);
+    EXPECT_DELAY_MS(1000);
     uint16_t n = hal.rcout->serial_read_bytes(blheli.buf, req_bytes);
     debug("BL_ReadBuf %u -> %u", len, n);
     if (req_bytes != n) {
@@ -594,6 +597,7 @@ uint8_t AP_BLHeli::BL_GetACK(uint16_t timeout_ms)
 {
     uint8_t ack;
     uint32_t start_ms = AP_HAL::millis();
+    EXPECT_DELAY_MS(1000);
     while (AP_HAL::millis() - start_ms < timeout_ms) {
         if (hal.rcout->serial_read_bytes(&ack, 1) == 1) {
             return ack;
@@ -700,6 +704,8 @@ bool AP_BLHeli::BL_ConnectEx(void)
     case 0x3306:
     case 0x3406:
     case 0x3506:
+    case 0x2B06:
+    case 0x4706:
         blheli.interface_mode[blheli.chan] = imARM_BLB;
         debug("Interface type imARM_BLB");
         break;
@@ -734,7 +740,7 @@ bool AP_BLHeli::BL_PageErase(void)
         if (!BL_SendBuf(sCMD, 2)) {
             return false;
         }
-        return BL_GetACK(1000) == brSUCCESS;
+        return BL_GetACK(3000) == brSUCCESS;
     }
     return false;
 }
@@ -1132,6 +1138,7 @@ void AP_BLHeli::run_connection_test(uint8_t chan)
     run_test.set_and_notify(0);
     bool passed = false;
     for (uint8_t tries=0; tries<5; tries++) {
+        EXPECT_DELAY_MS(3000);
         blheli.ack = ACK_OK;
         setDisconnected();
         if (BL_ConnectEx()) {
@@ -1272,7 +1279,7 @@ void AP_BLHeli::update(void)
     motor_mask = mask;
     debug("ESC: %u motors mask=0x%04x", num_motors, mask);
 
-    if (telem_rate > 0) {
+    if (num_motors != 0 && telem_rate > 0) {
         AP_SerialManager *serial_manager = AP_SerialManager::get_singleton();
         if (serial_manager) {
             telem_uart = serial_manager->find_serial(AP_SerialManager::SerialProtocol_ESCTelemetry,0);
@@ -1340,7 +1347,7 @@ void AP_BLHeli::read_telemetry_packet(void)
     td.voltage = (buf[1]<<8) | buf[2];
     td.current = (buf[3]<<8) | buf[4];
     td.consumption = (buf[5]<<8) | buf[6];
-    td.rpm = ((buf[7]<<8) | buf[8]) * motor_poles;
+    td.rpm = ((buf[7]<<8) | buf[8]) * 100 * 2 / motor_poles;
     td.timestamp_ms = AP_HAL::millis();
 
     last_telem[last_telem_esc] = td;

@@ -51,6 +51,11 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
         case Mode::Number::QAUTOTUNE:
         case Mode::Number::QACRO:
             failsafe_mode = &mode_qland;
+        if (quadplane.options & QuadPlane::OPTION_FS_QRTL) {
+            set_mode(mode_qrtl, reason);
+        } else {
+            set_mode(mode_qland, reason);
+        }
             break;
 
         case Mode::Number::AUTO:
@@ -71,6 +76,7 @@ void Plane::failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t rea
             }
             break;
 
+    case Mode::Number::TAKEOFF:
         case Mode::Number::INITIALISING:
             break;
     }
@@ -122,6 +128,11 @@ void Plane::failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reas
             break;
 
         // auto modes
+        if (quadplane.options & QuadPlane::OPTION_FS_QRTL) {
+            set_mode(mode_qrtl, reason);
+        } else {
+            set_mode(mode_qland, reason);
+        }
         case Mode::Number::AUTO:
         case Mode::Number::RTL:
         case Mode::Number::LOITER:
@@ -201,7 +212,7 @@ void Plane::handle_battery_failsafe(const char *type_str, const int8_t action)
             }
             FALLTHROUGH;
         case Failsafe_Action_RTL:
-            if (flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND && control_mode != &mode_qland ) {
+            if (flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND && control_mode != &mode_qland && !quadplane.in_vtol_land_sequence()) {
                 // never stop a landing if we were already committed
                 set_mode(mode_rtl, MODE_REASON_BATTERY_FAILSAFE);
                 aparm.throttle_cruise.load();
@@ -214,12 +225,14 @@ void Plane::handle_battery_failsafe(const char *type_str, const int8_t action)
             snprintf(battery_type_str, 17, "%s battery", type_str);
             afs.gcs_terminate(true, battery_type_str);
 #else
-            disarm_motors();
+            arming.disarm();
 #endif
             break;
 
         case Failsafe_Action_Parachute:
+#if PARACHUTE == ENABLED
             parachute_release();
+#endif
             break;
 
         case Failsafe_Action_None:

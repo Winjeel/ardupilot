@@ -130,17 +130,10 @@ void Plane::loop()
     G_Dt = scheduler.get_loop_period_s();
 }
 
-void Plane::update_soft_armed()
-{
-    hal.util->set_soft_armed(arming.is_armed() &&
-                             hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
-    logger.set_vehicle_armed(hal.util->get_soft_armed());
-}
-
 // update AHRS system
 void Plane::ahrs_update()
 {
-    update_soft_armed();
+    arming.update_soft_armed();
 
 #if HIL_SUPPORT
     if (g.hil_mode == 1) {
@@ -174,7 +167,7 @@ void Plane::ahrs_update()
     quadplane.check_yaw_reset();
 
     // update inertial_nav for quadplane
-    quadplane.inertial_nav.update(G_Dt);
+    quadplane.inertial_nav.update();
 }
 
 /*
@@ -313,12 +306,6 @@ void Plane::one_second_loop()
             // reset the landing altitude correction
             landing.alt_offset = 0;
     }
-
-    // update error mask of sensors and subsystems. The mask uses the
-    // MAV_SYS_STATUS_* values from mavlink. If a bit is set then it
-    // indicates that the sensor or subsystem is present but not
-    // functioning correctly
-    gcs().update_sensor_status_flags();
 }
 
 void Plane::compass_save()
@@ -401,11 +388,6 @@ void Plane::update_GPS_10Hz(void)
 
                 next_WP_loc = prev_WP_loc = home;
 
-                if (AP::compass().enabled()) {
-                    // Set compass declination automatically
-                    const Location &loc = gps.location();
-                    compass.set_initial_location(loc.lat, loc.lng);
-                }
                 ground_start_count = 0;
             }
         }
@@ -523,6 +505,7 @@ void Plane::update_navigation()
     case Mode::Number::LOITER:
     case Mode::Number::AVOID_ADSB:
     case Mode::Number::GUIDED:
+    case Mode::Number::TAKEOFF:
         update_loiter(radius);
         break;
 
@@ -564,7 +547,7 @@ void Plane::set_flight_stage(AP_Vehicle::FixedWing::FlightStage fs)
 
     if (fs == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND) {
         gcs().send_text(MAV_SEVERITY_NOTICE, "Landing aborted, climbing to %dm",
-                          auto_state.takeoff_altitude_rel_cm/100);
+                        int(auto_state.takeoff_altitude_rel_cm/100));
     }
 
     flight_stage = fs;
@@ -660,7 +643,7 @@ void Plane::update_flight_stage(void)
             } else {
                 set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
             }
-        } else {
+        } else if (control_mode != &mode_takeoff) {
             // If not in AUTO then assume normal operation for normal TECS operation.
             // This prevents TECS from being stuck in the wrong stage if you switch from
             // AUTO to, say, FBWB during a landing, an aborted landing or takeoff.
@@ -672,9 +655,6 @@ void Plane::update_flight_stage(void)
     } else {
         set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
     }
-
-    // tell AHRS the airspeed to true airspeed ratio
-    airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
 }
 
 
@@ -693,7 +673,7 @@ void Plane::disarm_if_autoland_complete()
         arming.is_armed()) {
         /* we have auto disarm enabled. See if enough time has passed */
         if (millis() - auto_state.last_flying_ms >= landing.get_disarm_delay()*1000UL) {
-            if (disarm_motors()) {
+            if (arming.disarm()) {
                 gcs().send_text(MAV_SEVERITY_INFO,"Auto disarmed");
             }
         }

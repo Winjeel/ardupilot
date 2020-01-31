@@ -23,6 +23,8 @@
 #include "AP_AHRS.h"
 #include <AP_HAL/AP_HAL.h>
 #include <GCS_MAVLink/GCS.h>
+#include <AP_GPS/AP_GPS.h>
+#include <AP_Baro/AP_Baro.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -148,7 +150,7 @@ AP_AHRS_DCM::matrix_update(float _G_Dt)
     Vector3f delta_angle;
     const AP_InertialSensor &_ins = AP::ins();
     for (uint8_t i=0; i<_ins.get_gyro_count(); i++) {
-        if (_ins.get_gyro_health(i) && healthy_count < 2) {
+        if (_ins.use_gyro(i) && healthy_count < 2) {
             Vector3f dangle;
             if (_ins.get_delta_angle(i, dangle)) {
                 healthy_count++;
@@ -456,7 +458,7 @@ bool AP_AHRS_DCM::use_compass(void)
     // degrees and the estimated wind speed is less than 80% of the
     // ground speed, then switch to GPS navigation. This will help
     // prevent flyaways with very bad compass offsets
-    const int32_t error = abs(wrap_180_cd(yaw_sensor - AP::gps().ground_course_cd()));
+    const int32_t error = labs(wrap_180_cd(yaw_sensor - AP::gps().ground_course_cd()));
     if (error > 4500 && _wind.length() < AP::gps().ground_speed()*0.8f) {
         if (AP_HAL::millis() - _last_consistent_heading > 2000) {
             // start using the GPS for heading if the compass has been
@@ -636,8 +638,9 @@ AP_AHRS_DCM::drift_correction(float deltat)
     const AP_InertialSensor &_ins = AP::ins();
 
     // rotate accelerometer values into the earth frame
+    uint8_t healthy_count = 0;
     for (uint8_t i=0; i<_ins.get_accel_count(); i++) {
-        if (_ins.get_accel_health(i)) {
+        if (_ins.use_accel(i) && healthy_count < 2) {
             /*
               by using get_delta_velocity() instead of get_accel() the
               accel value is sampled over the right time delta for
@@ -651,6 +654,7 @@ AP_AHRS_DCM::drift_correction(float deltat)
                 // integrate the accel vector in the earth frame between GPS readings
                 _ra_sum[i] += _accel_ef[i] * deltat;
             }
+            healthy_count++;
         }
     }
 

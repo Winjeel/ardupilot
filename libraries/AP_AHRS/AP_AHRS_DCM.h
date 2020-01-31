@@ -106,7 +106,7 @@ public:
 
     // sets the default value of airspeed to be assumed if no measurement available
     // not supported by this estimator
-    void set_default_airspeed(float spd) {}
+    void set_default_airspeed(float spd) override {}
 
 private:
     float _ki;

@@ -25,6 +25,10 @@
 #include "Util.h"
 #include "hwdef/common/stm32_util.h"
 
+#ifndef HAL_DEVICE_THREAD_STACK
+#define HAL_DEVICE_THREAD_STACK 1024
+#endif
+
 using namespace ChibiOS;
 
 static const AP_HAL::HAL &hal = AP_HAL::get_HAL();
@@ -114,7 +118,7 @@ AP_HAL::Device::PeriodicHandle DeviceBus::register_periodic_callback(uint32_t pe
             break;
         }
 
-        thread_ctx = thread_create_alloc(THD_WORKING_AREA_SIZE(1024),
+        thread_ctx = thread_create_alloc(THD_WORKING_AREA_SIZE(HAL_DEVICE_THREAD_STACK),
                                          name,
                                          thread_priority,           /* Initial priority.    */
                                          DeviceBus::bus_thread,    /* Thread function.     */
@@ -160,15 +164,23 @@ bool DeviceBus::adjust_timer(AP_HAL::Device::PeriodicHandle h, uint32_t period_u
 /*
   setup to use DMA-safe bouncebuffers for device transfers
  */
-void DeviceBus::bouncebuffer_setup(const uint8_t *&buf_tx, uint16_t tx_len,
+bool DeviceBus::bouncebuffer_setup(const uint8_t *&buf_tx, uint16_t tx_len,
                                    uint8_t *&buf_rx, uint16_t rx_len)
 {
     if (buf_rx) {
-        bouncebuffer_setup_read(bounce_buffer_rx, &buf_rx, rx_len);
+        if (!bouncebuffer_setup_read(bounce_buffer_rx, &buf_rx, rx_len)) {
+            return false;
+        }
     }
     if (buf_tx) {
-        bouncebuffer_setup_write(bounce_buffer_tx, &buf_tx, tx_len);
+        if (!bouncebuffer_setup_write(bounce_buffer_tx, &buf_tx, tx_len)) {
+            if (buf_rx) {
+                bouncebuffer_abort(bounce_buffer_rx);
+            }
+            return false;
+        }
     }
+    return true;
 }
 
 /*

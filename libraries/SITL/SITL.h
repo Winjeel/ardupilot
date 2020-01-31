@@ -10,8 +10,6 @@
 #include "SIM_Parachute.h"
 #include "SIM_Precland.h"
 
-class AP_Logger;
-
 namespace SITL {
 
 struct vector3f_array {
@@ -177,8 +175,12 @@ public:
     AP_Int8  telem_baudlimit_enable; // enable baudrate limiting on links
     AP_Float flow_noise; // optical flow measurement noise (rad/sec)
     AP_Float launch_elevation; // initial elevation angle of launch (deg)
- 
-     // wind control
+    AP_Int8  baro_count; // number of simulated baros to create
+    AP_Int8 gps_hdg_enabled; // enable the output of a NMEA heading HDT sentence
+    AP_Int32 loop_delay; // extra delay to add to every loop
+    AP_Float mag_scaling; // scaling factor on first compasses
+
+    // wind control
     enum WindType {
         WIND_TYPE_SQRT = 0,
         WIND_TYPE_NO_LIMIT = 1,
@@ -255,6 +257,27 @@ public:
     } twist;
 
     AP_Int8 gnd_behav;
+
+    struct {
+        AP_Int8 enable;     // 0: disabled, 1: roll and pitch, 2: roll, pitch and heave
+        AP_Float length;    // m
+        AP_Float amp;       // m
+        AP_Float direction; // deg (direction wave is coming from)
+        AP_Float speed;     // m/s
+    } wave;
+
+    struct {
+        AP_Float direction; // deg (direction tide is coming from)
+        AP_Float speed;     // m/s
+    } tide;
+
+    // original simulated position
+    struct {
+        AP_Float lat;
+        AP_Float lng;
+        AP_Float alt; // metres
+        AP_Float hdg; // 0 to 360
+    } opos;
 
     uint16_t irlock_port;
 

@@ -263,9 +263,12 @@ public:
     // get the index of the current primary gyro sensor
     uint8_t get_primary_gyro_index(void) const override;
 
+    // see if EKF lane switching is possible to avoid EKF failsafe
+    void check_lane_switch(void) override;
+
     // sets the default value of EAS to be assumed when there is no direct measurement
     // only supported by EKF2 & 3
-    void set_default_airspeed(float spd) {
+    void set_default_airspeed(float spd) override {
         if (active_EKF_type() == EKF_TYPE2) {
             EKF2.set_default_airspeed(spd);
         } else if (active_EKF_type() == EKF_TYPE3) {
@@ -273,6 +276,10 @@ public:
         }
     }
 
+    void Log_Write();
+
+    // check whether compass can be bypassed for arming check in case when external navigation data is available
+    bool is_ext_nav_used_for_yaw(void) const;
 
 private:
     enum EKF_TYPE {EKF_TYPE_NONE=0,
@@ -293,11 +300,11 @@ private:
     bool _ekf2_started;
     bool _ekf3_started;
     bool _force_ekf;
-    
+
     // rotation from vehicle body to NED frame
     Matrix3f _dcm_matrix;
     Vector3f _dcm_attitude;
-    
+
     Vector3f _gyro_drift;
     Vector3f _gyro_estimate;
     Vector3f _accel_ef_ekf[INS_MAX_INSTANCES];
@@ -318,5 +325,5 @@ private:
     SITL::SITL *_sitl;
     uint32_t _last_body_odm_update_ms = 0;
     void update_SITL(void);
-#endif    
+#endif
 };

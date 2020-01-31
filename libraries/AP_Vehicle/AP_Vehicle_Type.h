@@ -27,7 +27,8 @@
 #define APM_BUILD_Replay         6
 #define APM_BUILD_ArduSub        7
 #define APM_BUILD_iofirmware     8
-#define APM_BUILD_BoardTest      9
+#define APM_BUILD_AP_Periph      9
+#define APM_BUILD_BoardTest      64 // large number to deconflict with upstream
 
 /*
   using this macro catches cases where we try to check vehicle type on

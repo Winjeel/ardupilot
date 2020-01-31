@@ -24,6 +24,7 @@ public:
         BattMonitor_TYPE_BLHeliESC                  = 9,
         BattMonitor_TYPE_Sum                        = 10,
         BattMonitor_TYPE_FuelFlow                   = 11,
+        BattMonitor_TYPE_FuelLevel_PWM              = 12,
 
         // de-conflict with upstream changes
         BattMonitor_TYPE_MotorPod                   = 64,
