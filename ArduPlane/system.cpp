@@ -331,7 +331,9 @@ void Plane::check_long_failsafe()
                                ((now_ms - failsafe.last_heartbeat_ms) < fs_timeout_long_ms);
 
     // check if GCS can hear us
-    uint32_t const last_remRSSI_ms = gcs().chan(0).last_radio_status_remrssi_ms;
+    uint32_t const last_remRSSI_ms = (gcs().chan(0) != nullptr)
+                                   ? gcs().chan(0)->last_radio_status_remrssi_ms
+                                   : 0;
     bool const has_rssi = last_remRSSI_ms == 0 ||
                           ((now_ms - last_remRSSI_ms) < fs_timeout_long_ms);
 
