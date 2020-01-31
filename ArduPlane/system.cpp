@@ -384,8 +384,7 @@ void Plane::check_short_failsafe()
     uint32_t const fs_timeout_short_ms = g.fs_timeout_short * 1000;
 
     // The rc_failsafe flag is set in radio.cpp
-    bool const in_RC_failsafe_state = (g.fs_action_short != FS_ACTION_SHORT_DISABLED) &&
-                                      failsafe.rc_failsafe &&
+    bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
                                       ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_short_ms);
 
     // only act on changes
