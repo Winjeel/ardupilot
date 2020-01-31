@@ -356,10 +356,11 @@ void Plane::check_long_failsafe()
 
     // only act on changes
     if (failsafe.state != FailsafeState::Long_Radio && failsafe.state != FailsafeState::Long_GCS) {
-        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
+        bool doing_takeoff = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) || plane.mission.current_cmd_is_takeoff();
+        bool doing_landing = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) || plane.mission.current_cmd_is_land();
+        if (doing_takeoff || doing_landing) {
             return;
         }
-
         if (in_RC_failsafe_state) {
             failsafe_long_on_event(FailsafeState::Long_Radio, MODE_REASON_RADIO_FAILSAFE);
         } else if (in_GCS_failsafe_state) {
@@ -389,7 +390,9 @@ void Plane::check_short_failsafe()
 
     // only act on changes
     if (failsafe.state == FailsafeState::None) {
-        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) {
+        bool doing_takeoff = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) || plane.mission.current_cmd_is_takeoff();
+        bool doing_landing = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) || plane.mission.current_cmd_is_land();
+        if (doing_takeoff || doing_landing) {
             return;
         }
 
