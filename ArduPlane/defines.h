@@ -21,10 +21,10 @@ enum class FailsafeState : uint8_t {
 
 // GCS failsafe types for FS_GCS_ENABL parameter
 enum gcs_failsafe {
-    GCS_FAILSAFE_OFF        = 0, // no GCS failsafe
-    GCS_FAILSAFE_HEARTBEAT  = 1, // failsafe if we stop receiving heartbeat
-    GCS_FAILSAFE_HB_OR_RSSI = 2, // failsafe if we stop receiving heartbeat OR if RADIO.remrssi drops to 0
-    GCS_FAILSAFE_HB_IN_AUTO = 3  // failsafe if we stop receiving heartbeat AND in AUTO mode
+    GCS_FAILSAFE_OFF               = 0, // no GCS failsafe
+    GCS_FAILSAFE_HEARTBEAT         = 1, // failsafe if we stop receiving heartbeat
+    GCS_FAILSAFE_HB_OR_REMOTE_RSSI = 2, // failsafe if we stop receiving heartbeat OR if RADIO.remrssi drops to 0
+    GCS_FAILSAFE_HB_IN_AUTO        = 3  // failsafe if we stop receiving heartbeat AND in AUTO mode
 };
 
 enum failsafe_action_short {

@@ -331,11 +331,11 @@ void Plane::check_long_failsafe()
                                ((now_ms - failsafe.last_heartbeat_ms) < fs_timeout_long_ms);
 
     // check if GCS can hear us
-    uint32_t const last_remRSSI_ms = (gcs().chan(0) != nullptr)
-                                   ? gcs().chan(0)->last_radio_status_remrssi_ms
-                                   : 0;
-    bool const has_rssi = last_remRSSI_ms == 0 ||
-                          ((now_ms - last_remRSSI_ms) < fs_timeout_long_ms);
+    uint32_t const last_remote_RSSI_ms = (gcs().chan(0) != nullptr)
+                                       ? gcs().chan(0)->last_radio_status_remrssi_ms
+                                       : 0;
+    bool const has_remote_rssi = last_remote_RSSI_ms == 0 ||
+                                 ((now_ms - last_remote_RSSI_ms) < fs_timeout_long_ms);
 
     bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
                                       ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_long_ms);
@@ -346,8 +346,8 @@ void Plane::check_long_failsafe()
             in_GCS_failsafe_state = !has_heartbeat;
             break;
         }
-        case GCS_FAILSAFE_HB_OR_RSSI: {
-            in_GCS_failsafe_state = !has_heartbeat || !has_rssi;
+        case GCS_FAILSAFE_HB_OR_REMOTE_RSSI: {
+            in_GCS_failsafe_state = !has_heartbeat || !has_remote_rssi;
             break;
         }
         case GCS_FAILSAFE_HB_IN_AUTO: {
