@@ -375,7 +375,7 @@ private:
 
         // A tracking variable for type of failsafe active
         // Used for failsafe based on loss of RC signal or GCS signal
-        int16_t state;
+        enum FailsafeState state;
 
         // number of low throttle values
         uint8_t throttle_counter;
@@ -391,6 +391,9 @@ private:
         //keeps track of the last valid rc as it relates to the AFS system
         //Does not count rc inputs as valid if the standard failsafe is on
         uint32_t AFS_last_valid_rc_ms;
+
+        // captures when the rc_failsafe was activated, so timeouts can be calculated
+        uint32_t rc_failsafe_activated_ms;
     } failsafe;
 
     enum Landing_ApproachStage {
@@ -408,7 +411,7 @@ private:
     } vtol_approach_s;
 
     bool any_failsafe_triggered() {
-        return failsafe.state != FAILSAFE_NONE || battery.has_failsafed() || failsafe.adsb;
+        return failsafe.state != FailsafeState::None || battery.has_failsafed() || failsafe.adsb;
     }
 
     // A counter used to count down valid gps fixes to allow the gps estimate to settle
@@ -945,8 +948,8 @@ private:
     void autotune_restore(void);
     void autotune_enable(bool enable);
     bool fly_inverted(void);
-    void failsafe_short_on_event(enum failsafe_state fstype, mode_reason_t reason);
-    void failsafe_long_on_event(enum failsafe_state fstype, mode_reason_t reason);
+    void failsafe_short_on_event(enum FailsafeState fstype, mode_reason_t reason);
+    void failsafe_long_on_event(enum FailsafeState fstype, mode_reason_t reason);
     void failsafe_short_off_event(mode_reason_t reason);
     void failsafe_long_off_event(mode_reason_t reason);
     void handle_battery_failsafe(const char* type_str, const int8_t action);

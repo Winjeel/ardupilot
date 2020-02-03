@@ -323,64 +323,90 @@ bool Plane::set_mode_by_number(const Mode::Number new_mode_number, const mode_re
 
 void Plane::check_long_failsafe()
 {
-    uint32_t tnow = millis();
-    // only act on changes
-    // -------------------
-    if (failsafe.state != FAILSAFE_LONG && failsafe.state != FAILSAFE_GCS && flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND) {
-        uint32_t radio_timeout_ms = failsafe.last_valid_rc_ms;
-        if (failsafe.state == FAILSAFE_SHORT) {
-            // time is relative to when short failsafe enabled
-            radio_timeout_ms = failsafe.short_timer_ms;
+    uint32_t const now_ms = millis();
+    uint32_t const fs_timeout_long_ms = g.fs_timeout_long * 1000;
+
+    // check for heartbeat
+    bool const has_heartbeat = failsafe.last_heartbeat_ms == 0 ||
+                               ((now_ms - failsafe.last_heartbeat_ms) < fs_timeout_long_ms);
+
+    // check if GCS can hear us
+    uint32_t const last_remote_RSSI_ms = (gcs().chan(0) != nullptr)
+                                       ? gcs().chan(0)->last_radio_status_remrssi_ms
+                                       : 0;
+    bool const has_remote_rssi = last_remote_RSSI_ms == 0 ||
+                                 ((now_ms - last_remote_RSSI_ms) < fs_timeout_long_ms);
+
+    bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
+                                      ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_long_ms);
+
+    bool in_GCS_failsafe_state = false;
+    switch (g.gcs_heartbeat_fs_enabled) {
+        case GCS_FAILSAFE_HEARTBEAT: {
+            in_GCS_failsafe_state = !has_heartbeat;
+            break;
         }
-        if (failsafe.rc_failsafe &&
-            (tnow - radio_timeout_ms) > g.fs_timeout_long*1000) {
-            failsafe_long_on_event(FAILSAFE_LONG, MODE_REASON_RADIO_FAILSAFE);
-        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_AUTO && control_mode == &mode_auto &&
-                   failsafe.last_heartbeat_ms != 0 &&
-                   (tnow - failsafe.last_heartbeat_ms) > g.fs_timeout_long*1000) {
-            failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
-        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HEARTBEAT &&
-                   failsafe.last_heartbeat_ms != 0 &&
-                   (tnow - failsafe.last_heartbeat_ms) > g.fs_timeout_long*1000) {
-            failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
-        } else if (g.gcs_heartbeat_fs_enabled == GCS_FAILSAFE_HB_RSSI &&
-                   gcs().chan(0) != nullptr &&
-                   gcs().chan(0)->last_radio_status_remrssi_ms != 0 &&
-                   (tnow - gcs().chan(0)->last_radio_status_remrssi_ms) > g.fs_timeout_long*1000) {
-            failsafe_long_on_event(FAILSAFE_GCS, MODE_REASON_GCS_FAILSAFE);
+        case GCS_FAILSAFE_HB_OR_REMOTE_RSSI: {
+            in_GCS_failsafe_state = !has_heartbeat || !has_remote_rssi;
+            break;
+        }
+        case GCS_FAILSAFE_HB_IN_AUTO: {
+            in_GCS_failsafe_state = (control_mode == &mode_auto) && !has_heartbeat;
+            break;
+        }
+        case GCS_FAILSAFE_OFF:
+        default:
+            in_GCS_failsafe_state = false;
+            break;
+    }
+
+    // only act on changes
+    if (failsafe.state != FailsafeState::Long_Radio && failsafe.state != FailsafeState::Long_GCS) {
+        bool doing_takeoff = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) || plane.mission.current_cmd_is_takeoff();
+        bool doing_landing = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) || plane.mission.current_cmd_is_land();
+        if (doing_takeoff || doing_landing) {
+            return;
+        }
+        if (in_RC_failsafe_state) {
+            failsafe_long_on_event(FailsafeState::Long_Radio, MODE_REASON_RADIO_FAILSAFE);
+        } else if (in_GCS_failsafe_state) {
+            failsafe_long_on_event(FailsafeState::Long_GCS, MODE_REASON_GCS_FAILSAFE);
         }
     } else {
-        uint32_t timeout_seconds = g.fs_timeout_long;
-        if (g.fs_action_short != FS_ACTION_SHORT_DISABLED) {
-            // avoid dropping back into short timeout
-            timeout_seconds = g.fs_timeout_short;
-        }
-        // We do not change state but allow for user to change mode
-        if (failsafe.state == FAILSAFE_GCS &&
-            (tnow - failsafe.last_heartbeat_ms) < timeout_seconds*1000) {
-            failsafe_long_off_event(MODE_REASON_GCS_FAILSAFE);
-        } else if (failsafe.state == FAILSAFE_LONG &&
-                   !failsafe.rc_failsafe) {
-            failsafe_long_off_event(MODE_REASON_RADIO_FAILSAFE);
+        if (failsafe.state == FailsafeState::Long_Radio) {
+            if (!in_RC_failsafe_state) {
+                failsafe_long_off_event(MODE_REASON_RADIO_FAILSAFE);
+            }
+        } else if (failsafe.state == FailsafeState::Long_GCS) {
+            if (!in_GCS_failsafe_state) {
+                failsafe_long_off_event(MODE_REASON_GCS_FAILSAFE);
+            }
         }
     }
 }
 
 void Plane::check_short_failsafe()
 {
-    // only act on changes
-    // -------------------
-    if (g.fs_action_short != FS_ACTION_SHORT_DISABLED &&
-       failsafe.state == FAILSAFE_NONE &&
-       flight_stage != AP_Vehicle::FixedWing::FLIGHT_LAND) {
-        // The condition is checked and the flag rc_failsafe is set in radio.cpp
-        if(failsafe.rc_failsafe) {
-            failsafe_short_on_event(FAILSAFE_SHORT, MODE_REASON_RADIO_FAILSAFE);
-        }
-    }
+    uint32_t const now_ms = millis();
+    uint32_t const fs_timeout_short_ms = g.fs_timeout_short * 1000;
 
-    if(failsafe.state == FAILSAFE_SHORT) {
-        if(!failsafe.rc_failsafe || g.fs_action_short == FS_ACTION_SHORT_DISABLED) {
+    // The rc_failsafe flag is set in radio.cpp
+    bool const in_RC_failsafe_state = failsafe.rc_failsafe &&
+                                      ((now_ms - failsafe.rc_failsafe_activated_ms) > fs_timeout_short_ms);
+
+    // only act on changes
+    if (failsafe.state == FailsafeState::None) {
+        bool doing_takeoff = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF) || plane.mission.current_cmd_is_takeoff();
+        bool doing_landing = (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND) || plane.mission.current_cmd_is_land();
+        if (doing_takeoff || doing_landing) {
+            return;
+        }
+
+        if (in_RC_failsafe_state) {
+            failsafe_short_on_event(FailsafeState::Short, MODE_REASON_RADIO_FAILSAFE);
+        }
+    } else if (failsafe.state == FailsafeState::Short) {
+        if (!in_RC_failsafe_state) {
             failsafe_short_off_event(MODE_REASON_RADIO_FAILSAFE);
         }
     }
@@ -468,7 +494,6 @@ int8_t Plane::throttle_percentage(void)
 // Returns false if the  landing sequence was not updated
 bool Plane::create_into_wind_landing_sequence()
 {
-
     // Basic check that there is a DO_LAND_START followed by a MAV_CMD_LAND waypoint
     uint16_t landing_start_index = plane.mission.get_landing_sequence_start();
     bool landing_start_defined = landing_start_index > 0;

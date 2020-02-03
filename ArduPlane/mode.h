@@ -15,6 +15,7 @@ public:
     // Auto Pilot modes
     // ----------------
     enum Number {
+        // stabilise modes
         MANUAL        = 0,
         CIRCLE        = 1,
         STABILIZE     = 2,
@@ -24,13 +25,19 @@ public:
         FLY_BY_WIRE_B = 6,
         CRUISE        = 7,
         AUTOTUNE      = 8,
+
+        // auto modes
         AUTO          = 10,
         RTL           = 11,
         LOITER        = 12,
         TAKEOFF       = 13,
         AVOID_ADSB    = 14,
         GUIDED        = 15,
+
+        // startup modes
         INITIALISING  = 16,
+
+        // quadplane modes
         QSTABILIZE    = 17,
         QHOVER        = 18,
         QLOITER       = 19,

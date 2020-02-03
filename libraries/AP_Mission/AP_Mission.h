@@ -500,6 +500,12 @@ public:
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
+    // returns true if the current command is a TAKEOFF type
+    bool current_cmd_is_takeoff();
+
+    // returns true if the current command is a LAND type
+    bool current_cmd_is_land();
+
 private:
     static AP_Mission *_singleton;
 

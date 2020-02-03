@@ -2036,3 +2036,15 @@ void AP_Mission::unpackAngleSectorParam(uint16_t const param, uint16_t& sector_y
     tolerance_deg = (param >> NOMINAL_YAW_BITS ) * TOLERANCE_RESOLUTION;
     sector_yaw_deg = param & NOMINAL_YAW_MASK;
 }
+
+bool AP_Mission::current_cmd_is_takeoff() {
+    return  _nav_cmd.id == MAV_CMD_NAV_TAKEOFF ||
+            _nav_cmd.id == MAV_CMD_NAV_TAKEOFF_LOCAL ||
+            _nav_cmd.id == MAV_CMD_NAV_VTOL_TAKEOFF;
+}
+
+bool AP_Mission::current_cmd_is_land() {
+    return  _nav_cmd.id == MAV_CMD_NAV_LAND ||
+            _nav_cmd.id == MAV_CMD_NAV_LAND_LOCAL ||
+            _nav_cmd.id == MAV_CMD_NAV_VTOL_LAND;
+}
