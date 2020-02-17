@@ -367,6 +367,9 @@ public:
     // get timing statistics structure
     void getTimingStatistics(struct ekf_timing &timing);
 
+    // get solution data for the EKF-GSF emergency yaw estimator
+	void getDataEKFGSF(float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;
@@ -1303,4 +1306,47 @@ private:
 
     // vehicle specific initial gyro bias uncertainty
     float InitialGyroBiasUncertainty(void) const;
+
+    // declarations for yaw estimator using a bank of 3-state EKF's whose output is combined using a Gaussian Sum Filter
+    struct EKFGSF_ahrs_struct{
+		Quaternion quat;		// quaternion describing rotation from body to earth frame and calculated using only IMU data.
+		Matrix3f R;				// matrix that rotates a vector from body to earth frame
+		Vector3f gyro_bias;		// gyro bias learned and used by the quaternion calculation
+		bool quat_initialised{false};	// true when calibrator quaternion has been aligned
+		float accel_FR[2] {};	// front-right acceleration vector in a horizontal plane (m/s/s)
+		float vel_NE[2] {};		// NE velocity vector from last GPS measurement (m/s)
+		bool fuse_gps = false;	// true when GPS should be fused on that frame
+		float accel_dt = 0;		// time step used when generating _simple_accel_FR data (sec)
+	};
+	EKFGSF_ahrs_struct EKFGSF_ahrs[N_MODELS_EKFGSF];
+	bool EKFGSF_ahrs_tilt_aligned = false;// true the initial tilt alignment has been calculated
+	float EKFGSF_accel_gain;	    // gain from accel vector tilt error to rate gyro correction used by AHRS calculation
+	Vector3f EKFGSF_ahrs_accel;	    // measured body frame specific force vector used by AHRS calculation (m/s/s)
+	float EKFGSF_ahrs_accel_norm;	// length of body frame specific force vector used by AHRS calculation (m/s/s)
+	bool EKFGSF_ahrs_turn_comp_enabled;	// true when compensation for centripetal acceleration in coordinated turns is being used.
+
+	struct EKFGSF_struct{
+		float X[3];     // Vel North (m/s),  Vel East (m/s), yaw (rad)
+		float P[3][3];  // covariance matrix
+		float W = 0.0f; // weighting
+		float S[2][2];  // innovation variance
+		float innov[2]; // Velocity N,E innovation (m/s)
+		bool use_312;   // true if a 312 Tait-Bryan rotation sequence should be used when converting between the AHRS quaternion and EKF yaw state
+	};
+	EKFGSF_struct EKFGSF_mdl[N_MODELS_EKFGSF];
+	float X_GSF[3] {};
+	bool EKFGSF_vel_fuse_started = false;
+    float EKFGSF_yaw_var;
+	uint64_t EKFGSF_yaw_reset_time_ms{0};	// timestamp of last emergency yaw reset (uSec)
+
+	void EKFGSF_run();
+	void EKFGSF_initialise();
+	void EKFGSF_predictQuat(const uint8_t mdl_idx);
+	void EKFGSF_alignQuatTilt();
+	void EKFGSF_alignQuatYaw();
+	void EKFGSF_predict(const uint8_t mdl_idx);
+	void EKFGSF_correct(const uint8_t mdl_idx);
+	float EKFGSF_gaussianDensity(const uint8_t mdl_idx) const;
+	void EKFGSF_forceSymmetry(const uint8_t mdl_idx);
+    void EKFGSF_resetMainFilterYaw();
 };

@@ -1324,6 +1324,15 @@ uint32_t NavEKF3::getBodyFrameOdomDebug(int8_t instance, Vector3f &velInnov, Vec
     return ret;
 }
 
+// return data for debugging EKF-GSF yaw estimator
+void NavEKF3::getDataEKFGSF(int8_t instance, float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]) const
+{
+    if (instance < 0 || instance >= num_cores) instance = primary;
+    if (core) {
+        core[instance].getDataEKFGSF(yaw_composite, yaw_composite_variance, yaw, innov_VN, innov_VE, weight);
+    }
+}
+
 // return data for debugging range beacon fusion
 bool NavEKF3::getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED,
                                   float &offsetHigh, float &offsetLow, Vector3f &posNED) const
