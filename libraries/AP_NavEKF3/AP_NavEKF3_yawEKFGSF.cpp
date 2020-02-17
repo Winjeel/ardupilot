@@ -655,9 +655,12 @@ void NavEKF3_core::EKFGSF_forceSymmetry(const uint8_t mdl_idx)
 }
 
 // Reset quaternion states using yaw from EKF-GSF
-void NavEKF3_core::EKFGSF_resetMainFilterYaw()
+bool NavEKF3_core::EKFGSF_resetMainFilterYaw()
 {
-    if (EKFGSF_vel_fuse_started && EKFGSF_yaw_var < sq(radians(15.0f)) && (imuSampleTime_ms - EKFGSF_yaw_reset_time_ms) > 5000) {
+    if (EKFGSF_yaw_reset_count < frontend->EKFGSF_n_reset_max &&
+        EKFGSF_vel_fuse_started &&
+        EKFGSF_yaw_var < sq(radians(15.0f)) &&
+        (imuSampleTime_ms - EKFGSF_yaw_reset_time_ms) > 5000) {
 
         // save a copy of the quaternion state for later use in calculating the amount of reset change
         Quaternion quat_before_reset = stateStruct.quat;
@@ -719,8 +722,9 @@ void NavEKF3_core::EKFGSF_resetMainFilterYaw()
         yawResetAngle += deltaYaw;
         lastYawReset_ms = imuSampleTime_ms;
         EKFGSF_yaw_reset_time_ms = imuSampleTime_ms;
+        EKFGSF_yaw_reset_count++;
 
-        gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u emergency yaw reset - magnetometer failed",(unsigned)imu_index);
+        gcs().send_text(MAV_SEVERITY_WARNING, "EKF3 IMU%u emergency yaw reset - mag sensor stopped",(unsigned)imu_index);
 
         // Fail the magnetomer so it doesn't get used and pull the yaw away from the correct value
         allMagSensorsFailed = true;
@@ -729,6 +733,10 @@ void NavEKF3_core::EKFGSF_resetMainFilterYaw()
         ResetVelocity();
         ResetPosition();
 
+        return true;
+
     }
+    
+    return false;
 
 }

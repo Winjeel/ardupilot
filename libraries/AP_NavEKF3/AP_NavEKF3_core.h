@@ -370,6 +370,10 @@ public:
     // get solution data for the EKF-GSF emergency yaw estimator
 	void getDataEKFGSF(float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
 
+    // attempt to reset the yaw to the EKF-GSF value
+    // returns false if unsuccessful
+    bool EKFGSF_resetMainFilterYaw();
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF3 *frontend;
@@ -1334,10 +1338,11 @@ private:
 		bool use_312;   // true if a 312 Tait-Bryan rotation sequence should be used when converting between the AHRS quaternion and EKF yaw state
 	};
 	EKFGSF_struct EKFGSF_mdl[N_MODELS_EKFGSF];
-	float X_GSF[3] {};
-	bool EKFGSF_vel_fuse_started = false;
-    float EKFGSF_yaw_var;
+	float X_GSF[3] {};                      // composite state vector from GSF - North velocity (m/s), South Velocity (m/s), Yaw (rad)
+	bool EKFGSF_vel_fuse_started = false;   // true when the bank of EKF's has started fusing GPS velocity data
+    float EKFGSF_yaw_var;                   // variance of composite yaw estimate from GSF (rad^2)
 	uint64_t EKFGSF_yaw_reset_time_ms{0};	// timestamp of last emergency yaw reset (uSec)
+    uint8_t EKFGSF_yaw_reset_count{0};      // number of emergency yaw resets performed
 
 	void EKFGSF_run();
 	void EKFGSF_initialise();
@@ -1348,5 +1353,4 @@ private:
 	void EKFGSF_correct(const uint8_t mdl_idx);
 	float EKFGSF_gaussianDensity(const uint8_t mdl_idx) const;
 	void EKFGSF_forceSymmetry(const uint8_t mdl_idx);
-    void EKFGSF_resetMainFilterYaw();
 };
