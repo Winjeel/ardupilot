@@ -21,8 +21,7 @@
 
 #include <AP_HAL/AP_HAL.h>
 
-#include "AP_NavEKF3.h"
-#include "EKFGSF_yaw.h"
+#include "AP_NavEKF/EKFGSF_yaw.h"
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
