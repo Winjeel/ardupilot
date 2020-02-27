@@ -27,16 +27,31 @@
 #include <AP_Vehicle/AP_Vehicle.h>
 #include <GCS_MAVLink/GCS.h>
 
-void EKFGSF_yaw::update(Vector3f &delta_angle, // IMU delta angle rotation vector meassured in body frame (rad)
-                    Vector3f &delta_velocity, // IMU delta velocity vector meassured in body frame (m/s)
-                    float angle_dt,         // time interval that delAng was integrated over (sec)
-                    float velocity_dt,      // time interval that delVel was integrated over (sec)
-                    bool is_flying,         // set to true when flying 
-                    Vector2f &vel_NE,       // NE velocity measurement (m/s)
-                    float vel_accuracy,     // 1-sigma accuracy of velocity measurement (m/s)
-                    bool vel_data_updated,  // true when velocity data has been updated
-                    float true_airspeed)    // true airspeed used for centripetal accel compensation - set to 0 when not required.
+EKFGSF_yaw::EKFGSF_yaw()
 {
+	// this flag must be false when we start
+	ahrs_tilt_aligned = false;
+
+	// these objects are initialised in initialise() before being used internally, but can be reported for logging before then 
+	memset(&GSF, 0, sizeof(GSF));
+	memset(&EKF, 0, sizeof(EKF));
+};
+
+void EKFGSF_yaw::update(const Vector3f delAng,
+                        const Vector3f delVel,
+                        const float delAngDT,
+                        const float delVelDT,
+                        bool runEKF,
+                     	float TAS)
+{
+
+	// copy to class variables
+	delta_angle = delAng;
+	delta_velocity = delVel;
+	angle_dt = delAngDT;
+	velocity_dt = delVelDT;
+	run_ekf_gsf = runEKF;
+	true_airspeed = TAS;
 
 	// Iniitialise states and only when acceleration is close to 1g to rpevent vehicle movement casuing a large initial tilt error
 	ahrs_accel = delta_velocity / fmaxf(velocity_dt, 0.001f);
@@ -88,7 +103,7 @@ void EKFGSF_yaw::update(Vector3f &delta_angle, // IMU delta angle rotation vecto
 	}
 
 	// The 3-state EKF models only run when flying to avoid corrupted estimates due to operator handling and GPS interference
-	if (vel_data_updated && is_flying) {
+	if (vel_data_updated && run_ekf_gsf) {
 		if (!vel_fuse_running) {
 			// Perform in-flight alignment
 			for (uint8_t mdl_idx = 0; mdl_idx < N_MODELS_EKFGSF; mdl_idx ++) {
@@ -120,7 +135,7 @@ void EKFGSF_yaw::update(Vector3f &delta_angle, // IMU delta angle rotation vecto
 				}
 			}
 		}
-	} else if (vel_fuse_running && !is_flying) {
+	} else if (vel_fuse_running && !run_ekf_gsf) {
 		// We have landed so reset EKF-GSF states and wait to fly again
 		// Do not reset the AHRS as it continues to run when on ground
 		initialise();
@@ -163,6 +178,15 @@ void EKFGSF_yaw::update(Vector3f &delta_angle, // IMU delta angle rotation vecto
 		GSF.yaw_variance +=  GSF.weights[mdl_idx] * (EKF[mdl_idx].P[2][2] + sq(yawDelta));
 	}
 
+	// prevent the same velocity data being used again
+	vel_data_updated = false;
+}
+
+void EKFGSF_yaw::pushVelData(Vector2f vel, float velAcc)
+{
+	vel_NE = vel;
+	vel_accuracy = velAcc;
+	vel_data_updated = true;
 }
 
 void EKFGSF_yaw::predictAHRS(const uint8_t mdl_idx)
@@ -240,7 +264,7 @@ void EKFGSF_yaw::alignTilt()
 	// 2) The vehicle is not accelerating so all of the measured acceleration is due to gravity.
 
 	// Calculate earth frame Down axis unit vector rotated into body frame
-	Vector3f down_in_bf = -delVel;
+	Vector3f down_in_bf = -delta_velocity;
 	down_in_bf.normalize();
 
 	// Calculate earth frame North axis unit vector rotated into body frame, orthogonal to 'down_in_bf'
@@ -318,7 +342,7 @@ void EKFGSF_yaw::predict(const uint8_t mdl_idx)
 	}
 
 	// calculate delta velocity in a horizontal front-right frame
-	const Vector3f del_vel_NED = AHRS[mdl_idx].R * imuDataDelayed.delVel;
+	const Vector3f del_vel_NED = AHRS[mdl_idx].R * delta_velocity;
 	const float dvx =   del_vel_NED[0] * cosf(EKF[mdl_idx].X[2]) + del_vel_NED[1] * sinf(EKF[mdl_idx].X[2]);
 	const float dvy = - del_vel_NED[0] * sinf(EKF[mdl_idx].X[2]) + del_vel_NED[1] * cosf(EKF[mdl_idx].X[2]);
 
@@ -341,9 +365,9 @@ void EKFGSF_yaw::predict(const uint8_t mdl_idx)
 	const float P22 = EKF[mdl_idx].P[2][2];
 
 	// Use fixed values for delta velocity and delta angle process noise variances
-	const float dvxVar = sq(frontend->EKFGSF_accelNoise * imuDataDelayed.delVelDT); // variance of forward delta velocity - (m/s)^2
+	const float dvxVar = sq(EKFGSF_accelNoise * velocity_dt); // variance of forward delta velocity - (m/s)^2
 	const float dvyVar = dvxVar; // variance of right delta velocity - (m/s)^2
-	const float dazVar = sq(frontend->EKFGSF_gyroNoise * imuDataDelayed.delAngDT); // variance of yaw delta angle - rad^2
+	const float dazVar = sq(EKFGSF_gyroNoise * angle_dt); // variance of yaw delta angle - rad^2
 
 	const float t2 = sinf(EKF[mdl_idx].X[2]);
 	const float t3 = cosf(EKF[mdl_idx].X[2]);
@@ -380,11 +404,11 @@ void EKFGSF_yaw::predict(const uint8_t mdl_idx)
 void EKFGSF_yaw::correct(const uint8_t mdl_idx)
 {
 	// set observation variance from accuracy estimate supplied by GPS and apply a sanity check minimum
-	const float velObsVar = sq(fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise));
+	const float velObsVar = sq(fmaxf(vel_accuracy, 0.5f));
 
 	// calculate velocity observation innovations
-	EKF[mdl_idx].innov[0] = EKF[mdl_idx].X[0] - gpsDataDelayed.vel[0];
-	EKF[mdl_idx].innov[1] = EKF[mdl_idx].X[1] - gpsDataDelayed.vel[1];
+	EKF[mdl_idx].innov[0] = EKF[mdl_idx].X[0] - vel_NE[0];
+	EKF[mdl_idx].innov[1] = EKF[mdl_idx].X[1] - vel_NE[1];
 
 	// copy covariance matrix to temporary variables
 	const float P00 = EKF[mdl_idx].P[0][0];
@@ -532,7 +556,7 @@ void EKFGSF_yaw::initialise()
 	memset(&GSF, 0, sizeof(GSF));
 	vel_fuse_running = false;
     vel_data_updated = false;
-    is_flying = false;
+    run_ekf_gsf = false;
 
 	memset(&EKF, 0, sizeof(EKF));
 	const float yaw_increment = M_2PI / (float)N_MODELS_EKFGSF;
@@ -543,17 +567,11 @@ void EKFGSF_yaw::initialise()
 		// All filter models start with the same weight
 		GSF.weights[mdl_idx] = 1.0f / (float)N_MODELS_EKFGSF;
 
-		if (frontend->_fusionModeGPS <= 1) {
-			// Take state and variance estimates direct from GPS
-			EKF[mdl_idx].X[0] = gpsDataDelayed.vel[0];
-			EKF[mdl_idx].X[1] = gpsDataDelayed.vel[1];
-			EKF[mdl_idx].P[0][0] = sq(fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise));
-			EKF[mdl_idx].P[1][1] = EKF[mdl_idx].P[0][0];
-		} else {
-			// No velocity data so assume initial alignment conditions
-			EKF[mdl_idx].P[0][0] = sq(0.5f);
-			EKF[mdl_idx].P[1][1] = sq(0.5f);
-		}
+		// Take state and variance estimates direct from velocity sensor
+		EKF[mdl_idx].X[0] = vel_NE[0];
+		EKF[mdl_idx].X[1] = vel_NE[1];
+		EKF[mdl_idx].P[0][0] = sq(fmaxf(vel_accuracy, 0.5f));
+		EKF[mdl_idx].P[1][1] = EKF[mdl_idx].P[0][0];
 
 		// Use half yaw interval for yaw uncertainty as that is the maximum that the best model can be away from truth
         GSF.yaw_variance = sq(0.5f * yaw_increment);
@@ -607,18 +625,18 @@ void EKFGSF_yaw::getLogData(float *yaw_composite, float *yaw_composite_variance,
 	}
 }
 
-void EKFGSF_yaw::EKFGSF_forceSymmetry(const uint8_t mdl_idx)
+void EKFGSF_yaw::forceSymmetry(const uint8_t mdl_idx)
 {
-	float P01 = 0.5f * (EKFGSF_mdl[mdl_idx].P[0][1] + EKFGSF_mdl[mdl_idx].P[1][0]);
-	float P02 = 0.5f * (EKFGSF_mdl[mdl_idx].P[0][2] + EKFGSF_mdl[mdl_idx].P[2][0]);
-	float P12 = 0.5f * (EKFGSF_mdl[mdl_idx].P[1][2] + EKFGSF_mdl[mdl_idx].P[2][1]);
-	EKFGSF_mdl[mdl_idx].P[0][1] = EKFGSF_mdl[mdl_idx].P[1][0] = P01;
-	EKFGSF_mdl[mdl_idx].P[0][2] = EKFGSF_mdl[mdl_idx].P[2][0] = P02;
-	EKFGSF_mdl[mdl_idx].P[1][2] = EKFGSF_mdl[mdl_idx].P[2][1] = P12;
+	float P01 = 0.5f * (EKF[mdl_idx].P[0][1] + EKF[mdl_idx].P[1][0]);
+	float P02 = 0.5f * (EKF[mdl_idx].P[0][2] + EKF[mdl_idx].P[2][0]);
+	float P12 = 0.5f * (EKF[mdl_idx].P[1][2] + EKF[mdl_idx].P[2][1]);
+	EKF[mdl_idx].P[0][1] = EKF[mdl_idx].P[1][0] = P01;
+	EKF[mdl_idx].P[0][2] = EKF[mdl_idx].P[2][0] = P02;
+	EKF[mdl_idx].P[1][2] = EKF[mdl_idx].P[2][1] = P12;
 }
 
 // Apply a body frame delta angle to the body to earth frame rotation matrix using a small angle approximation
-Matrix3f EKFGSF_yaw::EKFGSF_updateRotMat(const Matrix3f &R, const Vector3f &g)
+Matrix3f EKFGSF_yaw::updateRotMat(const Matrix3f &R, const Vector3f &g)
 {
 	Matrix3f ret = R;
 	ret[0][0] += R[0][1] * g[2] - R[0][2] * g[1];

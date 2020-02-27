@@ -8,26 +8,22 @@
 #define GYRO_BIAS_LIMIT 0.5f
 #define N_MODELS_EKFGSF 8
 
-class AP_AHRS;
-
 class EKFGSF_yaw
 {
 public:
     // Constructor
     EKFGSF_yaw();
 
-    bool setup();
-    
     // Update Filter States - this should be called whenever new IMU data is available
-    void update(Vector3f &delAng,               // IMU delta angle rotation vector meassured in body frame (rad)
-                        Vector3f &delVel,       // IMU delta velocity vector meassured in body frame (m/s)
-                        float delAngDT,         // time interval that delAng was integrated over (sec)
-                        float delVelDT,         // time interval that delVel was integrated over (sec)
-                        bool is_flying,         // set to true when flying 
-                        Vector2f &vel_NE,       // NE velocity measurement (m/s)
-                        float vel_accuracy,     // 1-sigma accuracy of velocity measurement (m/s)
-                        bool vel_data_updated,  // true when velocity data has been updated
-                        float true_airspeed);   // true airspeed used for centripetal accel compensation - set to 0 when not required.
+    void update(const Vector3f delAng,// IMU delta angle rotation vector meassured in body frame (rad)
+                const Vector3f delVel,// IMU delta velocity vector meassured in body frame (m/s)
+                const float delAngDT, // time interval that delAng was integrated over (sec)
+                const float delVelDT, // time interval that delVel was integrated over (sec)
+                bool runEKF,          // set to true when flying or movement suitable for yaw estimation
+                float TAS);           // true airspeed used for centripetal accel compensation - set to 0 when not required.
+
+    void pushVelData(Vector2f vel,    // NE velocity measurement (m/s)
+                     float velAcc);   // 1-sigma accuracy of velocity measurement (m/s)
 
     // get solution data for logging
 	void getLogData(float *yaw_composite, float *yaw_composite_variance, float yaw[N_MODELS_EKFGSF], float innov_VN[N_MODELS_EKFGSF], float innov_VE[N_MODELS_EKFGSF], float weight[N_MODELS_EKFGSF]);
@@ -75,7 +71,7 @@ private:
 		float accel_dt = 0;		// time step used when generating _simple_accel_FR data (sec)
 	};
 	ahrs_struct AHRS[N_MODELS_EKFGSF];
-	bool ahrs_tilt_aligned = false; // true the initial tilt alignment has been calculated
+	bool ahrs_tilt_aligned;         // true the initial tilt alignment has been calculated
 	float accel_gain;	            // gain from accel vector tilt error to rate gyro correction used by AHRS calculation
 	Vector3f ahrs_accel;	        // measured body frame specific force vector used by AHRS calculation (m/s/s)
 	float ahrs_accel_norm;	        // length of body frame specific force vector used by AHRS calculation (m/s/s)
@@ -105,9 +101,9 @@ private:
 	EKF_struct EKF[N_MODELS_EKFGSF];
     bool vel_fuse_running;  // true when the bank of EKF's has started fusing GPS velocity data
     bool vel_data_updated;  // true when velocity data has been updated
-    bool is_flying;         // true when flying or mission movement started
+    bool run_ekf_gsf;       // true when operating condition is suitable for to run the GSF and EKF models and fuse velocity data
     Vector2f vel_NE;        // NE velocity observations (m/s)
-    float vel_variance;     // variance of velocity observations (m/s)^2
+    float vel_accuracy;     // 1-sigmaaccuracy of velocity observations (m/s)
 
     // Initialises the EKF's and GSF states, but not the AHRS complementary filters
 	void initialise();
