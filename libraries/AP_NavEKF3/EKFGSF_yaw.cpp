@@ -664,3 +664,13 @@ Matrix3f EKFGSF_yaw::updateRotMat(const Matrix3f &R, const Vector3f &g)
 
 	return ret;
 }
+
+bool EKFGSF_yaw::getYawData(float *yaw, float *yawVariance)
+{
+	if (!vel_fuse_running) {
+		return false;
+	}
+	memcpy(yaw, &GSF.state[2], sizeof(GSF.state[2]));
+	memcpy(yawVariance, &GSF.yaw_variance, sizeof(GSF.yaw_variance));
+	return true;
+}

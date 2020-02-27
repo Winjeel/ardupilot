@@ -390,6 +390,11 @@ void NavEKF3_core::InitialiseVariables()
     hal.util->snprintf(prearm_fail_string, sizeof(prearm_fail_string), "EKF3 still initialising");
 
     InitialiseVariablesMag();
+
+    // emergency reset of yaw to EKFGSF estimate
+    EKFGSF_yaw_reset_time_ms = 0;
+    EKFGSF_yaw_reset_count = 0;
+    EKFGSF_run_filterbank = false;
 }
 
 
@@ -630,7 +635,6 @@ void NavEKF3_core::UpdateFilter(bool predict)
         updateFilterStatus();
 
         // Generate an alternative yaw estimate used for inflight recovery from bad compass data
-        bool useVelData = (filterStatus.flags.horiz_pos_abs && inFlight);
         float trueAirspeed;
         if (frontend->_EKFGSF_easDefault > FLT_EPSILON && assume_zero_sideslip()) {
             if (imuDataDelayed.time_ms < (tasDataDelayed.time_ms + 5000)) {
@@ -641,7 +645,7 @@ void NavEKF3_core::UpdateFilter(bool predict)
         } else {
             trueAirspeed = 0.0f;
         }
-        yawEstimator.update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, useVelData, trueAirspeed);
+        yawEstimator.update(imuDataDelayed.delAng, imuDataDelayed.delVel, imuDataDelayed.delAngDT, imuDataDelayed.delVelDT, EKFGSF_run_filterbank, trueAirspeed);
         if (gpsDataToFuse) {
             Vector2f gpsVelNE = Vector2f(gpsDataDelayed.vel.x, gpsDataDelayed.vel.y);
             float gpsVelAcc = fmaxf(gpsSpdAccuracy, frontend->_gpsHorizVelNoise);
