@@ -236,7 +236,7 @@ bool AP_RAMTRON::read(uint32_t offset, uint8_t * const buf, uint32_t size)
 }
 
 // write to device
-bool AP_RAMTRON::write(uint32_t offset, uint8_t const * const buf, uint32_t size)
+bool AP_RAMTRON::_write(uint32_t offset, uint8_t const * const buf, uint32_t size)
 {
     // Don't allow writes outside of the FRAM memory.
     // NOTE: The FRAM devices will wrap back to address 0x0000 if they write past
@@ -269,4 +269,45 @@ bool AP_RAMTRON::write(uint32_t offset, uint8_t const * const buf, uint32_t size
     ok &= dev->set_chip_select(false);
 
     return ok;
+}
+
+bool AP_RAMTRON::write(uint32_t offset, uint8_t const * const buf, uint32_t size)
+{
+   for (uint8_t r = 0; r < RAMTRON_RETRIES; r++) {
+        if (r != 0) {
+            hal.scheduler->delay(RAMTRON_DELAY_MS);
+        }
+
+        bool ok = _write(offset, buf, size);
+        if (!ok) {
+            continue;
+        }
+        uint32_t crc1 = crc_crc32(0, buf, size);
+
+        uint8_t read_buf[16];
+        uint32_t crc2 = 0;
+        uint32_t remaining = size;
+        uint32_t read_offset = offset;
+
+        while (remaining) {
+            uint32_t read_sz = MIN(sizeof(read_buf), remaining);
+            ok = _read(read_offset, read_buf, read_sz);
+            if (!ok) {
+                break;
+            }
+            read_offset += read_sz;
+            remaining -= read_sz;
+            crc2 = crc_crc32(crc2, read_buf, read_sz);
+        }
+        if (!ok) {
+            continue;
+        }
+
+        if (crc1 == crc2) {
+            // all good
+            return true;
+        }
+    }
+
+    return false;
 }

@@ -20,6 +20,7 @@ public:
     bool read(uint32_t offset, uint8_t * const buf, uint32_t size);
 
     // write to device
+    // this will retry RAMTRON_RETRIES times until data read back matches the data written
     bool write(uint32_t offset, uint8_t const * const buf, uint32_t size);
 
 private:
@@ -44,5 +45,8 @@ private:
     bool _init(void);
     // perform a single device read
     bool _read(uint32_t offset, uint8_t * const buf, uint32_t size);
+    // perform a single device write
+    bool _write(uint32_t offset, uint8_t const * const buf, uint32_t size);
+
     bool _fill_cmd_buffer(uint8_t cmdBuffer[], uint32_t const kCmdBufferSz, uint8_t const cmd, uint32_t addr);
 };
