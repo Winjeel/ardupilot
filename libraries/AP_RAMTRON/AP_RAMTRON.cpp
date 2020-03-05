@@ -21,6 +21,10 @@ static const uint8_t RAMTRON_WRITE = 0x02;
 static const uint8_t RAMTRON_RETRIES = 10;
 static const uint8_t RAMTRON_DELAY_MS = 10;
 
+#ifndef RAMTRON_TEST
+#define RAMTRON_TEST (0)
+#endif
+
 /*
   list of supported devices. Thanks to NuttX ramtron driver
  */
@@ -144,11 +148,38 @@ bool AP_RAMTRON::init()
         }
 
         if (_init()) {
+            _destructive_test(0, 8);
             return true;
         }
     }
 
     return false;
+}
+
+void AP_RAMTRON::_destructive_test(uint32_t offset, uint32_t count) {
+#if RAMTRON_TEST
+    uint8_t const wb[8] = "RAMTRON";
+    uint8_t rb[sizeof(wb)];
+
+    // delay to give the console time to come up
+    hal.scheduler->delay(2000);
+
+    hal.console->print("RAMTRON test:\n");
+    for (uint32_t i = 0; i < count; i++) {
+        uint32_t const addr = offset + (i * sizeof(wb));
+        bool r = _write(addr, wb, sizeof(wb));
+        bool w = _read(addr, rb, sizeof(rb));
+        if (memcmp(wb, rb, sizeof(wb)) != 0) {
+            hal.console->printf("    [FAIL] @ addr 0x%08lx\n", addr);
+            hal.console->printf("        w=%u  [%02x %02x %02x %02x %02x %02x %02x %02x]\n", w, wb[0], wb[1], wb[2], wb[3], wb[4], wb[5], wb[6], wb[7]);
+            hal.console->printf("        r=%u  [%02x %02x %02x %02x %02x %02x %02x %02x]\n", r, rb[0], rb[1], rb[2], rb[3], rb[4], rb[5], rb[6], rb[7]);
+        } else {
+            hal.console->printf("    [PASS] @ addr 0x%08lx\n", addr);
+        }
+    }
+
+    hal.scheduler->delay(3000);
+#endif // RAMTRON_TEST
 }
 
 bool AP_RAMTRON::_fill_cmd_buffer(uint8_t cmdBuffer[], uint32_t const kCmdBufferSz, uint8_t const cmd, uint32_t addr)

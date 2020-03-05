@@ -49,4 +49,9 @@ private:
     bool _write(uint32_t offset, uint8_t const * const buf, uint32_t size);
 
     bool _fill_cmd_buffer(uint8_t cmdBuffer[], uint32_t const kCmdBufferSz, uint8_t const cmd, uint32_t addr);
+
+    // Test the FRAM by writing and reading back 8 byte chunks of data.
+    // Enabled by setting the RAMTRON_TEST #define
+    // WARNING: this will overwrite the existing FRAM contents! You WILL lose your data!
+    void _destructive_test(uint32_t offset, uint32_t count);
 };
