@@ -1294,3 +1294,41 @@ void NavEKF3_core::recordMagReset()
     yawInnovAtLastMagReset = innovYaw;
 }
 
+// Increase the variance of the quaternions about the yaw axis
+// Argument is additional yaw variance in rad**2
+void NavEKF3_core::increaseYawVariance(float yawVariance)
+{
+	// Intermediate variables
+	float SG[3];
+	SG[0] = sq(stateStruct.quat[0]) - sq(stateStruct.quat[1]) - sq(stateStruct.quat[2]) + sq(stateStruct.quat[3]);
+	SG[1] = 2*stateStruct.quat[0]*stateStruct.quat[2] - 2*stateStruct.quat[1]*stateStruct.quat[3];
+	SG[2] = 2*stateStruct.quat[0]*stateStruct.quat[1] + 2*stateStruct.quat[2]*stateStruct.quat[3];
+
+	float SQ[4];
+	SQ[0] = 0.5f * ((stateStruct.quat[1]*SG[0]) - (stateStruct.quat[0]*SG[2]) + (stateStruct.quat[3]*SG[1]));
+	SQ[1] = 0.5f * ((stateStruct.quat[0]*SG[1]) - (stateStruct.quat[2]*SG[0]) + (stateStruct.quat[3]*SG[2]));
+	SQ[2] = 0.5f * ((stateStruct.quat[3]*SG[0]) - (stateStruct.quat[1]*SG[1]) + (stateStruct.quat[2]*SG[2]));
+	SQ[3] = 0.5f * ((stateStruct.quat[0]*SG[0]) + (stateStruct.quat[1]*SG[2]) + (stateStruct.quat[2]*SG[1]));
+
+	// Limit yaw variance increase to prevent a badly conditioned covariance matrix
+	yawVariance = MIN(yawVariance, 1.0e-2f);
+
+	// Add covariances for additonal yaw uncertainty to existing covariances.
+	// This assumes that the additional yaw error is uncorrrelated to existing errors
+	P[0][0] += yawVariance*sq(SQ[2]);
+	P[0][1] += yawVariance*SQ[1]*SQ[2];
+	P[1][1] += yawVariance*sq(SQ[1]);
+	P[0][2] += yawVariance*SQ[0]*SQ[2];
+	P[1][2] += yawVariance*SQ[0]*SQ[1];
+	P[2][2] += yawVariance*sq(SQ[0]);
+	P[0][3] -= yawVariance*SQ[2]*SQ[3];
+	P[1][3] -= yawVariance*SQ[1]*SQ[3];
+	P[2][3] -= yawVariance*SQ[0]*SQ[3];
+	P[3][3] += yawVariance*sq(SQ[3]);
+	P[1][0] += yawVariance*SQ[1]*SQ[2];
+	P[2][0] += yawVariance*SQ[0]*SQ[2];
+	P[2][1] += yawVariance*SQ[0]*SQ[1];
+	P[3][0] -= yawVariance*SQ[2]*SQ[3];
+	P[3][1] -= yawVariance*SQ[1]*SQ[3];
+	P[3][2] -= yawVariance*SQ[0]*SQ[3];
+}

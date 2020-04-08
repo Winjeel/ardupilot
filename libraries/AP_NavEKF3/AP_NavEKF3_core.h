@@ -1306,4 +1306,11 @@ private:
 
     // vehicle specific initial gyro bias uncertainty
     float InitialGyroBiasUncertainty(void) const;
+
+    /*
+      Increase the variance of the quaternions about the yaw axis
+      Argument is additional yaw variance in rad**2
+    */
+    void increaseYawVariance(float yawVariance);
+
 };
