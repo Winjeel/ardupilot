@@ -161,6 +161,11 @@ void Plane::init_ardupilot()
     g2.gripper.init();
 #endif
 
+    // init fence
+#if AC_FENCE == ENABLED
+    fence.init();
+#endif
+
     // disable safety if requested
     BoardConfig.init_safety();
 }

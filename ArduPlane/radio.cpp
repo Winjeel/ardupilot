@@ -211,7 +211,14 @@ void Plane::read_radio()
 
     control_failsafe();
 
-    if (g.throttle_nudge && channel_throttle->get_control_in() > 50 && geofence_stickmixing()) {
+    if (g.throttle_nudge && channel_throttle->get_control_in() > 50 
+        #if GEOFENCE_ENABLED == ENABLED
+        && geofence_stickmixing()
+        #endif
+        #if AC_FENCE == ENABLED
+        && fence_stickmixing()
+        #endif        
+        ) {
         float nudge = (channel_throttle->get_control_in() - 50) * 0.02f;
         if (ahrs.airspeed_sensor_enabled()) {
             airspeed_nudge_cm = (aparm.airspeed_max * 100 - aparm.airspeed_cruise_cm) * nudge;

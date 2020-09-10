@@ -98,6 +98,10 @@
 #include "afs_plane.h"
 #endif
 
+#if AC_FENCE == ENABLED
+#include <AC_Fence/AC_Fence.h>
+#endif
+
 // Local modules
 #include "defines.h"
 #include "mode.h"
@@ -249,6 +253,10 @@ private:
 
     // Rally Ponints
     AP_Rally rally;
+
+#if AC_FENCE == ENABLED
+    AC_Fence fence;
+#endif
 
 #if OSD_ENABLED == ENABLED
     AP_OSD osd;
@@ -922,6 +930,13 @@ private:
     void failsafe_long_off_event(ModeReason reason);
     void handle_battery_failsafe(const char* type_str, const int8_t action);
 
+#if AC_FENCE == ENABLED
+    // fence.cpp
+    void fence_check();
+    bool fence_stickmixing() const;
+#endif
+
+#if GEOFENCE_ENABLED == ENABLED
     // geofence.cpp
     uint8_t max_fencepoints(void) const;
     Vector2l get_fence_point_with_index(uint8_t i) const;
@@ -940,6 +955,7 @@ private:
     void geofence_send_status(mavlink_channel_t chan);
     bool geofence_breached(void);
     void geofence_disable_and_send_error_msg(const char *errorMsg);
+#endif
 
     // ArduPlane.cpp
     void disarm_if_autoland_complete();
@@ -958,6 +974,7 @@ private:
     void afs_fs_check(void);
 #endif
     void one_second_loop(void);
+    void three_hz_loop(void);
     void airspeed_ratio_update(void);
     void compass_save(void);
     void update_logging1(void);
