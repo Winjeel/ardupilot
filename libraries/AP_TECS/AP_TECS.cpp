@@ -276,6 +276,22 @@ const AP_Param::GroupInfo AP_TECS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("HDEM_TCONST", 31, AP_TECS, _hgt_dem_tconst, 2.0f),
 
+    // @Param: ACCEL_GF
+    // @DisplayName: Vertical acceleration gain factor.
+    // @Description: Factor applied to the calculation of vertical acceleration demand
+    // @Range: 1.0 10.0
+    // @User: Advanced
+    AP_GROUPINFO("ACCEL_GF", 32, AP_TECS, _accel_gf, 5.0),
+
+    // @Param: FLARE_TAU
+    // @DisplayName: Flare control time constant
+    // @Description: This sets the time constant of the flare control loop that calculates the vertical acceleration required to follow the flare vertical position and velocity reference trajectory.
+    // @Range: 1.0 3.0
+    // @Units: s
+    // @Increment: 0.2
+    // @User: Advanced
+    AP_GROUPINFO("FLARE_TAU", 33, AP_TECS, _flare_tconst, 2.0f),
+
     AP_GROUPEND
 };
 
@@ -538,6 +554,7 @@ void AP_TECS::_update_height_demand(void)
             _flare_hgt_dem_ideal = _hgt_afe; 
             _hgt_at_start_of_flare = _hgt_afe;
             _hgt_rate_at_flare_entry = _climb_rate;
+            _hgt_rate_dem = _climb_rate;
 
             // adjust flare height controller integrator so that at flare entry the pitch
             const float K_P = 1.0f / _landTimeConst;
@@ -549,13 +566,17 @@ void AP_TECS::_update_height_demand(void)
         float land_sink_rate_adj = _land_sink + _land_sink_rate_change*_distance_beyond_land_wp;
 
         // bring it in linearly with height
-        float p;
+        float p, p_dot;
         if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
             p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / (_hgt_at_start_of_flare - _flare_holdoff_hgt), 0.0f, 1.0f);
+            p_dot = _hgt_rate_dem / (_flare_holdoff_hgt - _hgt_at_start_of_flare);
         } else {
             p = 1.0f;
+            p_dot = 0.0f;
         }
         _hgt_rate_dem = _hgt_rate_at_flare_entry * (1.0f - p) - land_sink_rate_adj * p;
+
+        _hgt_accel_dem = (land_sink_rate_adj - _hgt_rate_at_flare_entry) * p_dot;
 
         _flare_counter++;
 
@@ -921,7 +942,14 @@ void AP_TECS::_update_pitch(void)
     _pitch_dem_unc = (SEBdot_dem_total + _integSEB_state + integSEB_delta) / gainInv;
 
     // integrate SEB rate error and apply integrator state limits
-    const bool inhibit_integrator = (_pitch_dem_unc > _PITCHmaxf && integSEB_delta > 0.0f) || (_pitch_dem_unc < _PITCHminf && integSEB_delta < 0.0f);
+    bool inhibit_integrator;
+    if (AP_HAL::millis() - _vert_accel_clip_time_ms < 200) {
+        inhibit_integrator = ((_vert_accel_clip == vert_accel_clip::UP   && integSEB_delta > 0.0f) ||
+                              (_vert_accel_clip == vert_accel_clip::DOWN && integSEB_delta < 0.0f));
+    } else {
+        inhibit_integrator = ((_pitch_dem_unc > _PITCHmaxf && integSEB_delta > 0.0f) ||
+                              (_pitch_dem_unc < _PITCHminf && integSEB_delta < 0.0f));
+    }
     if (!inhibit_integrator) {
         _integSEB_state += integSEB_delta;
     } else if (is_positive(integSEB_delta * _hgt_rate_err_integ)) {
@@ -950,6 +978,20 @@ void AP_TECS::_update_pitch(void)
                     (double)integSEB_min,               // S7
                     (double)integSEB_max,               // S8
                     (double)_integSEB_state);           // S9
+
+    if (_landing.is_flaring()) {
+        // Special case to demand a vertical acceleration demand to track flare height reference trajectory
+        const float gain = 1.0f / MAX(_flare_tconst, 0.1f);
+        const float hdot_dem = (_hgt_dem - _hgt_afe) * 0.5f * gain;
+        _vert_accel_dem = _hgt_accel_dem + (hdot_dem - _climb_rate) * 2.0f * gain;
+        _vert_accel_dem = constrain_float(_vert_accel_dem , -_vertAccLim, _vertAccLim);
+    } else {
+        // calculate a demanded vertical velocity
+        const float vel_dem = constrain_float((SEBdot_dem_total + _integSEB_state) / (timeConstant() * GRAVITY_MSS), -_maxSinkRate, _maxClimbRate);
+
+        // calculate a demanded vertical acceleration
+        _vert_accel_dem = constrain_float((vel_dem - _climb_rate) * (_accel_gf / timeConstant()) , -_vertAccLim, _vertAccLim);
+    }
 
     // Constrain pitch demand
     _pitch_dem = constrain_float(_pitch_dem_unc, _PITCHminf, _PITCHmaxf);
@@ -993,12 +1035,13 @@ void AP_TECS::_initialise_states(int32_t ptchMinCO_cd, float hgt_afe)
         _flags.reached_speed_takeoff = false;
         _need_reset                  = false;
 
-        // misc variables used for alternative precision landing pitch control
+        // misc variables used for alternative precision height control
         _hgt_rate_err_integ       = 0.0f;
         _hgt_at_start_of_flare    = 0.0f;
         _hgt_rate_at_flare_entry  = 0.0f;
         _hgt_afe                  = 0.0f;
         _pitch_min_at_flare_entry = 0.0f;
+        _vert_accel_clip_time_ms = 0;
     }
     else if (_flight_stage == AP_Vehicle::FixedWing::FLIGHT_TAKEOFF || _flight_stage == AP_Vehicle::FixedWing::FLIGHT_ABORT_LAND)
     {

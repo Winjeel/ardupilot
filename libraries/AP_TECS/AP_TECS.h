@@ -68,6 +68,25 @@ public:
         return int32_t(_pitch_dem * 5729.5781f);
     }
 
+    // get upper pitch angle limit in rad/s
+    float get_pitch_max(void) override {
+        return _PITCHmaxf;
+    }
+
+    // get lower pitch angle limit in rad/s
+    float get_pitch_min(void) override {
+        return _PITCHminf;
+    }
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    // set input argument clipping as:
+	// UP when acceleraton is clipping in the up direction, DOWN when clipping in the down direction, NONE when not clipping
+    float get_vert_accel_demand(vert_accel_clip clipping) override {
+        _vert_accel_clip = clipping;
+        _vert_accel_clip_time_ms = AP_HAL::millis();
+        return _vert_accel_dem;
+    }
+
     // Rate of change of velocity along X body axis in m/s^2
     float get_VXdot(void) override {
         return _vel_dot;
@@ -176,11 +195,14 @@ private:
     AP_Int8  _land_pitch_trim;
     AP_Float _flare_holdoff_hgt;
     AP_Float _hgt_dem_tconst;
+    AP_Float _flare_tconst;
 
     enum {
         OPTION_GLIDER_ONLY=(1<<0),
         OPTION_NO_HGT_SMOOTHNG=(1<<1),
     };
+
+    AP_Float _accel_gf;
 
     // temporary _pitch_max_limit. Cleared on each loop. Clear when >= 90
     int8_t _pitch_max_limit = 90;
@@ -253,7 +275,8 @@ private:
     // height rate demands
     float _hgt_rate_dem_in;     // height rate demand input from the autopilot (m/s)
     float _hgt_dem_rate_ltd;    // height demand after application of the rate limiter (m)
-    float _hgt_rate_dem;        // height rate demand sent to control loops
+    float _hgt_rate_dem;        // height rate demand sent to control loops (m/s)
+    float _hgt_accel_dem;       // height acceleration demand sent to control loops (m/s)
 
     // offset applied to height demand post takeoff to compensate for height demand filter lag
     float _post_TO_hgt_offset;
@@ -330,6 +353,14 @@ private:
 
     // Specific energy error quantities
     float _STE_error;
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    float _vert_accel_dem;
+
+    // 1 when acceleration is clpping externally in the up direction
+    // -1 when acceleration is clpping externally in the down direction
+    vert_accel_clip _vert_accel_clip;
+    uint32_t _vert_accel_clip_time_ms;
 
     // Time since last update of main TECS loop (seconds)
     float _DT;
