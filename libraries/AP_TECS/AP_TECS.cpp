@@ -985,6 +985,20 @@ void AP_TECS::_update_pitch(void)
         const float hdot_dem = (_hgt_dem - _hgt_afe) * 0.5f * gain;
         _vert_accel_dem = _hgt_accel_dem + (hdot_dem + _hgt_rate_dem - _climb_rate) * 2.0f * gain;
         _vert_accel_dem = constrain_float(_vert_accel_dem , -_vertAccLim, _vertAccLim);
+    AP::logger().Write("TECF", "TimeUS,hd,hm,hrff,hrd,hrm,had,vad,val,clip",
+                       "s---------",
+                       "F---------",
+                       "Qffffffffb",
+                       AP_HAL::micros64(),
+                       (double)_hgt_dem,
+                       (double)_hgt_afe,
+                       (double)_hgt_rate_dem,
+                       (double)hdot_dem,
+                       (double)_climb_rate,
+                       (double)_hgt_accel_dem,
+                       (double)_vert_accel_dem,
+                       (double)_vertAccLim,
+                       (int8_t)_vert_accel_clip);
     } else {
         // calculate a demanded vertical velocity
         const float vel_dem = constrain_float((SEBdot_dem_total + _integSEB_state) / (timeConstant() * GRAVITY_MSS), -_maxSinkRate, _maxClimbRate);
