@@ -25,6 +25,9 @@ public:
 
 	int32_t get_rate_out(float desired_rate, float scaler);
 	int32_t get_servo_out(int32_t angle_err, float scaler, bool disable_integrator);
+    float   get_rate_demand();
+    float   get_coordination_gain() { return _roll_ff; }
+    float   get_angle_error_gain() { return 1.0f / MAX(gains.tau, 0.1f); }
 
 	void reset_I();
 
@@ -56,6 +59,7 @@ private:
 	AP_Float _roll_ff;
 	uint32_t _last_t;
 	float _last_out;
+    float _last_rate_demand = 0.0f;
 	
     AP_Logger::PID_Info _pid_info;
 

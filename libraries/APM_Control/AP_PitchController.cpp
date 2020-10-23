@@ -120,10 +120,18 @@ const AP_Param::GroupInfo AP_PitchController::var_info[] = {
 };
 
 /*
+ Function returns the demanded pitch rate in deg/s
+*/
+float AP_PitchController::get_rate_demand(void)
+{
+	return _last_rate_demand;
+}
+
+/*
  Function returns an equivalent elevator deflection in centi-degrees in the range from -4500 to 4500
- A positive demand is up
+ to acheive a desired angular velocity about the Y body axis.
  Inputs are: 
- 1) demanded pitch rate in degrees/second
+ 1) demanded pitch rate in degrees/second about the Y body axis, where a RH rotation is positive.
  2) control gain scaler = scaling_speed / aspeed
  3) boolean which is true when stabilise mode is active
  4) minimum FBW airspeed (metres/sec)
@@ -147,6 +155,7 @@ int32_t AP_PitchController::_get_rate_out(float desired_rate, float scaler, bool
 	// Calculate the pitch rate error (deg/sec) and scale
     float achieved_rate = ToDeg(omega_y);
     _pid_info.error = desired_rate - achieved_rate;
+	_last_rate_demand = desired_rate;
     float rate_error = _pid_info.error * scaler;
     _pid_info.target = desired_rate;
     _pid_info.actual = achieved_rate;
@@ -339,15 +348,14 @@ int32_t AP_PitchController::get_servo_out(int32_t angle_err, float scaler, bool 
 	// Calculate ideal turn rate from bank angle and airspeed assuming a level coordinated turn
 	// Pitch rate offset is the component of turn rate about the pitch axis
 	float aspeed;
-	float rate_offset;
 	bool inverted;
+
+	const float rate_offset = _get_coordination_rate_offset(aspeed, inverted);
 
     if (gains.tau < 0.1f) {
         gains.tau.set(0.1f);
     }
 
-    rate_offset = _get_coordination_rate_offset(aspeed, inverted);
-	
 	// Calculate the desired pitch rate (deg/sec) from the angle error
 	float desired_rate = angle_err * 0.01f / gains.tau;
 	
