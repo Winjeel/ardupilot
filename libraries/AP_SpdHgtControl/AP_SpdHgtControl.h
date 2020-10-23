@@ -43,6 +43,23 @@ public:
 	// should return -9000 to +9000
 	virtual int32_t get_pitch_demand(void)=0;
 	
+    enum vert_accel_clip {
+        DOWN = -1,
+        NONE = 0,
+        UP   = 1
+    };
+
+    // demanded vertical acceleration in m/s/s - up is positive
+    // set input argument clipping as:
+	// UP when acceleraton is clipping in the up direction, DOWN when clipping in the down direction, NONE when not clipping
+    virtual float get_vert_accel_demand(vert_accel_clip clipping)=0;
+
+    // get upper pitch angle limit in rad/s
+    virtual float get_pitch_max(void)=0;
+
+    // get lower pitch angle limit in rad/s
+    virtual float get_pitch_min(void)=0;
+
 	// Rate of change of velocity along X body axis in m/s^2
     virtual float get_VXdot(void)=0;
 	
