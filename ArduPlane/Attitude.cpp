@@ -122,9 +122,14 @@ void Plane::stabilize_pitch(float speed_scaler)
     if (control_mode == &mode_stabilize && channel_pitch->get_control_in() != 0) {
         disable_integrator = true;
     }
-    SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor, 
-                                                                                           speed_scaler, 
-                                                                                           disable_integrator));
+
+    if (landing.is_flaring() || (g.use_accel_vector_nav == 1 && auto_throttle_mode)) {
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_rate_out(degrees(nav_body_pitch_rate_rps), speed_scaler));
+    } else {
+        SRV_Channels::set_output_scaled(SRV_Channel::k_elevator, pitchController.get_servo_out(demanded_pitch - ahrs.pitch_sensor,
+                                                                                            speed_scaler,
+                                                                                            disable_integrator));
+    }
 }
 
 /*
@@ -556,22 +561,33 @@ void Plane::calc_nav_yaw_ground(void)
 
 
 /*
-  calculate a new nav_pitch_cd from the speed height controller
+  calculate a new nav_pitch_cd or nav_body_pitch_rate_rps from the speed height controller
+
+  ********************************************
+  *** MUST BE CALLED AFTER calc_nav_roll() ***
+  ********************************************
+
  */
 void Plane::calc_nav_pitch()
 {
-    // Calculate the Pitch of the plane
-    // --------------------------------
-    int32_t commanded_pitch = SpdHgt_Controller->get_pitch_demand();
-
+    int32_t commanded_pitch;
     // Received an external msg that guides roll in the last 3 seconds?
     if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
             plane.guided_state.last_forced_rpy_ms.y > 0 &&
-            millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            millis() - plane.guided_state.last_forced_rpy_ms.y < 3000 &&
+            !landing.is_flaring()) {
         commanded_pitch = plane.guided_state.forced_rpy_cd.y;
+        nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    } else if (g.use_accel_vector_nav != 1 && !landing.is_flaring()) {
+        // pitch angle is used as a control variable
+        commanded_pitch = SpdHgt_Controller->get_pitch_demand();
+        nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
+    } else {
+        // trajectory is being controlled using a demanded accel vector
+        // pitch angle is limited but not used as a control variable
+        // calculates the pitch rate demand and modifies the roll angle demand nav_roll_cd
+        plane.do_accel_vector_nav();
     }
-
-    nav_pitch_cd = constrain_int32(commanded_pitch, pitch_limit_min_cd, aparm.pitch_limit_max_cd.get());
 }
 
 
@@ -620,7 +636,94 @@ void Plane::calc_nav_roll()
     }
 
     nav_roll_cd = constrain_int32(commanded_roll, -roll_limit_cd, roll_limit_cd);
+
     update_load_factor();
+}
+
+/*
+  calculate a pitch rate and roll angle demand to achieve demanded vertical and horizontal acceleration
+ */
+void Plane::do_accel_vector_nav(void)
+{
+    float true_airspeed;
+    if (ahrs.airspeed_estimate(&true_airspeed)) {
+        true_airspeed = ahrs.get_EAS2TAS() * MAX(true_airspeed, 0.8f * (float)aparm.airspeed_min);
+
+        // calculate roll angle from vertical and horizopntal acceleration demans
+        float vert_accel_dem = SpdHgt_Controller->get_vert_accel_demand(nav_pitch_clip);
+        const float commanded_roll_rad = radians(0.01f*(float)nav_roll_cd);
+        const float normal_accel_for_const_hgt = GRAVITY_MSS / cosf(commanded_roll_rad);
+        float turn_accel_dem = normal_accel_for_const_hgt * sinf(commanded_roll_rad);
+
+        // correct demanded vertical and turn acceleration for lateral g due to sideslip and airframe asymmetry
+        lateral_accel_filt.apply(AP::ins().get_accel().y);
+        const float accel_y = lateral_accel_filt.get();
+        vert_accel_dem += accel_y * sinf(ahrs.roll) * g.lat_acc_compensation_gain;
+        turn_accel_dem -= accel_y * cosf(ahrs.roll) * g.lat_acc_compensation_gain;
+
+        const float roll_demand_rad = atan2f(turn_accel_dem , vert_accel_dem + GRAVITY_MSS);
+
+        // limit roll and recalculate turn acceleration
+        nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
+        turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
+
+        const float pitch_error_gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
+
+        // Received an external msg that guides attitude in the last 3 seconds?
+        if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
+                plane.guided_state.last_forced_rpy_ms.y > 0 &&
+                millis() - plane.guided_state.last_forced_rpy_ms.y < 3000) {
+            nav_body_pitch_rate_rps = pitch_error_gain * (radians(0.01f * plane.guided_state.forced_rpy_cd.y) - ahrs.pitch);
+        } else {
+            // Convert acceeration demand to a body frame pitch rate using measured roll angle predicted ahead
+            // for the lag from pitch rate to load factor.
+            // TODO investigate use of a lead/lag filter instead.
+            const float vert_rate =  plane.pitchController.get_coordination_gain() * vert_accel_dem / true_airspeed;
+            const float turn_rate =  plane.pitchController.get_coordination_gain() * turn_accel_dem / true_airspeed;
+            const Vector3f ang_rate = ahrs.get_gyro_latest();
+            const float predicted_roll = ahrs.roll + g.load_factor_lag * ang_rate.x;
+            nav_body_pitch_rate_rps =  vert_rate * cosf(predicted_roll);
+            nav_body_pitch_rate_rps += turn_rate * sinf(predicted_roll);
+        }
+
+        // get the rate limits required to observe the structural load factor limit
+        float rate_limit_max =  (   g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
+        float rate_limit_min =  ( - g.load_factor_max - cosf(ahrs.roll)) * (GRAVITY_MSS / true_airspeed);
+
+        // update rate limits to observe pitch angle limits
+        rate_limit_max = MIN(pitch_error_gain * (SpdHgt_Controller->get_pitch_max() - ahrs.pitch), rate_limit_max);
+        rate_limit_min = MAX(pitch_error_gain * (SpdHgt_Controller->get_pitch_min() - ahrs.pitch), rate_limit_min);
+        if (rate_limit_max > rate_limit_min) {
+            if (nav_body_pitch_rate_rps > rate_limit_max) {
+                nav_body_pitch_rate_rps = rate_limit_max;
+                nav_pitch_clip = AP_SpdHgtControl::vert_accel_clip::UP;
+            } else if (nav_body_pitch_rate_rps < rate_limit_min) {
+                nav_body_pitch_rate_rps = rate_limit_min;
+                nav_pitch_clip = AP_SpdHgtControl::vert_accel_clip::DOWN;
+            } else {
+                nav_pitch_clip = AP_SpdHgtControl::vert_accel_clip::NONE;
+            }
+        } else {
+            // error condition so sit between min and max limits and wait for limits to separate
+            nav_body_pitch_rate_rps = 0.5f * (rate_limit_max + rate_limit_min);
+        }
+        AP::logger().Write("ACVN",
+                        "TimeUS,TAD,VAD,RLU,RLD,NPR,ALU,ALD,CRR,DRD,AY",
+                        "snnnnnnnnnn",
+                        "F0000000000",
+                        "Qffffffffff",
+                        AP_HAL::micros(),
+                        turn_accel_dem,
+                        vert_accel_dem,
+                        rate_limit_max,
+                        rate_limit_min,
+                        nav_body_pitch_rate_rps,
+                        SpdHgt_Controller->get_pitch_max(),
+                        SpdHgt_Controller->get_pitch_min(),
+                        commanded_roll_rad,
+                        roll_demand_rad,
+                        accel_y);
+    }
 }
 
 /*

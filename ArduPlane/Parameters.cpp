@@ -60,6 +60,37 @@ const AP_Param::Info Plane::var_info[] = {
     // @Bitmask: 0:Roll,1:Pitch,2:Yaw,3:Steering,4:Landing
     GSCALAR(gcs_pid_mask,           "GCS_PID_MASK",     0),
 
+    // @Param: LOAD_FACTOR_MAX
+    // @DisplayName: Maximum load factor
+    // @Description: Maximum load factor that will be commanded during flight modes using automatic height control with NAV_TYPE_ACC active.
+    // @Range: 2.0 6.0
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(load_factor_max, "LOAD_FACTOR_MAX", 4.0f),
+
+    // @Param: LOAD_FACTOR_LAG
+    // @DisplayName: Lag from pitch rate to laod factor
+    // @Description: Time lag from pitch rate to load factor that the navigation loops compensate for when NAV_TYPE_ACC = 1.
+    // @Range: 0.0 0.1
+    // @Increment: 0.01
+    // @User: Standard
+    GSCALAR(load_factor_lag, "LOAD_FACTOR_LAG", 0.2f),
+
+    // @Param: NAV_TYPE_ACC
+    // @DisplayName: Enables acceleration vector navigation
+    // @Description: If NAV_TYPE_ACC is set to 1, then when the speed and height controller is active, a vertical acceleration converted to a pitch rate rather than pitch angle will be demanded and pitch rate demand will be limited to respect the load factor limit set by LOAD_FACTOR_MAX. Pitch angle limaits will still be respected.
+    // @Values: 0:Disabled,1:Enabled
+    // @User: Standard
+    GSCALAR(use_accel_vector_nav, "NAV_TYPE_ACC", 0),
+
+    // @Param: LAT_ACC_GAIN
+    // @DisplayName: Compensation gain for lateral g
+    // @Description: This gain controls how much the navigation loop conpensates for sideslip induced lateral g when NAV_TYPE_ACC = 1.
+    // @Range: 0.0 1.0
+    // @Increment: 0.1
+    // @User: Standard
+    GSCALAR(lat_acc_compensation_gain, "LAT_ACC_GAIN", 0.0f),
+
     // @Param: KFF_RDDRMIX
     // @DisplayName: Rudder Mix
     // @Description: Amount of rudder to add during aileron movement. Increase if nose initially yaws away from roll. Reduces adverse yaw.

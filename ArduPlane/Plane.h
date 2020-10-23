@@ -623,6 +623,15 @@ private:
     // The instantaneous desired pitch angle.  Hundredths of a degree
     int32_t nav_pitch_cd;
 
+    // The instantaneous desired body pitch rate in rad/s
+    float nav_body_pitch_rate_rps;
+
+    // filter applied to lateral body frame (Y) acceleration
+    LowPassFilterFloat lateral_accel_filt;
+
+    // 1 if pitch is past the upper limit, -1 if past the lower limit, 0 if between
+    AP_SpdHgtControl::vert_accel_clip nav_pitch_clip;
+
     // the aerodymamic load factor. This is calculated from the demanded
     // roll before the roll is clipped, using 1/sqrt(cos(nav_roll))
     float aerodynamic_load_factor = 1.0f;
@@ -833,6 +842,7 @@ private:
 
     void load_parameters(void);
     void convert_mixers(void);
+    void do_accel_vector_nav(void);
     void adjust_altitude_target();
     void setup_glide_slope(void);
     int32_t get_RTL_altitude();
