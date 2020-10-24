@@ -1157,7 +1157,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
             p = 0.0f;
         } else if (_hgt_at_start_of_flare > _flare_holdoff_hgt) {
             p = constrain_float((_hgt_at_start_of_flare - _hgt_afe) / _hgt_at_start_of_flare, 0.0f, 1.0f);
-            p = sq(p);
+            p = powf(p, 1.5f);
         } else {
             p = 1.0f;
         }
