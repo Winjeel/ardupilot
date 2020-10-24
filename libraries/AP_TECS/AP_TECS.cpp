@@ -466,23 +466,20 @@ void AP_TECS::_update_speed_demand(void)
     const float velRateMin = 0.5f * _STEdot_min / _TAS_state;
     const float TAS_dem_previous = _TAS_dem_adj;
 
-    // assume fixed 10Hz call rate
-    const float dt = 0.1;
-
     // Apply rate limit
-    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * dt))
+    if ((_TAS_dem - TAS_dem_previous) > (velRateMax * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMax * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMax * _DT;
         _TAS_rate_dem = velRateMax;
     }
-    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * dt))
+    else if ((_TAS_dem - TAS_dem_previous) < (velRateMin * _DT))
     {
-        _TAS_dem_adj = TAS_dem_previous + velRateMin * dt;
+        _TAS_dem_adj = TAS_dem_previous + velRateMin * _DT;
         _TAS_rate_dem = velRateMin;
     }
     else
     {
-        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / dt;
+        _TAS_rate_dem = (_TAS_dem - TAS_dem_previous) / _DT;
         _TAS_dem_adj = _TAS_dem;
     }
     // Constrain speed demand again to protect against bad values on initialisation.
