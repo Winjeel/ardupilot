@@ -676,6 +676,16 @@ void Plane::do_accel_vector_nav(void)
             const float stall_speed = (float)aparm.airspeed_min * ahrs.get_EAS2TAS() * (1.0f/1.2f);
             const float spd_to_vert_accel_derivative = 2.0f * SpdHgt_Controller->get_VX() / sq(stall_speed);
             vert_accel_dem -= spd_to_vert_accel_derivative * SpdHgt_Controller->get_VXdot();
+        AP::logger().Write("FLR", "TimeUS,ssp,stvad,spderiv,delta",
+                        "s----",
+                        "F----",
+                        "Qffff",
+                        AP_HAL::micros64(),
+                        (double)stall_speed,
+                        (double)spd_to_vert_accel_derivative,
+                        (double)SpdHgt_Controller->get_VXdot(),
+                        (double)(-spd_to_vert_accel_derivative * SpdHgt_Controller->get_VXdot()));
+        }
 
         // Received an external msg that guides attitude in the last 3 seconds?
         if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
