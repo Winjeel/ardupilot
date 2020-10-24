@@ -92,6 +92,11 @@ public:
         return _vel_dot;
     }
 
+    // velocity anlong X body axis in m/s
+    float get_VX(void) override {
+        return _TAS_state;
+    }
+
     // return current target airspeed
     float get_target_airspeed(void) const override {
         return _TAS_dem / _ahrs.get_EAS2TAS();
