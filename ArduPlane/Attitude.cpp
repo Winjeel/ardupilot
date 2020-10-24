@@ -667,7 +667,15 @@ void Plane::do_accel_vector_nav(void)
         nav_roll_cd = constrain_int32((int32_t)(100.0f*degrees(roll_demand_rad)), -roll_limit_cd, roll_limit_cd);
         turn_accel_dem = (vert_accel_dem + GRAVITY_MSS) * tanf(radians(0.01f*(float)nav_roll_cd));
 
-        const float pitch_error_gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
+        float pitch_error_gain = plane.pitchController.get_angle_error_gain() / MAX(cosf(ahrs.roll),0.1f);
+
+        if (landing.is_flaring()) {
+            pitch_error_gain *= 2.0f;
+
+            // compensate for airspeed decay during flare
+            const float stall_speed = (float)aparm.airspeed_min * ahrs.get_EAS2TAS() * (1.0f/1.2f);
+            const float spd_to_vert_accel_derivative = 2.0f * SpdHgt_Controller->get_VX() / sq(stall_speed);
+            vert_accel_dem -= spd_to_vert_accel_derivative * SpdHgt_Controller->get_VXdot();
 
         // Received an external msg that guides attitude in the last 3 seconds?
         if ((control_mode == &mode_guided || control_mode == &mode_avoidADSB) &&
