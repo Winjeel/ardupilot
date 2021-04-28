@@ -251,7 +251,7 @@ void Helicopter::update(const struct sitl_input &input)
     }
 
 
-    update_dynamics(rot_accel);
+    update_dynamics(rot_accel,input);
     
     // update lat/lon/altitude
     update_position();

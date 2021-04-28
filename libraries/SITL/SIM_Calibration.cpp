@@ -46,7 +46,7 @@ void SITL::Calibration::update(const struct sitl_input &input)
     }
 
     accel_body.zero();
-    update_dynamics(rot_accel);
+    update_dynamics(rot_accel,input);
     update_position();
     time_advance();
 

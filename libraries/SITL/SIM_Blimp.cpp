@@ -54,7 +54,7 @@ void Blimp::update(const struct sitl_input &input)
 
     calculate_forces(input, rot_accel, accel_body);
 
-    update_dynamics(rot_accel);
+    update_dynamics(rot_accel,input);
     update_external_payload(input);
 
     // update lat/lon/altitude

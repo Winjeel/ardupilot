@@ -208,8 +208,8 @@ protected:
 
     uint64_t time_now_us;
 
-    const float gyro_noise = radians(0.1f);
-    const float accel_noise = 0.3f;
+    const float gyro_noise = 0.0f;//radians(0.1f);
+    const float accel_noise = 0.0f;//0.3f;
     float rate_hz = 1200.0f;
     float target_speedup;
     uint64_t frame_time_us;
@@ -224,6 +224,8 @@ protected:
     float last_speedup = -1.0f;
     const char *config_ = "";
 
+    uint64_t gnd_move_start_time_us = 0;
+
     // allow for AHRS_ORIENTATION
     AP_Int8 *ahrs_orientation;
     enum Rotation last_imu_rotation;
@@ -236,9 +238,11 @@ protected:
         GROUND_BEHAVIOR_NO_MOVEMENT,
         GROUND_BEHAVIOR_FWD_ONLY,
         GROUND_BEHAVIOR_TAILSITTER,
+        GROUND_BEHAVIOR_MOVEMENT_TEST,
     } ground_behavior;
 
     bool use_smoothing;
+    bool movement_test_complete;
 
     AP_Terrain *terrain;
     float ground_height_difference() const;
@@ -274,7 +278,7 @@ protected:
     uint64_t get_wall_time_us(void) const;
 
     // update attitude and relative position
-    void update_dynamics(const Vector3f &rot_accel);
+    void update_dynamics(const Vector3f &rot_accel, const struct sitl_input &input);
 
     // update wind vector
     void update_wind(const struct sitl_input &input);
@@ -307,13 +311,17 @@ private:
 #endif
 
     struct {
-        Vector3f accel_body;
-        Vector3f gyro;
-        Matrix3f rotation_b2e;
-        Vector3f position;
-        Vector3f velocity_ef;
+        Matrix3f dcm_prev; // previous simulatotr dcm matrix
+        Vector3f accel_body; // body frame acceleration measured by accelerometers (m/s/s)
+        Vector3f gyro; // body frame angular rate measured by gyros (rad/sec)
+        Quaternion quat; // rotation from body to earth frame that should track the simulator dcm matrix
+        Vector3f position_ef; // NED position that should track the simulator position state (m)
+        Vector3f position_demand_prev; // previous simulator NED position state (m)
+        Vector3f velocity_ef; // NED velocity
+        Vector3f accel_ef; // NED acceleration
         uint64_t last_update_us;
         Location location;
+        Vector3f earthRate_bf; // Earth spin rate measured by gyros in body frame (rad/sec)
     } smoothing;
 
     LowPassFilterFloat servo_filter[4];
