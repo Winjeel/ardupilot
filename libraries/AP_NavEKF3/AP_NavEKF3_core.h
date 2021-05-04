@@ -80,6 +80,9 @@
 // number of continuous valid GSF yaw estimates required to confirm valid hostory
 #define GSF_YAW_VALID_HISTORY_THRESHOLD 5
 
+// minimum allowed yaw observation RMS error used to set observation variance
+#define YAW_OBS_ERR_RMS_MIN radians(5.0f)
+
 class NavEKF3_core : public NavEKF_core_common
 {
 public:
@@ -717,6 +720,9 @@ private:
     // determine when to perform fusion of range measurements take relative to a beacon at a known NED position
     void SelectRngBcnFusion();
 
+    // Store yaw angle when moving for use as a static reference when not moving
+    void StoreStaticYawAngle();
+
     // determine when to perform fusion of magnetometer measurements
     void SelectMagFusion();
 
@@ -1322,7 +1328,10 @@ private:
     Vector3f gyro_prev;                 // gyro vector from previous time step (rad/s)
     Vector3f accel_prev;                // accelerometer vector from previous time step (m/s/s)
     bool onGroundNotMoving;             // true when on the ground and not moving
+    bool onGroundNotMovingPrev;         // onGroundNotMoving from previous update
     uint32_t lastMoveCheckLogTime_ms;   // last time the movement check data was logged (msec)
+    bool storeYawNextStateUpdate;       // true when the yaw angle should be stored after the next quaternion state prediction step
+    bool onGroundNotMovingCheckPaused;  // true when the on ground no tmoving check has been paused
 
 	// variables used to inhibit accel bias learning
     bool inhibitDelVelBiasStates;       // true when all IMU delta velocity bias states are de-activated

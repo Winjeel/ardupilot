@@ -339,6 +339,7 @@ void NavEKF3_core::InitialiseVariables()
     velOffsetNED.zero();
     posOffsetNED.zero();
     memset(&velPosObs, 0, sizeof(velPosObs));
+    onGroundNotMovingCheckPaused = true;
 
     // range beacon fusion variables
     memset((void *)&rngBcnDataDelayed, 0, sizeof(rngBcnDataDelayed));
@@ -768,6 +769,11 @@ void NavEKF3_core::UpdateStrapdownEquationsNED()
 
     // calculate the nav to body cosine matrix
     stateStruct.quat.inverse().rotation_matrix(prevTnb);
+
+    // save a yaw value for use as a reference to stop yaw drift on ground if yaw sensor data is lost
+    if (storeYawNextStateUpdate) {
+        StoreStaticYawAngle();
+    }
 
     // calculate the rate of change of velocity (used for launch detect and other functions)
     velDotNED = delVelNav / imuDataDelayed.delVelDT;

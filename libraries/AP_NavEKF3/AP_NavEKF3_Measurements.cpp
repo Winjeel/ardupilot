@@ -1047,7 +1047,7 @@ void NavEKF3_core::writeExtNavData(const Vector3f &pos, const Quaternion &quat, 
         quat.to_euler(roll_rad, pitch_rad, yaw_rad);
         yaw_elements extNavYawAngDataNew;
         extNavYawAngDataNew.yawAng = yaw_rad;
-        extNavYawAngDataNew.yawAngErr = MAX(angErr, radians(5.0f)); // ensure yaw accuracy is no better than 5 degrees (some callers may send zero)
+        extNavYawAngDataNew.yawAngErr = MAX(angErr, YAW_OBS_ERR_RMS_MIN); // protect against numerical instability due to too small specified error value (some callers may send zero)
         extNavYawAngDataNew.order = rotationOrder::TAIT_BRYAN_321; // Euler rotation order is 321 (ZYX)
         extNavYawAngDataNew.time_ms = timeStamp_ms;
         storedExtNavYawAng.push(extNavYawAngDataNew);
@@ -1309,12 +1309,14 @@ float NavEKF3_core::MagDeclination(void) const
 */
 void NavEKF3_core::updateMovementCheck(void)
 {
+    onGroundNotMovingPrev = onGroundNotMoving;
+
     const AP_NavEKF_Source::SourceYaw yaw_source = frontend->sources.getYawSource();
     const bool runCheck = onGround && (yaw_source == AP_NavEKF_Source::SourceYaw::GPS || yaw_source == AP_NavEKF_Source::SourceYaw::GPS_COMPASS_FALLBACK ||
                                        yaw_source == AP_NavEKF_Source::SourceYaw::EXTNAV || yaw_source == AP_NavEKF_Source::SourceYaw::GSF || !use_compass());
     if (!runCheck)
     {
-        onGroundNotMoving = false;
+        onGroundNotMovingCheckPaused = true;
         return;
     }
 
@@ -1330,13 +1332,14 @@ void NavEKF3_core::updateMovementCheck(void)
     Vector3f gyro = ins.get_gyro(gyro_index_active) - stateStruct.gyro_bias * dtEkfAvgInv;
     Vector3f accel = ins.get_accel(accel_index_active) - stateStruct.accel_bias * dtEkfAvgInv;
 
-    if (!prevOnGround) {
+    if (onGroundNotMovingCheckPaused) {
         gyro_prev = gyro;
         accel_prev = accel;
-        onGroundNotMoving = false;
         gyro_diff = gyro_diff_limit;
         accel_diff = accel_diff_limit;
-        return;
+        onGroundNotMoving = false;
+        onGroundNotMovingPrev = false;
+        lastMoveCheckLogTime_ms = 0;
     }
 
     // calculate a gyro rate of change metric
@@ -1372,7 +1375,10 @@ void NavEKF3_core::updateMovementCheck(void)
         logStatusChange = true;
     }
 
-    if (logStatusChange || imuSampleTime_ms - lastMoveCheckLogTime_ms > 200) {
+    storeYawNextStateUpdate = (onGroundNotMoving && !onGroundNotMovingPrev) || onGroundNotMovingCheckPaused;
+    onGroundNotMovingCheckPaused = false;
+
+    if (onGroundNotMovingCheckPaused || logStatusChange || imuSampleTime_ms - lastMoveCheckLogTime_ms > 200) {
         lastMoveCheckLogTime_ms = imuSampleTime_ms;
         const struct log_XKFM pkt{
             LOG_PACKET_HEADER_INIT(LOG_XKFM_MSG),

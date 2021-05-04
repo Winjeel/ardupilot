@@ -180,7 +180,7 @@ void NavEKF3_core::realignYawGPS()
 void NavEKF3_core::alignYawAngle(const yaw_elements &yawAngData)
 {
     // update quaternion states and covariances
-    resetQuatStateYawOnly(yawAngData.yawAng, sq(MAX(yawAngData.yawAngErr, 1.0e-2f)), yawAngData.order);
+    resetQuatStateYawOnly(yawAngData.yawAng, sq(MAX(yawAngData.yawAngErr, sq(YAW_OBS_ERR_RMS_MIN))), yawAngData.order);
 
     // send yaw alignment information to console
     GCS_SEND_TEXT(MAV_SEVERITY_INFO, "EKF3 IMU%u yaw aligned",(unsigned)imu_index);
@@ -189,6 +189,22 @@ void NavEKF3_core::alignYawAngle(const yaw_elements &yawAngData)
 /********************************************************
 *                   FUSE MEASURED_DATA                  *
 ********************************************************/
+
+// Store yaw angle when moving for use as a static reference when not moving
+void NavEKF3_core::StoreStaticYawAngle()
+{
+    if (fabsf(prevTnb[0][2]) < fabsf(prevTnb[1][2])) {
+        // A 321 rotation order is best conditioned because the X axis is closer to horizontal than the Y axis
+        yawAngDataStatic.order = rotationOrder::TAIT_BRYAN_321;
+        yawAngDataStatic.yawAng = atan2f(prevTnb[0][1], prevTnb[0][0]);
+    } else {
+        // A 312 rotation order is best conditioned because the Y axis is closer to horizontal than the X axis
+        yawAngDataStatic.order = rotationOrder::TAIT_BRYAN_312;
+        yawAngDataStatic.yawAng = atan2f(-prevTnb[1][0], prevTnb[1][1]);
+    }
+    yawAngDataStatic.yawAngErr = 0.5f;
+    yawAngDataStatic.time_ms = imuDataDelayed.time_ms;
+}
 
 // select fusion of magnetometer data
 void NavEKF3_core::SelectMagFusion()
@@ -202,21 +218,6 @@ void NavEKF3_core::SelectMagFusion()
     if (yaw_source != yaw_source_last) {
         yaw_source_last = yaw_source;
         yaw_source_reset = true;
-    }
-
-    // Store yaw angle when moving for use as a static reference when not moving
-    if (!onGroundNotMoving) {
-        if (fabsf(prevTnb[0][2]) < fabsf(prevTnb[1][2])) {
-            // A 321 rotation order is best conditioned because the X axis is closer to horizontal than the Y axis
-            yawAngDataStatic.order = rotationOrder::TAIT_BRYAN_321;
-            yawAngDataStatic.yawAng = atan2f(prevTnb[0][1], prevTnb[0][0]);
-        } else {
-            // A 312 rotation order is best conditioned because the Y axis is closer to horizontal than the X axis
-            yawAngDataStatic.order = rotationOrder::TAIT_BRYAN_312;
-            yawAngDataStatic.yawAng = atan2f(-prevTnb[1][0], prevTnb[1][1]);
-        }
-        yawAngDataStatic.yawAngErr = MAX(frontend->_yawNoise, 0.05f);
-        yawAngDataStatic.time_ms = imuDataDelayed.time_ms;
     }
 
     // Handle case where we are not using a yaw sensor of any type and attempt to reset the yaw in
@@ -241,7 +242,7 @@ void NavEKF3_core::SelectMagFusion()
 
             // fallback methods
             if (!didUseEKFGSF) {
-                if (onGroundNotMoving) {
+                if (onGroundNotMoving && (yawAngDataStatic.time_ms != 0)) {
                     // fuse last known good yaw angle before we stopped moving to allow yaw bias learning when on ground before flight
                     fuseEulerYaw(yawFusionMethod::STATIC);
                 } else if (onGround || PV_AidingMode == AID_NONE || (P[0][0]+P[1][1]+P[2][2]+P[3][3] > 0.01f)) {
@@ -277,21 +278,26 @@ void NavEKF3_core::SelectMagFusion()
         } else if (tiltAlignComplete && !yawAlignComplete) {
             // External yaw sources can take significant time to start providing yaw data so
             // wuile waiting, fuse a 'fake' yaw observation at 7Hz to keeop the filter stable
-            if(imuSampleTime_ms - lastSynthYawTime_ms > 140) {
-                yawAngDataDelayed.yawAngErr = MAX(frontend->_yawNoise, 0.05f);
+            if (imuSampleTime_ms - lastSynthYawTime_ms > 140) {
                 // update the yaw angle using the last estimate which will be used as a static yaw reference when movement stops
                 if (!onGroundNotMoving) {
                     // prevent uncontrolled yaw variance growth by fusing a zero innovation
                     fuseEulerYaw(yawFusionMethod::PREDICTED);
-                } else {
+                } else if (yawAngDataStatic.time_ms != 0) {
                     // fuse last known good yaw angle before we stopped moving to allow yaw bias learning when on ground before flight
                     fuseEulerYaw(yawFusionMethod::STATIC);
                 }
                 lastSynthYawTime_ms = imuSampleTime_ms;
             }
-        } else if (tiltAlignComplete && yawAlignComplete && onGround && imuSampleTime_ms - last_gps_yaw_fuse_ms > 10000) {
-            // handle scenario where we were using GPS yaw previously, but the yaw fusion has timed out.
-            yaw_source_reset = true;
+        } else if (onGround && tiltAlignComplete && yawAlignComplete && (imuSampleTime_ms - last_gps_yaw_fuse_ms > 1000)) {
+            // If GPS yaw fusion stops when on ground, use last known yaw angle when stationary as a reference to constrain drift
+            // and request a yaw reset if condition persists
+            if (onGroundNotMoving && (yawAngDataStatic.time_ms != 0) && (imuSampleTime_ms - lastSynthYawTime_ms > 140)) {
+                fuseEulerYaw(yawFusionMethod::STATIC);
+                lastSynthYawTime_ms = imuSampleTime_ms;
+            } else if (imuSampleTime_ms - last_gps_yaw_fuse_ms > 10000) {
+                yaw_source_reset = true;
+            }
         }
 
         if (yaw_source == AP_NavEKF_Source::SourceYaw::GPS) {
@@ -354,7 +360,7 @@ void NavEKF3_core::SelectMagFusion()
                 if (!onGroundNotMoving) {
                     // prevent uncontrolled yaw variance growth by fusing a zero innovation
                     fuseEulerYaw(yawFusionMethod::PREDICTED);
-                } else {
+                } else if (yawAngDataStatic.time_ms != 0) {
                     // fuse last known good yaw angle before we stopped moving to allow yaw bias learning when on ground before flight
                     fuseEulerYaw(yawFusionMethod::STATIC);
                 }
@@ -913,26 +919,26 @@ bool NavEKF3_core::fuseEulerYaw(yawFusionMethod method)
     float R_YAW;
     switch (method) {
     case yawFusionMethod::GPS:
-        R_YAW = sq(yawAngDataDelayed.yawAngErr);
+        R_YAW = sq(MAX(yawAngDataDelayed.yawAngErr, YAW_OBS_ERR_RMS_MIN));
         break;
 
     case yawFusionMethod::GSF:
-        R_YAW = gsfYawVariance;
+        R_YAW = MAX(gsfYawVariance, sq(YAW_OBS_ERR_RMS_MIN));
         break;
 
     case yawFusionMethod::STATIC:
-        R_YAW = sq(yawAngDataStatic.yawAngErr);
+        R_YAW = sq(MAX(yawAngDataStatic.yawAngErr, YAW_OBS_ERR_RMS_MIN));
         break;
 
     case yawFusionMethod::MAGNETOMETER:
     case yawFusionMethod::PREDICTED:
     default:
-        R_YAW = sq(frontend->_yawNoise);
+        R_YAW = sq(MAX(frontend->_yawNoise, YAW_OBS_ERR_RMS_MIN));
         break;
 
 #if EK3_FEATURE_EXTERNAL_NAV
     case yawFusionMethod::EXTNAV:
-        R_YAW = sq(MAX(extNavYawAngDataDelayed.yawAngErr, 0.05f));
+        R_YAW = sq(MAX(extNavYawAngDataDelayed.yawAngErr, YAW_OBS_ERR_RMS_MIN));
         break;
 #endif
     }
@@ -1623,7 +1629,9 @@ void NavEKF3_core::resetQuatStateYawOnly(float yaw, float yawVariance, rotationO
 
     // Update the rotation matrix
     stateStruct.quat.inverse().rotation_matrix(prevTnb);
-    
+
+    StoreStaticYawAngle();
+
     float deltaYaw = wrap_PI(yaw - eulerAngles.z);
 
     // calculate the change in the quaternion state and apply it to the output history buffer
