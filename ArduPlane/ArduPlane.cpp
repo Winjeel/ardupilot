@@ -566,6 +566,7 @@ void Plane::update_alt()
         TECS_controller.update_pitch_throttle(tecs_target_alt_cm,
                                                  target_airspeed_cm,
                                                  flight_stage,
+                                                 quadplane.transition->get_mav_vtol_state(),
                                                  distance_beyond_land_wp,
                                                  get_takeoff_pitch_min_cd(),
                                                  throttle_nudge,
