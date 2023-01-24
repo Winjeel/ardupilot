@@ -746,7 +746,7 @@ void AP_TECS::_update_throttle_with_airspeed(void)
         // Calculate integrator state, constraining state
         // Set integrator to a max throttle value during climbout
         _integTHR_state = _integTHR_state + (_STE_error * _get_i_gain()) * _DT * K_STE2Thr;
-        if (_flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING) {
+        if (_flight_stage == AP_FixedWing::FlightStage::TAKEOFF || _flight_stage == AP_FixedWing::FlightStage::ABORT_LANDING || _flags.is_doing_fw_transition) {
             if (!_flags.reached_speed_takeoff) {
                 // ensure we run at full throttle until we reach the target airspeed
                 _throttle_dem = MAX(_throttle_dem, _THRmaxf - _integTHR_state);
@@ -869,6 +869,9 @@ void AP_TECS::_update_throttle_without_airspeed(int16_t throttle_nudge)
         if (dt*0.001 < aparm.takeoff_throttle_max_t) {
             _throttle_dem = _THRmaxf;
         }
+    } else if (_flags.is_doing_fw_transition) {
+        _throttle_dem = _THRmaxf;
+        _takeoff_start_ms = 0;
     } else {
         _takeoff_start_ms = 0;
     }
@@ -1147,6 +1150,7 @@ void AP_TECS::_update_STE_rate_lim(void)
 void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
                                     int32_t EAS_dem_cm,
                                     enum AP_FixedWing::FlightStage flight_stage,
+                                    enum MAV_VTOL_STATE transition_state,
                                     float distance_beyond_land_wp,
                                     int32_t ptchMinCO_cd,
                                     int16_t throttle_nudge,
@@ -1163,6 +1167,7 @@ void AP_TECS::update_pitch_throttle(int32_t hgt_dem_cm,
     _flags.is_doing_auto_land = (flight_stage == AP_FixedWing::FlightStage::LAND);
     _distance_beyond_land_wp = distance_beyond_land_wp;
     _flight_stage = flight_stage;
+    _flags.is_doing_fw_transition = transition_state == MAV_VTOL_STATE::MAV_VTOL_STATE_TRANSITION_TO_FW;
 
     // Convert inputs
     _hgt_dem_in_raw = hgt_dem_cm * 0.01f;
