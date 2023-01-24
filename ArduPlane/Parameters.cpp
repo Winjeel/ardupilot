@@ -334,8 +334,8 @@ const AP_Param::Info Plane::var_info[] = {
     ASCALAR(throttle_max,           "THR_MAX",        THROTTLE_MAX),
 
     // @Param: TKOFF_THR_MAX
-    // @DisplayName: Maximum Throttle for takeoff
-    // @Description: The maximum throttle setting during automatic takeoff. If this is zero then THR_MAX is used for takeoff as well.
+    // @DisplayName: Maximum Throttle for takeoff and transition
+    // @Description: The maximum throttle setting during automatic takeoff or quadplane transition from VTOL to forward flight. If this is zero then THR_MAX is used.
     // @Units: %
     // @Range: 0 100
     // @Increment: 1
