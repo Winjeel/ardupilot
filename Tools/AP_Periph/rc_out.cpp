@@ -140,7 +140,7 @@ void AP_Periph_FW::rcout_update()
     }
 
     if (!rcout_has_new_data_to_update) {
-        return;
+        // return;
     }
     rcout_has_new_data_to_update = false;
 

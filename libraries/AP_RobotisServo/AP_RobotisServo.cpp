@@ -42,6 +42,7 @@
 #include <AP_Math/AP_Math.h>
 #include <AP_SerialManager/AP_SerialManager.h>
 #include <SRV_Channel/SRV_Channel.h>
+#include <GCS_MAVLink/GCS.h>
 
 extern const AP_HAL::HAL& hal;
 
@@ -233,6 +234,10 @@ void AP_RobotisServo::detect_servos(void)
 
     // give plenty of time for replies from all servos
     last_send_us = AP_HAL::micros();
+    
+    // Delay long enough for all possible servo outputs to respond their status message
+    delay_time_us += HAL_PWM_COUNT * (14 * us_per_byte + us_gap);
+
     delay_time_us += 1000 * us_per_byte;
 }
 
@@ -244,7 +249,7 @@ void AP_RobotisServo::configure_servos(void)
     // disable torque control
     send_command(BROADCAST_ID, REG_TORQUE_ENABLE, 0, 1);
 
-        // disable replies unless we read
+    // disable replies unless we read
     send_command(BROADCAST_ID, REG_STATUS_RETURN, STATUS_RETURN_READ, 1);
 
     // use position control mode
@@ -351,10 +356,14 @@ void AP_RobotisServo::process_packet(const uint8_t *pkt, uint8_t length)
 
 void AP_RobotisServo::update()
 {
+    if (AP_HAL::millis() < 10 * 1000) {
+        return; 
+    }
     if (!initialised) {
         initialised = true;
         init();
         last_send_us = AP_HAL::micros();
+        gcs().send_text(MAV_SEVERITY_INFO, "Robotis: init()");
         return;
     }
     
@@ -366,23 +375,27 @@ void AP_RobotisServo::update()
 
     uint32_t now = AP_HAL::micros();
     if (last_send_us != 0 && now - last_send_us < delay_time_us) {
-        // waiting for last send to complete
+        // waiting for last send, and response to complete
         return;
     }
-
+    static uint8_t dc = 0;
     if (detection_count < DETECT_SERVO_COUNT) {
         detection_count++;
         detect_servos();
+        gcs().send_text(MAV_SEVERITY_INFO, "Robotis: detect() %d", dc++);
+        return;
     }
 
     if (servo_mask == 0) {
         return;
     }
 
+    static uint8_t sc = 0;
     if (configured_servos < CONFIGURE_SERVO_COUNT) {
         configured_servos++;
         last_send_us = now;
         configure_servos();
+        gcs().send_text(MAV_SEVERITY_INFO, "Robotis: configure_servos() %d", sc++);
         return;
     }
 
