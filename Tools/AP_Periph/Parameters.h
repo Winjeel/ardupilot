@@ -69,6 +69,8 @@ public:
         k_param_proximity_baud,
         k_param_proximity_port,
         k_param_proximity_max_rate,
+        k_param_robotis_servo_baud,
+        k_param_robotis_servo_port,
     };
 
     AP_Int16 format_version;
@@ -143,6 +145,11 @@ public:
 #if HAL_WITH_ESC_TELEM
     AP_Int32 esc_telem_rate;
 #endif
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_ROBOTISSERVO
+    AP_Int32 robotis_servo_baud;
+    AP_Int8 robotis_servo_port;
 #endif
 
     AP_Int8 debug;
