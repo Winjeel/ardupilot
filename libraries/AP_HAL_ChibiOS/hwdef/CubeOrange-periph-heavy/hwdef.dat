@@ -23,9 +23,11 @@ define HAL_PERIPH_ENABLE_MAG
 define HAL_PERIPH_ENABLE_BARO
 define HAL_PERIPH_ENABLE_RC_OUT
 define HAL_PERIPH_ENABLE_NOTIFY
+define HAL_PERIPH_ENABLE_ROBOTISSERVO
 define HAL_LOGGING_ENABLED TRUE
 
 define AP_INERTIALSENSOR_ENABLED 1
+define AP_ROBOTISSERVO_ENABLED 1
 
 
 # single GPS and compass for peripherals
@@ -67,5 +69,4 @@ define HAL_CAN_DRIVER_DEFAULT 1
 # listen for reboot command from uploader.py script
 # undefine to disable. Use -1 to allow on all ports, otherwise serial number index defined in SERIAL_ORDER starting at 0
 define HAL_PERIPH_LISTEN_FOR_SERIAL_UART_REBOOT_CMD_PORT 0
- 
 
