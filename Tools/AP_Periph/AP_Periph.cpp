@@ -185,6 +185,19 @@ void AP_Periph_FW::init()
         }
     }
 #endif
+
+#ifdef HAL_PERIPH_ENABLE_ROBOTISSERVO
+    if (g.robotisservo_port >= 0) {
+        auto *uart = hal.serial(g.robotisservo_port);
+        if (uart != nullptr) {
+            uart->begin(g.robotisservo_baud);
+            serial_manager.set_protocol_and_baud(g.robotisservo_port, AP_SerialManager::SerialProtocol_Robotis, g.robotisservo_baud);
+            uart->set_unbuffered_writes(true);
+            uart->set_flow_control(AP_HAL::UARTDriver::FLOW_CONTROL_DISABLE);
+            uart->set_options(AP_HAL::UARTDriver::OPTION_HDPLEX);
+        }
+    }
+#endif
     
 #ifdef HAL_PERIPH_ENABLE_AIRSPEED
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS

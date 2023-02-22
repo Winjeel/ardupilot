@@ -70,6 +70,8 @@ public:
         k_param_proximity_port,
         k_param_proximity_max_rate,
         k_param_nmea,
+        k_param_robotisservo_baud,
+        k_param_robotisservo_port,
     };
 
     AP_Int16 format_version;
@@ -161,6 +163,11 @@ public:
 #ifdef HAL_PERIPH_ENABLE_EFI
     AP_Int32 efi_baudrate;
     AP_Int8 efi_port;
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_ROBOTISSERVO
+    AP_Int32 robotisservo_baud;
+    AP_Int8 robotisservo_port;
 #endif
     
 #if HAL_CANFD_SUPPORTED

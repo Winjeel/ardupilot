@@ -51,6 +51,14 @@ extern const AP_HAL::HAL &hal;
 #define HAL_PERIPH_EFI_BAUDRATE_DEFAULT 115200
 #endif
 
+#ifndef AP_PERIPH_ROBOTISSERVO_PORT_DEFAULT
+#define AP_PERIPH_ROBOTISSERVO_PORT_DEFAULT 1
+#endif
+
+#ifndef AP_PERIPH_ROBOTISSERVO_BAUDRATE_DEFAULT
+#define AP_PERIPH_ROBOTISSERVO_BAUDRATE_DEFAULT 57600
+#endif
+
 #ifndef HAL_DEFAULT_MAV_SYSTEM_ID
 #define MAV_SYSTEM_ID 3
 #else
@@ -521,6 +529,26 @@ const AP_Param::Info AP_Periph_FW::var_info[] = {
     // @Group: NMEA_
     // @Path: ../libraries/AP_NMEA_Output/AP_NMEA_Output.cpp
     GOBJECT(nmea, "NMEA_",   AP_NMEA_Output),
+#endif
+
+#ifdef HAL_PERIPH_ENABLE_ROBOTISSERVO
+    // @Param: ROBOTIS_BAUD
+    // @DisplayName: RobotisServo serial baudrate
+    // @Description: RobotisServo serial baudrate.
+    // @Values: 1:1200,2:2400,4:4800,9:9600,19:19200,38:38400,57:57600,111:111100,115:115200,230:230400,256:256000,460:460800,500:500000,921:921600,1500:1500000
+    // @Increment: 1
+    // @User: Advanced
+    // @RebootRequired: True
+    GSCALAR(robotisservo_baud, "ROBOTIS_BAUD", AP_PERIPH_ROBOTISSERVO_BAUDRATE_DEFAULT),
+
+    // @Param: ROBOTIS_PORT
+    // @DisplayName: RobotisServo serial port
+    // @Description: RobotisServo serial port.
+    // @Values: -1 10
+    // @Increment: 1
+    // @User: Standard
+    // @RebootRequired: True
+    GSCALAR(robotisservo_port, "ROBOTIS_PORT", AP_PERIPH_ROBOTISSERVO_PORT_DEFAULT),
 #endif
 
     AP_VAREND
